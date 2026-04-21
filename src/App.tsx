@@ -30,12 +30,31 @@ import {
   saveChunkBounds,
   saveCompletedRound,
   type ChapterPersisted,
+  type StoredChunkRound,
 } from "@/lib/socratic-db";
 
 import "./index.css";
 
 function isSettingsReady(s: UserSettings): boolean {
   return Boolean(s.apiBaseUrl.trim() && s.apiKey.trim());
+}
+
+type PersistedHistorySegment = {
+  chunkIndex: number;
+  passage: string;
+  rounds: StoredChunkRound[];
+};
+
+function buildPersistedHistory(chapterText: string, record: ChapterPersisted): PersistedHistorySegment[] {
+  const segments: PersistedHistorySegment[] = [];
+  for (let i = 0; i < record.chunkRounds.length; i++) {
+    const rounds = record.chunkRounds[i];
+    if (!rounds?.length) continue;
+    const bounds = record.chunks[i];
+    const passage = bounds ? chapterText.slice(bounds.start, bounds.end).trim() : "";
+    segments.push({ chunkIndex: i, passage, rounds });
+  }
+  return segments;
 }
 
 export function App() {
@@ -56,6 +75,11 @@ export function App() {
     () => chapters.find(c => c.id === selectedChapterId) ?? null,
     [chapters, selectedChapterId],
   );
+
+  const persistedHistorySegments = useMemo(() => {
+    if (!persistedChapter || !selectedChapter) return [];
+    return buildPersistedHistory(selectedChapter.text, persistedChapter);
+  }, [persistedChapter, selectedChapter]);
 
   useEffect(() => {
     if (!currentBookId || !selectedChapterId) {
@@ -469,6 +493,93 @@ export function App() {
                       : null}
                     .
                   </p>
+                ) : null}
+                {persistedHistorySegments.length > 0 ? (
+                  <div className="mt-3 grid gap-2 border-t border-border/80 pt-3">
+                    <p className="text-foreground text-xs font-medium">Saved Q&amp;A history</p>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Completed sessions for this chapter are collapsed below. Expand a segment to review questions,
+                      your answers, and feedback.
+                    </p>
+                    <div className="grid gap-2">
+                      {persistedHistorySegments.map(({ chunkIndex, passage, rounds }) => (
+                        <details
+                          key={chunkIndex}
+                          className="group rounded-lg border border-border/80 bg-muted/20 open:bg-muted/30"
+                        >
+                          <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium leading-snug outline-none marker:hidden [&::-webkit-details-marker]:hidden">
+                            <span className="text-muted-foreground mr-1.5 select-none group-open:hidden">▸</span>
+                            <span className="text-muted-foreground mr-1.5 select-none hidden group-open:inline">▾</span>
+                            Segment {chunkIndex + 1}
+                            <span className="text-muted-foreground font-normal">
+                              {" "}
+                              · {rounds.length} completed session{rounds.length === 1 ? "" : "s"}
+                            </span>
+                          </summary>
+                          <div className="grid gap-4 border-t border-border/60 px-3 pb-3 pt-3">
+                            {passage ? (
+                              <div>
+                                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                  Passage for this segment
+                                </p>
+                                <div className="bg-muted/40 mt-1.5 max-h-48 overflow-y-auto rounded-md border border-border/60 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                                  {passage}
+                                </div>
+                              </div>
+                            ) : null}
+                            {rounds.map((round, roundIdx) => (
+                              <div
+                                key={roundIdx}
+                                className={`grid gap-3${roundIdx > 0 ? " border-t border-border/60 pt-4" : ""}`}
+                              >
+                                <p className="text-muted-foreground text-xs font-medium">
+                                  Session {roundIdx + 1} of {rounds.length}
+                                </p>
+                                <div>
+                                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Question
+                                  </p>
+                                  <p className="mt-1 text-sm leading-relaxed">{round.question}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Your answer
+                                  </p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{round.userAnswer}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Reference (model) answer
+                                  </p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
+                                    {round.correctAnswer}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Analysis vs. the text
+                                  </p>
+                                  <div className="prose prose-sm dark:prose-invert mt-1 max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                                    {round.passageGroundedAnalysis}
+                                  </div>
+                                </div>
+                                {round.llmOpinion ? (
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                      Socratus&apos;s own view
+                                    </p>
+                                    <div className="prose prose-sm dark:prose-invert mt-1 max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                                      {round.llmOpinion}
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
                 ) : null}
               </div>
             ) : null}
