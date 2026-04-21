@@ -160,11 +160,18 @@ export function App() {
         question: session.currentQA.question,
         correctAnswer: session.currentQA.correctAnswer,
         userAnswer: answer,
+        passage: session.currentBlock,
+        includeLlmOpinion: settings.includeLlmOpinion,
       });
 
       setSession({
         ...session,
-        phase: { kind: "show_passage", passage: session.currentBlock, feedback },
+        phase: {
+          kind: "show_passage",
+          passage: session.currentBlock,
+          passageGroundedAnalysis: feedback.passageGroundedAnalysis,
+          llmOpinion: feedback.llmOpinion,
+        },
       });
       setUserAnswer("");
     } catch (e) {
@@ -257,6 +264,25 @@ export function App() {
                 onChange={e => persistSettings({ ...settings, model: e.target.value })}
               />
             </div>
+            <div className="flex items-start gap-3 rounded-lg border border-border/80 bg-muted/30 p-3">
+              <input
+                id="llm-opinion"
+                type="checkbox"
+                className="mt-1 size-4 shrink-0 rounded border-input accent-primary"
+                checked={settings.includeLlmOpinion}
+                onChange={e => persistSettings({ ...settings, includeLlmOpinion: e.target.checked })}
+              />
+              <div className="grid gap-1">
+                <Label htmlFor="llm-opinion" className="font-medium leading-snug">
+                  Include tutor&apos;s own opinion
+                </Label>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  When enabled, feedback adds a <strong className="text-foreground font-medium">separate</strong> section
+                  with the model&apos;s personal or pedagogical view. The main analysis stays grounded in the book
+                  passage only.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -342,7 +368,7 @@ export function App() {
                     ? "Finding the next reading segment…"
                     : phase.kind === "loading_qa"
                       ? "Writing a comprehension question…"
-                      : "Reviewing your answer…"}
+                      : "Analyzing your answer…"}
                 </div>
               ) : null}
 
@@ -376,11 +402,24 @@ export function App() {
 
               {phase?.kind === "show_passage" ? (
                 <div className="grid gap-4">
-                  {phase.feedback ? (
-                    <div>
-                      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Feedback</p>
-                      <div className="prose prose-sm dark:prose-invert mt-1 max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                        {phase.feedback}
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      Analysis vs. the text
+                    </p>
+                    <div className="prose prose-sm dark:prose-invert mt-1 max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                      {phase.passageGroundedAnalysis}
+                    </div>
+                  </div>
+                  {phase.llmOpinion ? (
+                    <div className="border-t pt-4">
+                      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                        Tutor&apos;s own view
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs italic">
+                        Optional perspective you enabled in settings—not a substitute for what the passage says.
+                      </p>
+                      <div className="prose prose-sm dark:prose-invert mt-2 max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                        {phase.llmOpinion}
                       </div>
                     </div>
                   ) : null}
