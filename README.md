@@ -6,7 +6,7 @@ AI-assisted **educational reading** helper. It runs **entirely in the browser**:
 
 - EPUB upload and text extraction along the **spine** (typical chapter order)
 - Chapter picker
-- For each segment: model finds a **logical block** → generates **one Q&A pair** → asks you → **compares your answer** to the model answer → shows the **passage**
+- For each segment: model finds a **logical block** → generates **one Q&A pair** → asks you → **analysis vs. the book text** (sense, alignment and gaps). Optionally a **separate tutor opinion** (Settings) → shows the **passage**
 
 ## Develop
 
