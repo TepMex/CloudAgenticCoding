@@ -25,9 +25,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Project pages are served from /<repo>/, so hashed assets must use
+      # /<repo>/socratic/ — not /socratic/ (that resolves to the org/user site root).
       - name: Build
         env:
-          GH_PAGES_PUBLIC_PATH: /socratic/
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/socratic/
         run: bun run build
 
       - name: Prepare GitHub Pages site (app at /socratic/)

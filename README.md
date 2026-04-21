@@ -23,15 +23,15 @@ Open the URL printed by Bun (local assets use relative paths).
 bun run build
 ```
 
-For the same asset paths as **GitHub Pages** (`/socratic/`):
+For the same asset paths as **GitHub Pages** on a **project site** (repo `my-repo` → `/my-repo/socratic/`):
 
 ```bash
-GH_PAGES_PUBLIC_PATH=/socratic/ bun run build
+GH_PAGES_PUBLIC_PATH=/my-repo/socratic/ bun run build
 ```
 
 ## GitHub Pages
 
-On push to `master`, CI builds with `GH_PAGES_PUBLIC_PATH=/socratic/` and deploys to `gh-pages` so the app is available at:
+On push to `master`, CI builds with `GH_PAGES_PUBLIC_PATH=/<repository>/socratic/` (from the workflow) and deploys to `gh-pages` so the app is available at:
 
 `https://<owner>.github.io/<repository>/socratic/`
 
