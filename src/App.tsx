@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Loader2, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,15 @@ import {
   initialSessionState,
   type SessionState,
 } from "@/lib/socratic";
+import {
+  deleteChapterRecord,
+  loadChapterRecord,
+  makeBookPersistenceId,
+  nextPersistedChunkIndex,
+  saveChunkBounds,
+  saveCompletedRound,
+  type ChapterPersisted,
+} from "@/lib/socratic-db";
 
 import "./index.css";
 
@@ -37,6 +46,8 @@ export function App() {
   const [selectedChapterId, setSelectedChapterId] = useState<string>("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [currentBookId, setCurrentBookId] = useState<string | null>(null);
+  const [persistedChapter, setPersistedChapter] = useState<ChapterPersisted | null>(null);
 
   const [session, setSession] = useState<SessionState | null>(null);
   const [userAnswer, setUserAnswer] = useState("");
@@ -45,6 +56,20 @@ export function App() {
     () => chapters.find(c => c.id === selectedChapterId) ?? null,
     [chapters, selectedChapterId],
   );
+
+  useEffect(() => {
+    if (!currentBookId || !selectedChapterId) {
+      setPersistedChapter(null);
+      return;
+    }
+    let cancelled = false;
+    void loadChapterRecord(currentBookId, selectedChapterId).then(rec => {
+      if (!cancelled) setPersistedChapter(rec);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentBookId, selectedChapterId]);
 
   const persistSettings = useCallback((next: UserSettings) => {
     setSettings(next);
@@ -58,6 +83,7 @@ export function App() {
     setChapters([]);
     setSelectedChapterId("");
     setSession(null);
+    setCurrentBookId(makeBookPersistenceId(file.name, file.size));
     setBookTitle(file.name.replace(/\.epub$/i, ""));
     try {
       const list = await parseEpub(file);
@@ -83,6 +109,44 @@ export function App() {
 
       try {
         setSession({ ...base, phase: { kind: "loading_block" } });
+        const p = base.persistence;
+
+        if (p) {
+          const record = await loadChapterRecord(p.bookId, p.chapterId);
+          const reuseIdx = nextPersistedChunkIndex(record);
+          if (record && reuseIdx < record.chunks.length) {
+            const bounds = record.chunks[reuseIdx];
+            if (bounds) {
+              const block = base.chapterText.slice(bounds.start, bounds.end).trim();
+              if (block) {
+                setSession({
+                  ...base,
+                  phase: { kind: "loading_qa" },
+                  currentBlock: block,
+                  persistence: { ...p, chunkIndex: reuseIdx },
+                });
+
+                const qa = await generateQA({
+                  baseUrl: apiBaseUrl,
+                  apiKey,
+                  model,
+                  passage: block,
+                });
+
+                setSession({
+                  ...base,
+                  phase: { kind: "llm_question", question: qa.question },
+                  currentBlock: block,
+                  currentQA: qa,
+                  pendingNextCursor: bounds.end,
+                  persistence: { ...p, chunkIndex: reuseIdx },
+                });
+                return;
+              }
+            }
+          }
+        }
+
         const { block, nextCursor } = await detectBlockEnd({
           baseUrl: apiBaseUrl,
           apiKey,
@@ -99,10 +163,21 @@ export function App() {
           return;
         }
 
+        let chunkIndexForSession = 0;
+        if (p) {
+          const recordAfter = await loadChapterRecord(p.bookId, p.chapterId);
+          chunkIndexForSession = recordAfter?.chunks.length ?? 0;
+          await saveChunkBounds(p.bookId, p.chapterId, chunkIndexForSession, {
+            start: base.cursor,
+            end: nextCursor,
+          });
+        }
+
         setSession({
           ...base,
           phase: { kind: "loading_qa" },
           currentBlock: block,
+          persistence: p ? { ...p, chunkIndex: chunkIndexForSession } : null,
         });
 
         const qa = await generateQA({
@@ -118,6 +193,7 @@ export function App() {
           currentBlock: block,
           currentQA: qa,
           pendingNextCursor: nextCursor,
+          persistence: p ? { ...p, chunkIndex: chunkIndexForSession } : null,
         });
       } catch (e) {
         setSession({
@@ -131,7 +207,11 @@ export function App() {
 
   const startSession = () => {
     if (!selectedChapter) return;
-    void runBlockPipeline(initialSessionState(selectedChapter.text));
+    const persistence =
+      currentBookId !== null
+        ? { bookId: currentBookId, chapterId: selectedChapter.id, chunkIndex: 0 }
+        : null;
+    void runBlockPipeline(initialSessionState(selectedChapter.text, persistence));
   };
 
   const pipelineLoading =
@@ -163,6 +243,18 @@ export function App() {
         passage: session.currentBlock,
         includeLlmOpinion: settings.includeLlmOpinion,
       });
+
+      const persist = session.persistence;
+      if (persist && session.currentQA) {
+        await saveCompletedRound(persist.bookId, persist.chapterId, persist.chunkIndex, {
+          question: session.currentQA.question,
+          correctAnswer: session.currentQA.correctAnswer,
+          userAnswer: answer,
+          passageGroundedAnalysis: feedback.passageGroundedAnalysis,
+          llmOpinion: feedback.llmOpinion,
+        });
+        void loadChapterRecord(persist.bookId, persist.chapterId).then(setPersistedChapter);
+      }
 
       setSession({
         ...session,
@@ -196,11 +288,16 @@ export function App() {
       currentBlock: null,
       currentQA: null,
       pendingNextCursor: undefined,
+      persistence: session.persistence,
     };
     void runBlockPipeline(next);
   };
 
   const resetSession = () => {
+    if (currentBookId && selectedChapterId) {
+      setPersistedChapter(null);
+      void deleteChapterRecord(currentBookId, selectedChapterId);
+    }
     setSession(null);
     setUserAnswer("");
   };
@@ -334,6 +431,16 @@ export function App() {
                   Loaded: <span className="font-medium text-foreground">{bookTitle}</span> · {chapters.length}{" "}
                   sections
                 </p>
+                {persistedChapter && persistedChapter.chunks.length > 0 ? (
+                  <p className="text-muted-foreground text-xs">
+                    Saved in this browser: {persistedChapter.chunks.length} segment
+                    {persistedChapter.chunks.length === 1 ? "" : "s"}
+                    {persistedChapter.chunkRounds.some(r => r.length > 0)
+                      ? ` · ${persistedChapter.chunkRounds.reduce((n, r) => n + r.length, 0)} completed Q/A round(s)`
+                      : null}
+                    .
+                  </p>
+                ) : null}
               </div>
             ) : null}
 

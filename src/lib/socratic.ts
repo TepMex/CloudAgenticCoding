@@ -20,6 +20,14 @@ export type SessionPhase =
   | { kind: "chapter_done" }
   | { kind: "error"; message: string };
 
+/** IndexedDB scope: same file name + byte size restores this book’s saved data */
+export type SessionPersistence = {
+  bookId: string;
+  chapterId: string;
+  /** Index into the persisted chunk list for this chapter */
+  chunkIndex: number;
+};
+
 export type SessionState = {
   chapterText: string;
   /** Start index in chapterText for the current segment */
@@ -30,6 +38,7 @@ export type SessionState = {
   currentQA: QAPair | null;
   /** After the user reads the passage, advance the cursor to this index */
   pendingNextCursor?: number;
+  persistence: SessionPersistence | null;
 };
 
 const SYSTEM_BLOCK = `You are helping segment educational reading text. Given a chapter excerpt starting at the beginning marker, return where the next coherent "logical block" ends (one idea, scene, or argument unit — not the whole chapter).
@@ -187,12 +196,16 @@ export async function compareAnswer(params: {
   return { passageGroundedAnalysis, llmOpinion };
 }
 
-export function initialSessionState(chapterText: string): SessionState {
+export function initialSessionState(
+  chapterText: string,
+  persistence: SessionPersistence | null = null,
+): SessionState {
   return {
     chapterText,
     cursor: 0,
     phase: { kind: "loading_block" },
     currentBlock: null,
     currentQA: null,
+    persistence,
   };
 }
