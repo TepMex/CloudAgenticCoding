@@ -26,11 +26,19 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build
+        env:
+          GH_PAGES_PUBLIC_PATH: /socratic/
         run: bun run build
+
+      - name: Prepare GitHub Pages site (app at /socratic/)
+        run: |
+          mkdir -p deploy/socratic
+          cp -r dist/. deploy/socratic/
+          touch deploy/.nojekyll
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./deploy
           publish_branch: gh-pages
