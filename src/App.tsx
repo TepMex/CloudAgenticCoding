@@ -17,9 +17,9 @@ import { parseEpub, type EpubChapter } from "@/lib/epub";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings";
 import {
   compareAnswer,
-  detectBlockEnd,
   generateQA,
   initialSessionState,
+  streamNextLogicalBlock,
   type SessionState,
 } from "@/lib/socratic";
 import {
@@ -98,7 +98,7 @@ export function App() {
 
   const runBlockPipeline = useCallback(
     async (base: SessionState) => {
-      const { apiBaseUrl, apiKey, model } = settings;
+      const { apiBaseUrl, apiKey, model, splitModel } = settings;
       if (!isSettingsReady(settings)) {
         setSession({
           ...base,
@@ -108,7 +108,7 @@ export function App() {
       }
 
       try {
-        setSession({ ...base, phase: { kind: "loading_block" } });
+        setSession({ ...base, phase: { kind: "loading_block", splitCharsReceived: 0, splitFirstBlockClosed: false } });
         const p = base.persistence;
 
         if (p) {
@@ -147,12 +147,25 @@ export function App() {
           }
         }
 
-        const { block, nextCursor } = await detectBlockEnd({
+        const { block, nextCursor } = await streamNextLogicalBlock({
           baseUrl: apiBaseUrl,
           apiKey,
-          model,
+          model: splitModel,
           chapterText: base.chapterText,
           cursor: base.cursor,
+          onProgress: prog => {
+            setSession(prev => {
+              if (!prev || prev.phase.kind !== "loading_block") return prev;
+              return {
+                ...prev,
+                phase: {
+                  kind: "loading_block",
+                  splitCharsReceived: prog.charsReceived,
+                  splitFirstBlockClosed: prog.firstBlockClosed,
+                },
+              };
+            });
+          },
         });
 
         if (!block.trim()) {
@@ -353,13 +366,29 @@ export function App() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="model">Model</Label>
+              <Label htmlFor="model">Model (Q&amp;A and analytics)</Label>
               <Input
                 id="model"
                 placeholder="gpt-4o-mini"
                 value={settings.model}
                 onChange={e => persistSettings({ ...settings, model: e.target.value })}
               />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Used for pre-reading questions and post-reading feedback. Use your strongest model here.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="split-model">Split model (segmentation only)</Label>
+              <Input
+                id="split-model"
+                placeholder="gpt-3.5-turbo"
+                value={settings.splitModel}
+                onChange={e => persistSettings({ ...settings, splitModel: e.target.value })}
+              />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Streams logical blocks with <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">[BLOCK_END]</code> markers.
+                A smaller model is enough and keeps runs cheaper.
+              </p>
             </div>
             <div className="flex items-start gap-3 rounded-lg border border-border/80 bg-muted/30 p-3">
               <input
@@ -472,7 +501,13 @@ export function App() {
                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2 className="size-4 animate-spin" />
                   {phase.kind === "loading_block"
-                    ? "Finding the next reading segment…"
+                    ? `Finding the next reading segment…${
+                        typeof phase.splitCharsReceived === "number" && phase.splitCharsReceived > 0
+                          ? ` (${phase.splitCharsReceived.toLocaleString()} chars from splitter${
+                              phase.splitFirstBlockClosed ? ", block closed" : ""
+                            })`
+                          : ""
+                      }`
                     : phase.kind === "loading_qa"
                       ? "Socratus is preparing a pre-reading question…"
                       : "Socratus is reflecting on your answer…"}

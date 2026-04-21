@@ -1,10 +1,10 @@
-import { chatCompletion } from "./openai";
+import { chatCompletion, chatCompletionStream } from "./openai";
 import { parseJson } from "./json";
 
 export type QAPair = { question: string; correctAnswer: string };
 
 export type SessionPhase =
-  | { kind: "loading_block" }
+  | { kind: "loading_block"; splitCharsReceived?: number; splitFirstBlockClosed?: boolean }
   | { kind: "loading_qa" }
   | { kind: "llm_question"; question: string }
   | { kind: "awaiting_user" }
@@ -12,38 +12,46 @@ export type SessionPhase =
   | {
       kind: "show_passage";
       passage: string;
-      /** Sense-based analysis tied to the book passage (what aligns, what does not) */
       passageGroundedAnalysis: string;
-      /** Optional: model’s own view, only when user enabled it in settings */
       llmOpinion: string | null;
     }
   | { kind: "chapter_done" }
   | { kind: "error"; message: string };
 
-/** IndexedDB scope: same file name + byte size restores this book’s saved data */
 export type SessionPersistence = {
   bookId: string;
   chapterId: string;
-  /** Index into the persisted chunk list for this chapter */
   chunkIndex: number;
 };
 
 export type SessionState = {
   chapterText: string;
-  /** Start index in chapterText for the current segment */
   cursor: number;
   phase: SessionPhase;
-  /** Current logical block (when known) */
   currentBlock: string | null;
   currentQA: QAPair | null;
-  /** After the user reads the passage, advance the cursor to this index */
   pendingNextCursor?: number;
   persistence: SessionPersistence | null;
 };
 
-const SYSTEM_BLOCK = `You are helping segment educational reading text. Given a chapter excerpt starting at the beginning marker, return where the next coherent "logical block" ends (one idea, scene, or argument unit — not the whole chapter).
+const BLOCK_END = "[BLOCK_END]";
 
-Respond with JSON only: {"end_offset": <number>} where end_offset is the character index (0-based) in the provided excerpt marking the LAST character to include in this block. The excerpt uses 0-based indexing. Choose a block between roughly 400 and 4000 characters when possible; prefer natural paragraph boundaries.`;
+const SPLITTER_SYSTEM =
+  "You are a text analysis assistant. Output only the processed text with [BLOCK_END] markers. No commentary or labels before or after.";
+
+const SPLITTER_USER_PREFIX = `You are analyzing a textbook chapter excerpt. Split it into logical sections where each section represents one complete idea or subtopic.
+
+Rules:
+- Read the text carefully and decide where one logical block ends and another begins
+- After completing each logical block, output the block's text followed immediately by ${BLOCK_END}
+- Do NOT add any commentary, just the original text with markers
+- Each block should be meaningful enough to generate 2-3 questions about
+- Blocks are typically 3-8 paragraphs, but can vary based on content
+- Preserve the original wording; copy the excerpt faithfully inside each block
+
+Now process this excerpt:
+
+`;
 
 const SYSTEM_QA = `You are **Socratus**, a Socratic reading guide. You see the **upcoming passage** the learner will read only **after** they answer.
 
@@ -87,49 +95,174 @@ Respond with **JSON only**:
 {"passage_grounded_analysis": "<string>", "llm_opinion": "<string>"}`;
 }
 
-function excerptFromCursor(full: string, cursor: number, maxLen = 12000): string {
-  return full.slice(cursor, cursor + maxLen);
+/** Characters of chapter text sent to the splitter per call (window for very long chapters). */
+const MAX_EXCERPT_CHARS = 48_000;
+
+export function processStreamBuffer(buffer: string): { completeBlocks: string[]; remainingBuffer: string } {
+  const completeBlocks: string[] = [];
+  let remainingBuffer = buffer;
+  let markerIndex: number;
+  while ((markerIndex = remainingBuffer.indexOf(BLOCK_END)) !== -1) {
+    const blockText = remainingBuffer.slice(0, markerIndex).trim();
+    if (blockText) completeBlocks.push(blockText);
+    remainingBuffer = remainingBuffer.slice(markerIndex + BLOCK_END.length);
+  }
+  return { completeBlocks, remainingBuffer };
 }
 
-export async function detectBlockEnd(params: {
+export function fallbackSplit(text: string, targetBlockSize = 2000): string[] {
+  const paragraphs = text.split(/\n\n+/);
+  const blocks: string[] = [];
+  let currentBlock = "";
+  for (const para of paragraphs) {
+    const next = currentBlock ? `${currentBlock}\n\n${para}` : para;
+    if (next.length > targetBlockSize && currentBlock) {
+      blocks.push(currentBlock);
+      currentBlock = para;
+    } else {
+      currentBlock = next;
+    }
+  }
+  if (currentBlock.trim()) blocks.push(currentBlock.trim());
+  return blocks;
+}
+
+function findBlockSpanInExcerpt(excerpt: string, modelBlock: string, searchFrom: number): { start: number; end: number } | null {
+  const raw = modelBlock.trim();
+  if (!raw) return null;
+
+  let start = excerpt.indexOf(raw, searchFrom);
+  if (start !== -1) {
+    return { start, end: start + raw.length };
+  }
+
+  const headLen = Math.min(200, raw.length);
+  const head = raw.slice(0, headLen);
+  start = excerpt.indexOf(head, searchFrom);
+  if (start !== -1) {
+    const end = Math.min(excerpt.length, start + raw.length);
+    return { start, end };
+  }
+
+  return null;
+}
+
+function mapModelBlockToChapterRange(
+  chapterText: string,
+  cursor: number,
+  excerpt: string,
+  modelBlock: string,
+): { block: string; nextCursor: number } {
+  const span = findBlockSpanInExcerpt(excerpt, modelBlock, 0);
+  if (span) {
+    const block = chapterText.slice(cursor + span.start, cursor + span.end).trim();
+    if (block) {
+      return { block, nextCursor: cursor + span.end };
+    }
+  }
+
+  const fb = fallbackSplit(excerpt, 2000)[0]?.trim();
+  if (fb) {
+    const idx = excerpt.indexOf(fb);
+    if (idx !== -1) {
+      return {
+        block: chapterText.slice(cursor + idx, cursor + idx + fb.length).trim(),
+        nextCursor: cursor + idx + fb.length,
+      };
+    }
+    return { block: fb, nextCursor: cursor + Math.min(fb.length, excerpt.length) };
+  }
+
+  return { block: excerpt.trim(), nextCursor: cursor + excerpt.length };
+}
+
+export type ChapterSplitProgress = {
+  /** Delta text received from the model (including markers) for the current split call */
+  charsReceived: number;
+  /** True once the first [BLOCK_END] closed */
+  firstBlockClosed: boolean;
+};
+
+/**
+ * Streams the splitter model until the first complete logical block (marker) or the stream ends,
+ * then maps that block to a range in `chapterText` so persistence stays aligned with the book.
+ */
+export async function streamNextLogicalBlock(params: {
   baseUrl: string;
   apiKey: string;
   model: string;
   chapterText: string;
   cursor: number;
+  onProgress?: (p: ChapterSplitProgress) => void;
 }): Promise<{ block: string; nextCursor: number }> {
-  const { baseUrl, apiKey, model, chapterText, cursor } = params;
+  const { baseUrl, apiKey, model, chapterText, cursor, onProgress } = params;
+
   if (cursor >= chapterText.length) {
     return { block: "", nextCursor: cursor };
   }
 
-  const excerpt = excerptFromCursor(chapterText, cursor);
-  const user = `Excerpt (characters 0..${excerpt.length - 1} of this slice only):\n\n${excerpt}`;
-
-  const raw = await chatCompletion({
-    baseUrl,
-    apiKey,
-    model,
-    messages: [
-      { role: "system", content: SYSTEM_BLOCK },
-      { role: "user", content: user },
-    ],
-    temperature: 0.2,
-  });
-
-  const parsed = parseJson<{ end_offset?: number }>(raw);
-  const end = typeof parsed.end_offset === "number" ? parsed.end_offset : Number.NaN;
-  if (!Number.isFinite(end) || end < 0) {
-    throw new Error("Model returned invalid end_offset");
+  const excerpt = chapterText.slice(cursor, cursor + MAX_EXCERPT_CHARS);
+  if (!excerpt.trim()) {
+    return { block: "", nextCursor: chapterText.length };
   }
 
-  const clampedEnd = Math.min(Math.max(end, 0), excerpt.length - 1);
-  const block = excerpt.slice(0, clampedEnd + 1).trim();
-  if (!block) {
+  const controller = new AbortController();
+  let buffer = "";
+  let firstRaw: string | null = null;
+  let received = 0;
+
+  try {
+    for await (const piece of chatCompletionStream({
+      baseUrl,
+      apiKey,
+      model,
+      messages: [
+        { role: "system", content: SPLITTER_SYSTEM },
+        { role: "user", content: SPLITTER_USER_PREFIX + excerpt },
+      ],
+      temperature: 0.3,
+      signal: controller.signal,
+    })) {
+      received += piece.length;
+      buffer += piece;
+      const { completeBlocks, remainingBuffer } = processStreamBuffer(buffer);
+      buffer = remainingBuffer;
+      onProgress?.({ charsReceived: received, firstBlockClosed: false });
+      if (completeBlocks.length > 0) {
+        firstRaw = completeBlocks[0] ?? null;
+        controller.abort();
+        onProgress?.({ charsReceived: received, firstBlockClosed: true });
+        break;
+      }
+    }
+  } catch (e) {
+    const aborted =
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && e.name === "AbortError");
+    if (!aborted) {
+      throw e;
+    }
+  }
+
+  if (firstRaw === null) {
+    const { completeBlocks, remainingBuffer } = processStreamBuffer(buffer);
+    if (completeBlocks.length > 0) {
+      firstRaw = completeBlocks[0] ?? null;
+      buffer = remainingBuffer;
+    }
+  }
+
+  let rawBlock = firstRaw?.trim() ?? buffer.trim();
+  if (!rawBlock) {
+    const fb = fallbackSplit(excerpt, 2000);
+    rawBlock = fb[0] ?? excerpt.slice(0, Math.min(2000, excerpt.length));
+  }
+
+  const { block, nextCursor } = mapModelBlockToChapterRange(chapterText, cursor, excerpt, rawBlock);
+  if (!block.trim()) {
     throw new Error("Empty logical block from model");
   }
 
-  const nextCursor = cursor + clampedEnd + 1;
   return { block, nextCursor };
 }
 
