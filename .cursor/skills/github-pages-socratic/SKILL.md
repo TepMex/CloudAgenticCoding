@@ -10,7 +10,7 @@ The site is published from the `gh-pages` branch. The app lives under **`/socrat
 ## How it works
 
 1. **Build**: `bun run build` runs `build.ts` with `public-path` from the env var `GH_PAGES_PUBLIC_PATH` (defaults to `./` for local builds).
-2. **CI** (`.github/workflows/deploy.yml`): sets `GH_PAGES_PUBLIC_PATH=/socratic/` so hashed JS/CSS URLs in `index.html` are absolute under `/socratic/`.
+2. **CI** (`.github/workflows/deploy.yml`): sets `GH_PAGES_PUBLIC_PATH` to `/<repository>/socratic/` (via `github.event.repository.name`) so hashed JS/CSS URLs resolve under the **project site** root, not `/socratic/` at the org/user site root.
 3. **Deploy layout**: the workflow copies `dist/*` into `deploy/socratic/` and adds `deploy/.nojekyll`, then publishes **`deploy`** as the site root. Resulting URLs: `https://<user>.github.io/<repo>/socratic/`.
 
 ## Commands
@@ -19,8 +19,8 @@ The site is published from the `gh-pages` branch. The app lives under **`/socrat
 # Local dev (assets at ./)
 bun dev
 
-# Production-like build matching GitHub Pages
-GH_PAGES_PUBLIC_PATH=/socratic/ bun run build
+# Production-like build matching GitHub Pages (replace my-repo with your repo name)
+GH_PAGES_PUBLIC_PATH=/my-repo/socratic/ bun run build
 ```
 
 ## Changing the subfolder
