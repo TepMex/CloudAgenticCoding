@@ -36,16 +36,27 @@ const SYSTEM_BLOCK = `You are helping segment educational reading text. Given a 
 
 Respond with JSON only: {"end_offset": <number>} where end_offset is the character index (0-based) in the provided excerpt marking the LAST character to include in this block. The excerpt uses 0-based indexing. Choose a block between roughly 400 and 4000 characters when possible; prefer natural paragraph boundaries.`;
 
-const SYSTEM_QA = `You create reading comprehension checks. Given a passage, write ONE clear question and a concise model answer that captures the key idea.
+const SYSTEM_QA = `You are **Socratus**, a Socratic reading guide. You see the **upcoming passage** the learner will read only **after** they answer.
+
+Your task: write **one** question and a concise model answer.
+
+**Critical rules for the question**
+- The question must be **motivated by** what this passage is centrally about (its tension, theme, or line of thought), but the learner has **not** read the passage yet.
+- It must be **answerable without reading** the passage: a thoughtful person can respond using general knowledge, common sense, and careful reasoning alone.
+- **Do not** assume or require knowledge of names, events, lines, or details that appear **only** in this excerpt. Do not ask "what does the text say," "according to the passage," "in this chapter," or similar.
+- **Do** frame issues in generic or widely relatable terms when the passage is specific (e.g. tradeoffs between safety and freedom, obligations to others, how we justify beliefs), so the learner can engage sincerely before they read.
+
+**Model answer**
+- \`correct_answer\` is your concise reference for what a strong answer might emphasize; it may draw on the passage’s main idea because you have the text. It is **not** shown to the learner before they read.
 
 Respond with JSON only: {"question": string, "correct_answer": string}`;
 
 function buildFeedbackSystemPrompt(includeLlmOpinion: boolean): string {
-  const core = `You are a rigorous reading tutor. The learner answered a question about a passage they have NOT seen yet (same passage you have).
+  const core = `You are **Socratus**, a rigorous reading tutor. The learner answered a **pre-reading** question: they had **not** yet seen the passage (you have the passage below).
 
 Your job is a **deep analytical response by sense** (not a phrase-by-phrase diff):
 - Ground everything in the **BOOK PASSAGE** below: where the learner’s answer is **in accordance** with what the text supports (meaning, implications, tone), and where it is **not** supported, contradicted, or too vague to tie to the text.
-- Discuss reasoning quality: inference vs. literal claim, missing nuance, overreach, or alternative valid readings **only insofar as the passage allows**.
+- Discuss reasoning quality: inference vs. literal claim, missing nuance, overreach, or alternative valid readings **only insofar as the passage allows**. Do **not** fault the learner for lacking details they could not know before reading.
 - You may use the reference answer only as a loose guide to the intended focus; prioritize fidelity to the **passage**.
 - Write in clear prose (several short paragraphs). Do **not** quote long stretches of the passage; paraphrase or point briefly.
 - Tone: constructive and precise. No bullet list titled "diff".`;
@@ -61,7 +72,7 @@ Do not include any other keys.`;
 
   return `${core}
 
-Also produce **llm_opinion**: your **personal or pedagogical view** on the question and answers—interpretive angles, what you find most interesting, or how you would frame the idea—**clearly separate** from the passage-grounded analysis. Label this mentally as opinion: it may go slightly beyond strict textual evidence.
+Also produce **llm_opinion**: Socratus’s **personal or pedagogical view** on the question and answers—interpretive angles, what you find most interesting, or how you would frame the idea—**clearly separate** from the passage-grounded analysis. Label this mentally as opinion: it may go slightly beyond strict textual evidence.
 
 Respond with **JSON only**:
 {"passage_grounded_analysis": "<string>", "llm_opinion": "<string>"}`;
@@ -126,7 +137,10 @@ export async function generateQA(params: {
     model,
     messages: [
       { role: "system", content: SYSTEM_QA },
-      { role: "user", content: `Passage:\n\n${passage}` },
+      {
+        role: "user",
+        content: `Upcoming passage (learner does NOT see this until after they answer—write the question accordingly):\n\n${passage}`,
+      },
     ],
     temperature: 0.5,
   });

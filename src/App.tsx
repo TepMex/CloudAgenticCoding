@@ -213,9 +213,9 @@ export function App() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Socratic Reading Agent</h1>
           <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-relaxed">
-            An AI-assisted helper for educational reading. Runs entirely in your browser: bring your own API key and
-            OpenAI-compatible endpoint. Upload an EPUB, pick a chapter, and work through guided questions before
-            revealing each passage.
+            <span className="font-medium text-foreground">Socratus</span> is your reading tutor—an AI-assisted helper
+            that runs entirely in your browser. Bring your own API key and OpenAI-compatible endpoint, upload an EPUB,
+            pick a chapter, and answer Socratus&apos;s questions <em>before</em> each passage is revealed.
           </p>
         </div>
         <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setSettingsOpen(o => !o)}>
@@ -274,12 +274,12 @@ export function App() {
               />
               <div className="grid gap-1">
                 <Label htmlFor="llm-opinion" className="font-medium leading-snug">
-                  Include tutor&apos;s own opinion
+                  Include Socratus&apos;s own opinion
                 </Label>
                 <p className="text-muted-foreground text-xs leading-relaxed">
                   When enabled, feedback adds a <strong className="text-foreground font-medium">separate</strong> section
-                  with the model&apos;s personal or pedagogical view. The main analysis stays grounded in the book
-                  passage only.
+                  with Socratus&apos;s personal or pedagogical view. The main analysis stays grounded in the book passage
+                  only.
                 </p>
               </div>
             </div>
@@ -354,11 +354,11 @@ export function App() {
         {session ? (
           <Card>
             <CardHeader>
-              <CardTitle>Reading session</CardTitle>
-              <CardDescription>
-                {selectedChapter?.title ?? "Chapter"} · position {Math.min(session.cursor, session.chapterText.length)} /{" "}
-                {session.chapterText.length} characters
-              </CardDescription>
+            <CardTitle>Session with Socratus</CardTitle>
+            <CardDescription>
+              {selectedChapter?.title ?? "Chapter"} · position {Math.min(session.cursor, session.chapterText.length)} /{" "}
+              {session.chapterText.length} characters
+            </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               {phase?.kind === "loading_block" || phase?.kind === "loading_qa" || phase?.kind === "loading_feedback" ? (
@@ -367,8 +367,8 @@ export function App() {
                   {phase.kind === "loading_block"
                     ? "Finding the next reading segment…"
                     : phase.kind === "loading_qa"
-                      ? "Writing a comprehension question…"
-                      : "Analyzing your answer…"}
+                      ? "Socratus is preparing a pre-reading question…"
+                      : "Socratus is reflecting on your answer…"}
                 </div>
               ) : null}
 
@@ -381,8 +381,11 @@ export function App() {
               {phase?.kind === "llm_question" ? (
                 <div className="grid gap-3">
                   <div>
-                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Question</p>
-                    <p className="mt-1 text-base leading-relaxed">{phase.question}</p>
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Socratus</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      Answer from your own reasoning—you have not seen this passage yet.
+                    </p>
+                    <p className="mt-2 text-base leading-relaxed">{phase.question}</p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="answer">Your answer</Label>
@@ -413,7 +416,7 @@ export function App() {
                   {phase.llmOpinion ? (
                     <div className="border-t pt-4">
                       <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                        Tutor&apos;s own view
+                        Socratus&apos;s own view
                       </p>
                       <p className="text-muted-foreground mt-1 text-xs italic">
                         Optional perspective you enabled in settings—not a substitute for what the passage says.
