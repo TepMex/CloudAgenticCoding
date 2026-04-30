@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 import plugin from "bun-plugin-tailwind";
 import { existsSync } from "fs";
-import { rm } from "fs/promises";
+import { copyFile, readdir, readFile, rm, unlink, writeFile } from "fs/promises";
 import path from "path";
+
+/** Static assets not pulled in by the HTML/JS bundle (PWA icons are emitted by the bundler). */
+const STATIC_ASSETS = ["logo.svg", "manifest.webmanifest", "sw.js"] as const;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
@@ -145,5 +148,59 @@ const outputTable = result.outputs.map(output => ({
 
 console.table(outputTable);
 const buildTime = (end - start).toFixed(2);
+
+/** Bun may emit hashed filenames for referenced PNGs; keep manifest icons in sync. */
+async function linkPwaIconsInManifests(
+  outDir: string,
+  outputs: typeof result.outputs,
+): Promise<void> {
+  const hashedByPlain = new Map<string, string>();
+  for (const o of outputs) {
+    const bn = path.basename(o.path);
+    if (bn.startsWith("pwa-icon-192") && bn.endsWith(".png")) hashedByPlain.set("pwa-icon-192.png", bn);
+    if (bn.startsWith("pwa-icon-512") && bn.endsWith(".png")) hashedByPlain.set("pwa-icon-512.png", bn);
+  }
+  if (hashedByPlain.size === 0) return;
+
+  for (const f of await readdir(outDir)) {
+    if (!f.endsWith(".webmanifest")) continue;
+    const p = path.join(outDir, f);
+    const manifest = JSON.parse(await readFile(p, "utf8")) as { icons?: { src: string }[] };
+    if (!manifest.icons?.length) continue;
+    let changed = false;
+    for (const icon of manifest.icons) {
+      const base = path.basename((icon.src.split("?")[0] ?? icon.src).replace(/^\.\//, ""));
+      const hashed = hashedByPlain.get(base);
+      if (hashed) {
+        const next = `./${hashed}`;
+        if (icon.src !== next) {
+          icon.src = next;
+          changed = true;
+        }
+      }
+    }
+    if (changed) await writeFile(p, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  }
+
+  for (const [plain, hashed] of hashedByPlain) {
+    if (plain === hashed) continue;
+    const plainPath = path.join(outDir, plain);
+    if (existsSync(plainPath)) {
+      await unlink(plainPath);
+      console.log(`🗑️ Removed duplicate icon copy: ${path.relative(process.cwd(), plainPath)}`);
+    }
+  }
+}
+
+for (const name of STATIC_ASSETS) {
+  const from = path.join(process.cwd(), "src", name);
+  const to = path.join(outdir, name);
+  if (existsSync(from)) {
+    await copyFile(from, to);
+    console.log(`📎 Copied static asset: ${path.relative(process.cwd(), to)}`);
+  }
+}
+
+await linkPwaIconsInManifests(outdir, result.outputs);
 
 console.log(`\n✅ Build completed in ${buildTime}ms\n`);
