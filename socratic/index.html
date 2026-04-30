@@ -3,10 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1e405a" />
+    <meta name="description" content="Read EPUBs with a Socratic guide: passages, questions, and feedback." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Socratus" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="apple-touch-icon" href="/CloudAgenticCoding/socratic/pwa-icon-192-dwbq5m54.png" />
+    <link rel="preload" href="/CloudAgenticCoding/socratic/pwa-icon-512-kjs141y8.png" as="image" />
+    <link rel="manifest" href="/CloudAgenticCoding/socratic/manifest-2vkj4crn.webmanifest" />
     <title>Socratus · Socratic Reading Agent</title>
     
-  <link rel="stylesheet" crossorigin href="/CloudAgenticCoding/socratic/chunk-k13hkj5t.css"><script type="module" crossorigin src="/CloudAgenticCoding/socratic/chunk-0bpb1q7r.js"></script></head>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register(new URL("./sw.js", document.baseURI));
+        });
+      }
+    </script>
+  <link rel="stylesheet" crossorigin href="/CloudAgenticCoding/socratic/chunk-k13hkj5t.css"><script type="module" crossorigin src="/CloudAgenticCoding/socratic/chunk-ypv0wzk4.js"></script></head>
   <body>
     <div id="root"></div>
   </body>

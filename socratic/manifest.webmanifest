@@ -1,0 +1,25 @@
+{
+  "name": "Socratus · Socratic Reading Agent",
+  "short_name": "Socratus",
+  "description": "Read EPUBs with a Socratic guide: passages, questions, and feedback.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#1e405a",
+  "background_color": "#1e405a",
+  "icons": [
+    {
+      "src": "./pwa-icon-192-dwbq5m54.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-icon-512-kjs141y8.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
