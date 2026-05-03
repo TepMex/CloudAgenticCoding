@@ -5,7 +5,7 @@ import { copyFile, readdir, readFile, rm, unlink, writeFile } from "fs/promises"
 import path from "path";
 
 /** Static assets not pulled in by the HTML/JS bundle (PWA icons are emitted by the bundler). */
-const STATIC_ASSETS = ["logo.svg", "manifest.webmanifest", "sw.js"] as const;
+const STATIC_ASSETS = ["logo.svg", "bg-pattern.svg", "manifest.webmanifest", "sw.js"] as const;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
