@@ -10,13 +10,13 @@
   "background_color": "#1e405a",
   "icons": [
     {
-      "src": "./pwa-icon-192-dwbq5m54.png",
+      "src": "./pwa-icon-192-wk5j0x71.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./pwa-icon-512-kjs141y8.png",
+      "src": "./pwa-icon-512-kn63kr0y.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
