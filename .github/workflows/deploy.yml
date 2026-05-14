@@ -22,22 +22,33 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: Install dependencies (socratus)
         working-directory: socratus
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (mandarin-koan)
+        working-directory: mandarin-koan
+        run: bun install --frozen-lockfile
+
       # Project pages are served from /<repo>/, so hashed assets must use
-      # /<repo>/socratus/ — not /socratus/ (that resolves to the org/user site root).
-      - name: Build
+      # /<repo>/<app>/ — not /<app>/ (that resolves to the org/user site root).
+      - name: Build (socratus)
         working-directory: socratus
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/socratus/
         run: bun run build
 
-      - name: Prepare GitHub Pages site (app at /socratus/)
+      - name: Build (mandarin-koan)
+        working-directory: mandarin-koan
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/mandarin-koan/
+        run: bun run build
+
+      - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus
+          mkdir -p deploy/socratus deploy/mandarin-koan
           cp -r socratus/dist/. deploy/socratus/
+          cp -r mandarin-koan/dist/. deploy/mandarin-koan/
           touch deploy/.nojekyll
 
       - name: Deploy to gh-pages

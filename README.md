@@ -4,8 +4,9 @@ This repository hosts multiple browser apps. Each app lives in its own top-level
 
 ## Apps
 
-| Folder     | Published path   | Description              |
-| ---------- | ---------------- | ------------------------ |
-| `socratus` | `/<repo>/socratus/` | Socratus · Socratic Reading Agent |
+| Folder           | Published path             | Description                        |
+| ---------------- | -------------------------- | ---------------------------------- |
+| `socratus`       | `/<repo>/socratus/`        | Socratus · Socratic Reading Agent  |
+| `mandarin-koan`  | `/<repo>/mandarin-koan/`   | Mandarin Koan                      |
 
 Develop and build from inside the app directory (see each app’s `README.md`). Deployment is configured in `.github/workflows/deploy.yml`.
