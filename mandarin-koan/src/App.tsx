@@ -21,9 +21,9 @@ type SessionPhase =
   | { kind: "error"; message: string };
 
 function verdictLabel(v: ClozeVerdict): string {
-  if (v === "correct") return "正确";
-  if (v === "synonym") return "近义词";
-  return "明显错误";
+  if (v === "correct") return "Correct";
+  if (v === "synonym") return "Synonym";
+  return "Clearly wrong";
 }
 
 function verdictStyles(v: ClozeVerdict): string {
@@ -86,7 +86,7 @@ export function App() {
   const loadStory = useCallback(async () => {
     if (!targetVocab) return;
     if (!isSettingsReady(settings)) {
-      setPhase({ kind: "error", message: "请先在设置中填写 API 地址和密钥。" });
+      setPhase({ kind: "error", message: "Fill in the API base URL and key in Settings first." });
       return;
     }
     setPhase({ kind: "loading_story" });
@@ -96,7 +96,7 @@ export function App() {
       setPhase({ kind: "story_ready" });
     } catch (e) {
       setStoryText(null);
-      setPhase({ kind: "error", message: e instanceof Error ? e.message : "生成失败" });
+      setPhase({ kind: "error", message: e instanceof Error ? e.message : "Failed to generate the story." });
     }
   }, [settings, targetVocab]);
 
@@ -111,7 +111,7 @@ export function App() {
     const g = guess.trim();
     if (!g) return;
     if (!isSettingsReady(settings)) {
-      setPhase({ kind: "error", message: "请先在设置中填写 API 地址和密钥。" });
+      setPhase({ kind: "error", message: "Fill in the API base URL and key in Settings first." });
       return;
     }
     setPhase({ kind: "loading_feedback" });
@@ -124,7 +124,7 @@ export function App() {
       });
       setPhase({ kind: "feedback_done", result });
     } catch (e) {
-      setPhase({ kind: "error", message: e instanceof Error ? e.message : "评分失败" });
+      setPhase({ kind: "error", message: e instanceof Error ? e.message : "Failed to grade your answer." });
     }
   }, [guess, phase.kind, settings, storyText, targetVocab]);
 
@@ -145,9 +145,9 @@ export function App() {
     const url = practiceUrlForVocab(v);
     try {
       await navigator.clipboard.writeText(url);
-      setCopyHint("已复制链接");
+      setCopyHint("Link copied.");
     } catch {
-      setCopyHint("复制失败，请手动复制地址栏");
+      setCopyHint("Copy failed — copy the URL from the address bar manually.");
     }
     window.setTimeout(() => setCopyHint(null), 2500);
   }, [linkVocabInput]);
@@ -166,9 +166,9 @@ export function App() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Mandarin Koan</h1>
           <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-relaxed">
-            用 LLM 生成一小段中文故事，其中一个词变成填空（___）。从带{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">#vocab/</code>{" "}
-            的链接打开时，地址栏里不会出现明文生词（使用 Base64url 编码）。
+            The model writes a short Mandarin story and turns one word into a blank (___). When you open a link with{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">#vocab/</code>
+            , the target word stays out of the address bar in plain text (Base64url-encoded fragment).
           </p>
         </div>
         <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setSettingsOpen(o => !o)}>
@@ -180,11 +180,13 @@ export function App() {
       {settingsOpen ? (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>API 与提示词</CardTitle>
+            <CardTitle>API and prompts</CardTitle>
             <CardDescription>
-              与 Socratus 相同：仅保存在本机 <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">localStorage</code>
-              。使用 OpenAI 兼容的 Base URL（例如{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">https://api.openai.com</code>）。
+              Same idea as Socratus: stored only in this browser&apos;s{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">localStorage</code>. Use an OpenAI-compatible
+              base URL (for example{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">https://api.openai.com</code>
+              ).
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -218,7 +220,7 @@ export function App() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="story-prompt">故事生成提示词（可用 {"{{VOCAB}}"} 表示隐藏词）</Label>
+              <Label htmlFor="story-prompt">Story prompt (use {"{{VOCAB}}"} for the hidden word)</Label>
               <Textarea
                 id="story-prompt"
                 rows={12}
@@ -227,11 +229,12 @@ export function App() {
                 onChange={e => persistSettings({ ...settings, storyPrompt: e.target.value })}
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
-                模型须返回 JSON：<code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{"{ \"story\": \"...___...\" }"}</code>
+                The model must return JSON:{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{"{ \"story\": \"...___...\" }"}</code>
               </p>
             </div>
             <Button type="button" variant="secondary" size="sm" className="w-fit" onClick={() => persistSettings({ ...settings, storyPrompt: DEFAULT_STORY_PROMPT })}>
-              恢复默认故事提示词
+              Reset story prompt to default
             </Button>
           </CardContent>
         </Card>
@@ -242,31 +245,31 @@ export function App() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="size-5" />
-              开始练习
+              Start practice
             </CardTitle>
-            <CardDescription>输入生词，开始或复制编码后的练习链接。</CardDescription>
+            <CardDescription>Enter a target word, start the cloze, or copy an encoded practice link.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="vocab-link">生词（可中文）</Label>
+              <Label htmlFor="vocab-link">Target word (often Chinese)</Label>
               <Input
                 id="vocab-link"
-                placeholder="例如：坚持"
+                placeholder="Type the word to practice"
                 value={linkVocabInput}
                 onChange={e => setLinkVocabInput(e.target.value)}
               />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={goPractice} disabled={!linkVocabInput.trim()}>
-                打开填空
+                Open cloze
               </Button>
               <Button type="button" variant="outline" onClick={() => void copyPracticeLink()} disabled={!linkVocabInput.trim()}>
-                复制编码链接
+                Copy encoded link
               </Button>
             </div>
             {copyHint ? <p className="text-muted-foreground text-sm">{copyHint}</p> : null}
             {!isSettingsReady(settings) ? (
-              <p className="text-amber-600 text-sm dark:text-amber-400">请打开 Settings 填写 API 后再生成故事。</p>
+              <p className="text-amber-600 text-sm dark:text-amber-400">Open Settings and add your API details before generating a story.</p>
             ) : null}
           </CardContent>
         </Card>
@@ -276,16 +279,16 @@ export function App() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <BookOpen className="size-5" />
-                填空练习
+                Cloze practice
               </CardTitle>
-              <CardDescription>当前练习词已编码在地址栏中，不在此显示。</CardDescription>
+              <CardDescription>The practice word is encoded in the URL; it is not shown here.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               {phase.kind === "error" ? (
                 <div className="grid gap-2">
                   <p className="text-destructive text-sm">{phase.message}</p>
                   <Button type="button" variant="secondary" size="sm" className="w-fit" onClick={() => void loadStory()}>
-                    重试生成
+                    Retry generation
                   </Button>
                 </div>
               ) : null}
@@ -293,13 +296,13 @@ export function App() {
               {storyBusy ? (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2 className="size-4 animate-spin" />
-                  正在生成故事…
+                  Generating story…
                 </p>
               ) : null}
 
               {showStory && storyText ? (
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">故事</p>
+                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Story</p>
                   <div className="bg-muted/40 mt-2 rounded-lg border p-4 text-lg leading-relaxed tracking-wide">
                     {storyText}
                   </div>
@@ -308,12 +311,12 @@ export function App() {
 
               {showGuessForm ? (
                 <div className="grid gap-2">
-                  <Label htmlFor="guess">你的答案</Label>
+                  <Label htmlFor="guess">Your answer</Label>
                   <Input
                     id="guess"
                     value={guess}
                     onChange={e => setGuess(e.target.value)}
-                    placeholder="填入你猜的词…"
+                    placeholder="Type the word you think fits…"
                     disabled={feedbackBusy}
                     onKeyDown={e => {
                       if (e.key === "Enter") void submitGuess();
@@ -321,10 +324,10 @@ export function App() {
                   />
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" onClick={() => void submitGuess()} disabled={!guess.trim() || feedbackBusy}>
-                      提交并获取反馈
+                      Submit and get feedback
                     </Button>
                     <Button type="button" variant="outline" onClick={resetRound} disabled={storyBusy || feedbackBusy}>
-                      换一篇故事
+                      New story
                     </Button>
                   </div>
                 </div>
@@ -333,7 +336,7 @@ export function App() {
               {feedbackBusy ? (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2 className="size-4 animate-spin" />
-                  正在评分…
+                  Grading…
                 </p>
               ) : null}
 
@@ -343,7 +346,7 @@ export function App() {
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{phase.result.feedback}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button type="button" variant="secondary" size="sm" onClick={resetRound}>
-                      再练一次（新故事）
+                      Practice again (new story)
                     </Button>
                     <Button
                       type="button"
@@ -354,7 +357,7 @@ export function App() {
                         setPhase({ kind: "story_ready" });
                       }}
                     >
-                      再猜一次
+                      Guess again
                     </Button>
                   </div>
                 </div>
@@ -364,8 +367,10 @@ export function App() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>尚未选择生词</CardTitle>
-              <CardDescription>在上方输入词并点击「打开填空」，或使用带 #vocab/ 的链接进入。</CardDescription>
+              <CardTitle>No word selected yet</CardTitle>
+              <CardDescription>
+                Enter a word above and click &quot;Open cloze&quot;, or open a link that includes <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">#vocab/</code>.
+              </CardDescription>
             </CardHeader>
           </Card>
         )}
