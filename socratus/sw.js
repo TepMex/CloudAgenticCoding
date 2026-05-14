@@ -1,7 +1,7 @@
 /**
  * Minimal offline-capable service worker. Uses network-first; caches responses
  * for same-origin GET so repeat visits work offline. scope follows install path
- * (e.g. /repo/socratic/ on GitHub Pages).
+ * (e.g. /repo/socratus/ on GitHub Pages).
  */
 const CACHE = "socratus-v1";
 
