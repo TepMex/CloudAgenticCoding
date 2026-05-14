@@ -10,7 +10,7 @@ Classify the guess into exactly one verdict:
 - "absolute_mistake": wrong meaning, wrong part of speech for the slot, nonsense, unrelated word, or a word that does not plausibly fit.
 
 Language:
-- Write "feedback" in **Mandarin Chinese** (brief, clear). For "synonym", explain how the guess differs in nuance, register, or usage from the target.
+- Write "feedback" in **English** (brief, clear). Quote or refer to Chinese words from the story or guesses as needed. For "synonym", explain how the guess differs in nuance, register, or usage from the target.
 
 Respond with **JSON only**:
 {"verdict": "correct" | "absolute_mistake" | "synonym", "feedback": "<string>"}`;
