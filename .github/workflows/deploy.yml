@@ -23,19 +23,21 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        working-directory: socratus
         run: bun install --frozen-lockfile
 
       # Project pages are served from /<repo>/, so hashed assets must use
-      # /<repo>/socratic/ — not /socratic/ (that resolves to the org/user site root).
+      # /<repo>/socratus/ — not /socratus/ (that resolves to the org/user site root).
       - name: Build
+        working-directory: socratus
         env:
-          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/socratic/
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/socratus/
         run: bun run build
 
-      - name: Prepare GitHub Pages site (app at /socratic/)
+      - name: Prepare GitHub Pages site (app at /socratus/)
         run: |
-          mkdir -p deploy/socratic
-          cp -r dist/. deploy/socratic/
+          mkdir -p deploy/socratus
+          cp -r socratus/dist/. deploy/socratus/
           touch deploy/.nojekyll
 
       - name: Deploy to gh-pages
