@@ -27,6 +27,68 @@ class AnkiVocabularyRepository(private val context: Context) {
         ContextCompat.checkSelfPermission(context, AnkiContract.READ_WRITE_PERMISSION) ==
             PackageManager.PERMISSION_GRANTED
 
+    suspend fun loadAllDeckNames(): List<String> = withContext(Dispatchers.IO) {
+        if (!hasAnkiInstalled() || !hasAnkiPermission()) {
+            return@withContext emptyList()
+        }
+        val names = LinkedHashSet<String>()
+        try {
+            context.contentResolver.query(
+                AnkiContract.DECKS_ALL_URI,
+                arrayOf(AnkiContract.DECK_NAME),
+                null,
+                null,
+                AnkiContract.DECK_NAME,
+            )?.use { c ->
+                val col = c.getColumnIndex(AnkiContract.DECK_NAME)
+                if (col < 0) return@use
+                while (c.moveToNext()) {
+                    c.getString(col)?.trim()?.takeIf { it.isNotEmpty() }?.let { names.add(it) }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Deck query failed", e)
+        }
+        names.sortedWith(String.CASE_INSENSITIVE_ORDER)
+    }
+
+    /**
+     * Field names that can appear on notes in [deckName], based on note types seen in that deck.
+     * Empty [deckName] means all note types (union of every model's fields).
+     */
+    suspend fun loadDistinctFieldNamesForDeck(deckName: String): List<String> = withContext(Dispatchers.IO) {
+        if (!hasAnkiInstalled() || !hasAnkiPermission()) {
+            return@withContext emptyList()
+        }
+        val cr = context.contentResolver
+        val models = loadModelFieldNames(cr)
+        if (deckName.isBlank()) {
+            return@withContext unionAllFieldNames(models)
+        }
+        val mids = LinkedHashSet<Long>()
+        val escaped = deckName.replace("\"", "\\\"")
+        val search = """deck:"$escaped""""
+        try {
+            cr.query(AnkiContract.NOTES_URI, arrayOf(AnkiContract.NOTE_MID), search, null, null)?.use { c ->
+                val midCol = c.getColumnIndex(AnkiContract.NOTE_MID)
+                if (midCol < 0) return@use
+                var scanned = 0
+                while (c.moveToNext() && scanned < 800 && mids.size < 80) {
+                    mids.add(c.getLong(midCol))
+                    scanned++
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Notes query for deck fields failed", e)
+        }
+        val out = LinkedHashSet<String>()
+        mids.forEach { mid -> models[mid]?.forEach { out.add(it) } }
+        if (out.isEmpty()) {
+            return@withContext unionAllFieldNames(models)
+        }
+        out.sortedWith(String.CASE_INSENSITIVE_ORDER)
+    }
+
     suspend fun loadStudyQueueVocabulary(settings: StorySettings): Result<List<String>> = withContext(Dispatchers.IO) {
         if (!hasAnkiInstalled()) {
             return@withContext Result.failure(IllegalStateException("anki_missing"))
@@ -39,32 +101,17 @@ class AnkiVocabularyRepository(private val context: Context) {
         if (models.isEmpty()) {
             Log.w(TAG, "No models returned from AnkiDroid")
         }
-        val search = buildStudyQueueSearch(settings.deckNamesCsv)
-        val projection = arrayOf(AnkiContract.NOTE_MID, AnkiContract.NOTE_FLDS)
+        val rows = if (settings.deckFieldRows.isEmpty()) {
+            listOf(StoryDeckFieldRow(deckName = "", fieldName = ""))
+        } else {
+            settings.deckFieldRows
+        }
         val words = LinkedHashSet<String>()
         try {
-            cr.query(AnkiContract.NOTES_URI, projection, search, null, null)?.use { c ->
-                val midCol = c.getColumnIndex(AnkiContract.NOTE_MID)
-                val fldsCol = c.getColumnIndex(AnkiContract.NOTE_FLDS)
-                if (midCol < 0 || fldsCol < 0) {
-                    return@use
-                }
-                var count = 0
-                while (c.moveToNext() && count < MAX_NOTES) {
-                    val mid = c.getLong(midCol)
-                    val fldsRaw = c.getString(fldsCol) ?: continue
-                    val fieldNames = models[mid] ?: emptyList()
-                    val idx = fieldIndex(settings.vocabFieldName, fieldNames)
-                    val parts = fldsRaw.split(FIELD_SEP)
-                    val raw = parts.getOrNull(idx)?.trim().orEmpty()
-                    if (raw.isNotEmpty()) {
-                        val plain = stripToPlainText(raw)
-                        if (plain.isNotBlank()) {
-                            words.add(plain)
-                        }
-                    }
-                    count++
-                }
+            for (row in rows) {
+                val deckList = if (row.deckName.isBlank()) emptyList() else listOf(row.deckName)
+                val search = buildStudyQueueSearch(deckList)
+                collectVocabularyForSearch(cr, search, models, row.fieldName, words, MAX_NOTES_PER_ROW)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Anki query failed", e)
@@ -74,6 +121,40 @@ class AnkiVocabularyRepository(private val context: Context) {
             return@withContext Result.failure(IllegalStateException("no_vocab"))
         }
         Result.success(words.toList())
+    }
+
+    private fun collectVocabularyForSearch(
+        cr: android.content.ContentResolver,
+        search: String,
+        models: Map<Long, List<String>>,
+        vocabFieldName: String,
+        words: LinkedHashSet<String>,
+        maxNotes: Int,
+    ) {
+        val projection = arrayOf(AnkiContract.NOTE_MID, AnkiContract.NOTE_FLDS)
+        var count = 0
+        cr.query(AnkiContract.NOTES_URI, projection, search, null, null)?.use { c ->
+            val midCol = c.getColumnIndex(AnkiContract.NOTE_MID)
+            val fldsCol = c.getColumnIndex(AnkiContract.NOTE_FLDS)
+            if (midCol < 0 || fldsCol < 0) {
+                return@use
+            }
+            while (c.moveToNext() && count < maxNotes) {
+                val mid = c.getLong(midCol)
+                val fldsRaw = c.getString(fldsCol) ?: continue
+                val fieldNames = models[mid] ?: emptyList()
+                val idx = fieldIndex(vocabFieldName, fieldNames)
+                val parts = fldsRaw.split(FIELD_SEP)
+                val raw = parts.getOrNull(idx)?.trim().orEmpty()
+                if (raw.isNotEmpty()) {
+                    val plain = stripToPlainText(raw)
+                    if (plain.isNotBlank()) {
+                        words.add(plain)
+                    }
+                }
+                count++
+            }
+        }
     }
 
     private fun loadModelFieldNames(cr: android.content.ContentResolver): Map<Long, List<String>> {
@@ -97,6 +178,12 @@ class AnkiVocabularyRepository(private val context: Context) {
         return map
     }
 
+    private fun unionAllFieldNames(models: Map<Long, List<String>>): List<String> {
+        val out = LinkedHashSet<String>()
+        models.values.forEach { list -> list.forEach { out.add(it) } }
+        return out.sortedWith(String.CASE_INSENSITIVE_ORDER)
+    }
+
     private fun fieldIndex(vocabFieldName: String, fieldNames: List<String>): Int {
         val target = vocabFieldName.trim()
         if (target.isEmpty()) return 0
@@ -110,15 +197,12 @@ class AnkiVocabularyRepository(private val context: Context) {
     }
 
     companion object {
-        private const val MAX_NOTES = 250
+        private const val MAX_NOTES_PER_ROW = 250
 
-        fun buildStudyQueueSearch(deckNamesCsv: String): String {
+        fun buildStudyQueueSearch(deckNames: List<String>): String {
             val queue = "(is:due OR is:learn OR is:new)"
-            val decks = deckNamesCsv.split(',')
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-            if (decks.isEmpty()) return queue
-            val deckExpr = decks.joinToString(" OR ") { name ->
+            if (deckNames.isEmpty()) return queue
+            val deckExpr = deckNames.joinToString(" OR ") { name ->
                 val escaped = name.replace("\"", "\\\"")
                 """deck:"$escaped""""
             }
