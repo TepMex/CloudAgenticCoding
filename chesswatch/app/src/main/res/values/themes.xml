@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.ChessWatch" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/cw_primary</item>
+        <item name="colorOnPrimary">@color/cw_on_primary</item>
+        <item name="colorSurface">@color/cw_surface</item>
+        <item name="android:statusBarColor">@color/cw_surface</item>
+        <item name="android:navigationBarColor">@color/cw_background</item>
+        <item name="android:colorBackground">@color/cw_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="TextAppearance.ChessWatch.Title" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.12</item>
+        <item name="android:textColor">@color/cw_primary</item>
+    </style>
+
+    <style name="TextAppearance.ChessWatch.TileTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/cw_text_primary</item>
+    </style>
+
+    <style name="TextAppearance.ChessWatch.Timer" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/cw_text_secondary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>

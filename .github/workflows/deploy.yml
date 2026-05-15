@@ -44,11 +44,26 @@ jobs:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/mandarin-koan/
         run: bun run build
 
+      - name: Setup Java (ChessWatch)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK (ChessWatch)
+        uses: android-actions/setup-android@v3
+
+      - name: Build ChessWatch APK
+        working-directory: chesswatch
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan
+          mkdir -p deploy/socratus deploy/mandarin-koan deploy/chesswatch
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
+          cp chesswatch/app/build/outputs/apk/release/app-release.apk deploy/chesswatch/chesswatch.apk
+          cp chesswatch/site/index.html deploy/chesswatch/index.html
           touch deploy/.nojekyll
 
       - name: Deploy to gh-pages

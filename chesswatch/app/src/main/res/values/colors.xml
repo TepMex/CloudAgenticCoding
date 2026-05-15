@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cw_background">#FFF8F6F2</color>
+    <color name="cw_surface">#FFFFFFFF</color>
+    <color name="cw_primary">#1E5AA8</color>
+    <color name="cw_on_primary">#FFFFFFFF</color>
+    <color name="cw_tile">#FFFFFFFF</color>
+    <color name="cw_tile_stroke">#1A1E5AA8</color>
+    <color name="cw_tile_stroke_selected">#1E5AA8</color>
+    <color name="cw_ripple">#331E5AA8</color>
+    <color name="cw_text_primary">#1A1C1E</color>
+    <color name="cw_text_secondary">#5C5F62</color>
+    <color name="ic_launcher_background">#1E5AA8</color>
+</resources>
