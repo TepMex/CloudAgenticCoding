@@ -6,7 +6,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// New versionCode every Gradle sync/build so `adb install -r` can replace the previous APK.
 val autoVersionCode = (System.currentTimeMillis() / 1000L).toInt()
 
 val localProps = Properties()
@@ -15,17 +14,36 @@ if (localPropsFile.exists()) {
     localPropsFile.inputStream().use { localProps.load(it) }
 }
 
-fun prop(name: String): String? =
+fun propLocal(name: String): String? =
     localProps.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
 
-val signingStoreFile = prop("ankidroidllm.signingStoreFile")
-val signingStorePassword = prop("ankidroidllm.signingStorePassword")
-val signingKeyAlias = prop("ankidroidllm.signingKeyAlias")
-val signingKeyPassword = prop("ankidroidllm.signingKeyPassword")
-val useCustomSigning = signingStoreFile != null &&
-    signingStorePassword != null &&
-    signingKeyAlias != null &&
-    signingKeyPassword != null
+val overrideStoreFile = propLocal("ankidroidllm.signingStoreFile")
+val overrideStorePassword = propLocal("ankidroidllm.signingStorePassword")
+val overrideKeyAlias = propLocal("ankidroidllm.signingKeyAlias")
+val overrideKeyPassword = propLocal("ankidroidllm.signingKeyPassword")
+val useOverrideSigning = overrideStoreFile != null &&
+    overrideStorePassword != null &&
+    overrideKeyAlias != null &&
+    overrideKeyPassword != null
+
+val sideloadProps = Properties()
+val sideloadPropsFile = rootProject.file("sideload-signing.properties")
+val sideloadKs = rootProject.file("sideload.keystore")
+if (!useOverrideSigning && sideloadPropsFile.exists() && sideloadKs.exists()) {
+    sideloadPropsFile.inputStream().use { sideloadProps.load(it) }
+}
+
+fun propSideload(name: String): String? =
+    sideloadProps.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+
+val useCommittedSideload = !useOverrideSigning &&
+    sideloadKs.exists() &&
+    propSideload("storeFile") != null &&
+    propSideload("storePassword") != null &&
+    propSideload("keyAlias") != null &&
+    propSideload("keyPassword") != null
+
+val useCustomSigning = useOverrideSigning || useCommittedSideload
 
 android {
     namespace = "com.tepmex.ankidroidllm"
@@ -34,10 +52,17 @@ android {
     signingConfigs {
         if (useCustomSigning) {
             create("sideload") {
-                storeFile = rootProject.file(signingStoreFile!!)
-                storePassword = signingStorePassword!!
-                keyAlias = signingKeyAlias!!
-                keyPassword = signingKeyPassword!!
+                if (useOverrideSigning) {
+                    storeFile = rootProject.file(overrideStoreFile!!)
+                    storePassword = overrideStorePassword!!
+                    keyAlias = overrideKeyAlias!!
+                    keyPassword = overrideKeyPassword!!
+                } else {
+                    storeFile = rootProject.file(propSideload("storeFile")!!)
+                    storePassword = propSideload("storePassword")!!
+                    keyAlias = propSideload("keyAlias")!!
+                    keyPassword = propSideload("keyPassword")!!
+                }
             }
         }
     }
