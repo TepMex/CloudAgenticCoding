@@ -4,6 +4,9 @@
     <string name="settings_title">Settings</string>
     <string name="action_settings">Settings</string>
     <string name="generate_story">Generate story</string>
+    <string name="regenerate_story">Regenerate</string>
+    <string name="stop_generation">Stop</string>
+    <string name="status_stopped">Generation stopped.</string>
     <string name="story_hint">Your story will appear here. Tap Generate after granting AnkiDroid access if prompted.</string>
     <string name="status_idle">Ready</string>
     <string name="status_loading_vocab">Reading study queue from AnkiDroid…</string>

@@ -10,6 +10,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
@@ -37,6 +38,7 @@ class LiteRtStoryGenerator(private val context: Context) {
             engine.createConversation(conversationConfig).use { conversation ->
                 conversation.sendMessageAsync(userMessage)
                     .catch { throw it }
+                    .cancellable()
                     .collect { message ->
                         val delta = textDelta(message)
                         if (delta.isNotEmpty()) {

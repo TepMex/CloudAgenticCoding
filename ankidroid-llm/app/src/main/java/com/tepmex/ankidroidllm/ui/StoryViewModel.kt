@@ -11,7 +11,9 @@ import com.tepmex.ankidroidllm.data.LiteRtStoryGenerator
 import com.tepmex.ankidroidllm.data.ModelDownloader
 import com.tepmex.ankidroidllm.data.PromptVocabPlaceholders
 import com.tepmex.ankidroidllm.data.RemoteLlmClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,56 +41,65 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(StoryUiState(statusMessage = application.getString(R.string.status_idle)))
     val uiState: StateFlow<StoryUiState> = _uiState.asStateFlow()
 
+    private var generationJob: Job? = null
+    private var stopRequestedByUser = false
+
+    fun stopGeneration() {
+        stopRequestedByUser = true
+        generationJob?.cancel(CancellationException("user_stop"))
+    }
+
     fun generateStory() {
-        viewModelScope.launch {
-            val settings = appPrefs.settings.first()
-            if (settings.useRemoteLlm) {
-                if (settings.llmBaseUrl.isBlank() || settings.remoteModelName.isBlank()) {
-                    _uiState.update {
-                        it.copy(statusMessage = getApplication<Application>().getString(R.string.error_remote_config))
+        stopRequestedByUser = false
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
+            try {
+                val settings = appPrefs.settings.first()
+                if (settings.useRemoteLlm) {
+                    if (settings.llmBaseUrl.isBlank() || settings.remoteModelName.isBlank()) {
+                        _uiState.update {
+                            it.copy(statusMessage = getApplication<Application>().getString(R.string.error_remote_config))
+                        }
+                        return@launch
                     }
+                }
+                _uiState.update {
+                    it.copy(
+                        loading = true,
+                        statusMessage = getApplication<Application>().getString(R.string.status_loading_vocab),
+                    )
+                }
+                val rawPrompt = settings.systemPrompt
+                val placeholderMax = PromptVocabPlaceholders.maxRequestedCount(rawPrompt)
+                val usesVocabPlaceholder = PromptVocabPlaceholders.containsAny(rawPrompt)
+                val maxTerms = if (usesVocabPlaceholder) {
+                    maxOf(placeholderMax, 1).coerceAtMost(MAX_VOCAB_FETCH)
+                } else {
+                    DEFAULT_VOCAB_FETCH
+                }
+                val vocabResult = vocabRepo.loadStudyQueueVocabulary(settings, maxTerms)
+                val words = vocabResult.getOrNull()
+                if (words == null) {
+                    val err = vocabResult.exceptionOrNull()
+                    val msg = when (err?.message) {
+                        "anki_permission" -> getApplication<Application>().getString(R.string.error_anki_permission)
+                        "anki_missing" -> getApplication<Application>().getString(R.string.error_anki_missing)
+                        "no_vocab" -> getApplication<Application>().getString(R.string.error_no_vocab)
+                        else -> err?.message ?: err.toString()
+                    }
+                    _uiState.update { it.copy(loading = false, statusMessage = msg) }
                     return@launch
                 }
-            }
-            _uiState.update {
-                it.copy(
-                    loading = true,
-                    statusMessage = getApplication<Application>().getString(R.string.status_loading_vocab),
-                    storyText = "",
-                )
-            }
-            val rawPrompt = settings.systemPrompt
-            val placeholderMax = PromptVocabPlaceholders.maxRequestedCount(rawPrompt)
-            val usesVocabPlaceholder = PromptVocabPlaceholders.containsAny(rawPrompt)
-            val maxTerms = if (usesVocabPlaceholder) {
-                maxOf(placeholderMax, 1).coerceAtMost(MAX_VOCAB_FETCH)
-            } else {
-                DEFAULT_VOCAB_FETCH
-            }
-            val vocabResult = vocabRepo.loadStudyQueueVocabulary(settings, maxTerms)
-            val words = vocabResult.getOrNull()
-            if (words == null) {
-                val err = vocabResult.exceptionOrNull()
-                val msg = when (err?.message) {
-                    "anki_permission" -> getApplication<Application>().getString(R.string.error_anki_permission)
-                    "anki_missing" -> getApplication<Application>().getString(R.string.error_anki_missing)
-                    "no_vocab" -> getApplication<Application>().getString(R.string.error_no_vocab)
-                    else -> err?.message ?: err.toString()
+                val systemPrompt = if (usesVocabPlaceholder) {
+                    PromptVocabPlaceholders.expand(rawPrompt, words)
+                } else {
+                    rawPrompt
                 }
-                _uiState.update { it.copy(loading = false, statusMessage = msg) }
-                return@launch
-            }
-            val systemPrompt = if (usesVocabPlaceholder) {
-                PromptVocabPlaceholders.expand(rawPrompt, words)
-            } else {
-                rawPrompt
-            }
-            val userMessage = if (usesVocabPlaceholder) {
-                storyTaskUserMessageWithoutVocabList()
-            } else {
-                liteRtUserMessage(words)
-            }
-            try {
+                val userMessage = if (usesVocabPlaceholder) {
+                    storyTaskUserMessageWithoutVocabList()
+                } else {
+                    liteRtUserMessage(words)
+                }
                 if (settings.useRemoteLlm) {
                     _uiState.update {
                         it.copy(statusMessage = getApplication<Application>().getString(R.string.status_generating))
@@ -132,6 +143,16 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
                         it.copy(loading = false, statusMessage = getApplication<Application>().getString(R.string.status_idle))
                     }
                 }
+            } catch (e: CancellationException) {
+                if (stopRequestedByUser) {
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            statusMessage = getApplication<Application>().getString(R.string.status_stopped),
+                        )
+                    }
+                }
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(loading = false, statusMessage = e.message ?: e.toString())
@@ -157,6 +178,7 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
         private const val MAX_VOCAB_FETCH = 500
         private const val STORY_TASK_SUFFIX =
             "Write a short story that naturally weaves in as many of these words or phrases as makes sense. " +
+                "Use markdown (paragraph breaks, emphasis, lists) when it improves readability. " +
                 "End with a brief title line on its own line starting with \"Title: \"."
     }
 }
