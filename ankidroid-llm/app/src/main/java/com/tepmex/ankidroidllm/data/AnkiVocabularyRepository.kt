@@ -2,6 +2,7 @@ package com.tepmex.ankidroidllm.data
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.text.Html
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -10,6 +11,14 @@ import kotlinx.coroutines.withContext
 
 private const val FIELD_SEP = '\u001f'
 private const val TAG = "AnkiVocab"
+
+private data class StudyCardRow(
+    val cid: Long,
+    val nid: Long,
+    val queue: Int,
+    val due: Long,
+    val deckId: Long,
+)
 
 class AnkiVocabularyRepository(private val context: Context) {
 
@@ -90,38 +99,172 @@ class AnkiVocabularyRepository(private val context: Context) {
         out.sortedWith(String.CASE_INSENSITIVE_ORDER)
     }
 
-    suspend fun loadStudyQueueVocabulary(settings: StorySettings): Result<List<String>> = withContext(Dispatchers.IO) {
-        if (!hasAnkiInstalled()) {
-            return@withContext Result.failure(IllegalStateException("anki_missing"))
+    suspend fun loadStudyQueueVocabulary(settings: StorySettings, maxTerms: Int): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            if (!hasAnkiInstalled()) {
+                return@withContext Result.failure(IllegalStateException("anki_missing"))
+            }
+            if (!hasAnkiPermission()) {
+                return@withContext Result.failure(SecurityException("anki_permission"))
+            }
+            val cr = context.contentResolver
+            val models = loadModelFieldNames(cr)
+            if (models.isEmpty()) {
+                Log.w(TAG, "No models returned from AnkiDroid")
+            }
+            val cap = maxTerms.coerceAtLeast(1).coerceAtMost(MAX_TERMS_HARD_CAP)
+            val rows = if (settings.deckFieldRows.isEmpty()) {
+                listOf(StoryDeckFieldRow(deckName = "", fieldName = ""))
+            } else {
+                settings.deckFieldRows
+            }
+            try {
+                val fromCards = loadVocabularyViaStudyCardOrder(cr, models, rows, cap)
+                if (fromCards != null) {
+                    if (fromCards.isEmpty()) {
+                        return@withContext Result.failure(IllegalStateException("no_vocab"))
+                    }
+                    return@withContext Result.success(fromCards)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Card-order vocabulary failed, falling back to note search", e)
+            }
+            val words = LinkedHashSet<String>()
+            try {
+                for (row in rows) {
+                    if (words.size >= cap) break
+                    val deckList = if (row.deckName.isBlank()) emptyList() else listOf(row.deckName)
+                    val search = buildStudyQueueSearch(deckList)
+                    val remaining = (cap - words.size).coerceAtLeast(1)
+                    collectVocabularyForSearch(cr, search, models, row.fieldName, words, remaining)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Anki query failed", e)
+                return@withContext Result.failure(e)
+            }
+            if (words.isEmpty()) {
+                return@withContext Result.failure(IllegalStateException("no_vocab"))
+            }
+            Result.success(words.toList())
         }
-        if (!hasAnkiPermission()) {
-            return@withContext Result.failure(SecurityException("anki_permission"))
-        }
-        val cr = context.contentResolver
-        val models = loadModelFieldNames(cr)
-        if (models.isEmpty()) {
-            Log.w(TAG, "No models returned from AnkiDroid")
-        }
-        val rows = if (settings.deckFieldRows.isEmpty()) {
-            listOf(StoryDeckFieldRow(deckName = "", fieldName = ""))
-        } else {
-            settings.deckFieldRows
-        }
-        val words = LinkedHashSet<String>()
+
+    private fun loadVocabularyViaStudyCardOrder(
+        cr: android.content.ContentResolver,
+        models: Map<Long, List<String>>,
+        rows: List<StoryDeckFieldRow>,
+        maxTerms: Int,
+    ): List<String>? {
+        val deckList = rows.map { it.deckName.trim() }.filter { it.isNotEmpty() }.distinct()
+        val search = buildStudyQueueSearch(deckList)
+        val projection = arrayOf(
+            AnkiContract.CARD_ID,
+            AnkiContract.CARD_NOTE_ID,
+            AnkiContract.CARD_RAW_QUEUE,
+            AnkiContract.CARD_RAW_DUE,
+            AnkiContract.DECK_ID,
+        )
+        val cardRows = ArrayList<StudyCardRow>(256)
         try {
-            for (row in rows) {
-                val deckList = if (row.deckName.isBlank()) emptyList() else listOf(row.deckName)
-                val search = buildStudyQueueSearch(deckList)
-                collectVocabularyForSearch(cr, search, models, row.fieldName, words, MAX_NOTES_PER_ROW)
+            cr.query(AnkiContract.CARDS_URI, projection, search, null, null)?.use { c ->
+                val iCid = c.getColumnIndex(AnkiContract.CARD_ID)
+                val iNid = c.getColumnIndex(AnkiContract.CARD_NOTE_ID)
+                val iQ = c.getColumnIndex(AnkiContract.CARD_RAW_QUEUE)
+                val iDue = c.getColumnIndex(AnkiContract.CARD_RAW_DUE)
+                val iDid = c.getColumnIndex(AnkiContract.DECK_ID)
+                if (iCid < 0 || iNid < 0 || iQ < 0 || iDue < 0 || iDid < 0) {
+                    return null
+                }
+                while (c.moveToNext()) {
+                    cardRows.add(
+                        StudyCardRow(
+                            cid = c.getLong(iCid),
+                            nid = c.getLong(iNid),
+                            queue = c.getInt(iQ),
+                            due = c.getLong(iDue),
+                            deckId = c.getLong(iDid),
+                        ),
+                    )
+                }
+            } ?: return null
+        } catch (e: Exception) {
+            Log.w(TAG, "cards URI query failed", e)
+            return null
+        }
+        if (cardRows.isEmpty()) return emptyList()
+
+        val sorted = cardRows.sortedWith(
+            compareBy<StudyCardRow>({ queueSortTier(it.queue) }, { it.due }, { it.cid }),
+        )
+        val deckIdToName = loadDeckIdToName(cr)
+        val noteCache = HashMap<Long, Pair<Long, String>?>()
+        val out = ArrayList<String>(maxTerms.coerceAtMost(64))
+
+        for (card in sorted) {
+            if (out.size >= maxTerms) break
+            val deckName = deckIdToName[card.deckId].orEmpty()
+            val row = rows.firstOrNull { r ->
+                !r.deckName.isBlank() && r.deckName.equals(deckName, ignoreCase = true)
+            } ?: rows.firstOrNull { it.deckName.isBlank() } ?: continue
+
+            val pair = noteCache.getOrPut(card.nid) { loadNoteMidAndFlds(cr, card.nid) } ?: continue
+            val (mid, fldsRaw) = pair
+            val fieldNames = models[mid] ?: emptyList()
+            val idx = fieldIndex(row.fieldName, fieldNames)
+            val parts = fldsRaw.split(FIELD_SEP)
+            val raw = parts.getOrNull(idx)?.trim().orEmpty()
+            if (raw.isEmpty()) continue
+            val plain = stripToPlainText(raw)
+            if (plain.isBlank() || out.contains(plain)) continue
+            out.add(plain)
+        }
+        return out
+    }
+
+    private fun queueSortTier(rawQueue: Int): Int = when (rawQueue) {
+        1 -> 0
+        3 -> 1
+        2 -> 2
+        0 -> 3
+        else -> 99
+    }
+
+    private fun loadDeckIdToName(cr: android.content.ContentResolver): Map<Long, String> {
+        val map = HashMap<Long, String>()
+        try {
+            cr.query(
+                AnkiContract.DECKS_ALL_URI,
+                arrayOf(AnkiContract.DECK_ID, AnkiContract.DECK_NAME),
+                null,
+                null,
+                null,
+            )?.use { c ->
+                val iId = c.getColumnIndex(AnkiContract.DECK_ID)
+                val iName = c.getColumnIndex(AnkiContract.DECK_NAME)
+                if (iId < 0 || iName < 0) return@use
+                while (c.moveToNext()) {
+                    map[c.getLong(iId)] = c.getString(iName).orEmpty()
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Anki query failed", e)
-            return@withContext Result.failure(e)
+            Log.e(TAG, "Deck id map failed", e)
         }
-        if (words.isEmpty()) {
-            return@withContext Result.failure(IllegalStateException("no_vocab"))
+        return map
+    }
+
+    private fun loadNoteMidAndFlds(cr: android.content.ContentResolver, nid: Long): Pair<Long, String>? {
+        val uri = Uri.withAppendedPath(AnkiContract.NOTES_URI, nid.toString())
+        return try {
+            cr.query(uri, arrayOf(AnkiContract.NOTE_MID, AnkiContract.NOTE_FLDS), null, null, null)?.use { c ->
+                if (!c.moveToFirst()) return null
+                val iMid = c.getColumnIndex(AnkiContract.NOTE_MID)
+                val iFlds = c.getColumnIndex(AnkiContract.NOTE_FLDS)
+                if (iMid < 0 || iFlds < 0) return null
+                c.getLong(iMid) to (c.getString(iFlds) ?: return null)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Note lookup failed for nid=$nid", e)
+            null
         }
-        Result.success(words.toList())
     }
 
     private fun collectVocabularyForSearch(
@@ -140,7 +283,7 @@ class AnkiVocabularyRepository(private val context: Context) {
             if (midCol < 0 || fldsCol < 0) {
                 return@use
             }
-            while (c.moveToNext() && count < maxNotes) {
+            while (c.moveToNext() && count < maxNotes && words.size < MAX_TERMS_HARD_CAP) {
                 val mid = c.getLong(midCol)
                 val fldsRaw = c.getString(fldsCol) ?: continue
                 val fieldNames = models[mid] ?: emptyList()
@@ -198,7 +341,7 @@ class AnkiVocabularyRepository(private val context: Context) {
     }
 
     companion object {
-        private const val MAX_NOTES_PER_ROW = 250
+        private const val MAX_TERMS_HARD_CAP = 500
 
         fun buildStudyQueueSearch(deckNames: List<String>): String {
             val queue = "(is:due OR is:learn OR is:new)"

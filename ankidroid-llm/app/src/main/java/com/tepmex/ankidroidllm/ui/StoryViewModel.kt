@@ -9,6 +9,7 @@ import com.tepmex.ankidroidllm.data.AnkiVocabularyRepository
 import com.tepmex.ankidroidllm.data.AppPreferences
 import com.tepmex.ankidroidllm.data.LiteRtStoryGenerator
 import com.tepmex.ankidroidllm.data.ModelDownloader
+import com.tepmex.ankidroidllm.data.PromptVocabPlaceholders
 import com.tepmex.ankidroidllm.data.RemoteLlmClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,7 +57,15 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
                     storyText = "",
                 )
             }
-            val vocabResult = vocabRepo.loadStudyQueueVocabulary(settings)
+            val rawPrompt = settings.systemPrompt
+            val placeholderMax = PromptVocabPlaceholders.maxRequestedCount(rawPrompt)
+            val usesVocabPlaceholder = PromptVocabPlaceholders.containsAny(rawPrompt)
+            val maxTerms = if (usesVocabPlaceholder) {
+                maxOf(placeholderMax, 1).coerceAtMost(MAX_VOCAB_FETCH)
+            } else {
+                DEFAULT_VOCAB_FETCH
+            }
+            val vocabResult = vocabRepo.loadStudyQueueVocabulary(settings, maxTerms)
             val words = vocabResult.getOrNull()
             if (words == null) {
                 val err = vocabResult.exceptionOrNull()
@@ -69,18 +78,27 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(loading = false, statusMessage = msg) }
                 return@launch
             }
+            val systemPrompt = if (usesVocabPlaceholder) {
+                PromptVocabPlaceholders.expand(rawPrompt, words)
+            } else {
+                rawPrompt
+            }
+            val userMessage = if (usesVocabPlaceholder) {
+                storyTaskUserMessageWithoutVocabList()
+            } else {
+                liteRtUserMessage(words)
+            }
             try {
                 if (settings.useRemoteLlm) {
                     _uiState.update {
                         it.copy(statusMessage = getApplication<Application>().getString(R.string.status_generating))
                     }
-                    val userMsg = liteRtUserMessage(words)
                     val text = remoteClient.chatCompletion(
                         baseUrl = settings.llmBaseUrl,
                         bearerToken = settings.llmToken,
                         model = settings.remoteModelName,
-                        systemPrompt = settings.systemPrompt,
-                        userMessage = userMsg,
+                        systemPrompt = systemPrompt,
+                        userMessage = userMessage,
                     )
                     _uiState.update {
                         it.copy(loading = false, storyText = text, statusMessage = getApplication<Application>().getString(R.string.status_idle))
@@ -101,8 +119,8 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
                     val sb = StringBuilder()
                     liteRt.generate(
                         modelPath = modelFile.absolutePath,
-                        systemPrompt = settings.systemPrompt,
-                        vocabulary = words,
+                        systemPrompt = systemPrompt,
+                        userMessage = userMessage,
                         onToken = { chunk ->
                             sb.append(chunk)
                             withContext(Dispatchers.Main) {
@@ -127,7 +145,18 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
             appendLine("Vocabulary from my current Anki study queue (one per line):")
             vocabulary.forEach { appendLine("- $it") }
             appendLine()
-            append("Write a short story that naturally uses these words. End with a line: Title: ...")
+            append(STORY_TASK_SUFFIX)
         }
+    }
+
+    private fun storyTaskUserMessageWithoutVocabList(): String =
+        "The vocabulary list is in the system instructions above (in Anki card order).\n\n$STORY_TASK_SUFFIX"
+
+    companion object {
+        private const val DEFAULT_VOCAB_FETCH = 250
+        private const val MAX_VOCAB_FETCH = 500
+        private const val STORY_TASK_SUFFIX =
+            "Write a short story that naturally weaves in as many of these words or phrases as makes sense. " +
+                "End with a brief title line on its own line starting with \"Title: \"."
     }
 }

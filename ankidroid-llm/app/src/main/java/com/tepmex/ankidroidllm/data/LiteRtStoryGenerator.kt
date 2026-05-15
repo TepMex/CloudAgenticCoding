@@ -20,7 +20,7 @@ class LiteRtStoryGenerator(private val context: Context) {
     suspend fun generate(
         modelPath: String,
         systemPrompt: String,
-        vocabulary: List<String>,
+        userMessage: String,
         onToken: suspend (String) -> Unit,
     ) = withContext(Dispatchers.Default) {
         val engineConfig = EngineConfig(
@@ -30,7 +30,6 @@ class LiteRtStoryGenerator(private val context: Context) {
         )
         Engine(engineConfig).use { engine ->
             engine.initialize()
-            val userMessage = buildUserMessage(vocabulary)
             val conversationConfig = ConversationConfig(
                 systemInstruction = Contents.of(systemPrompt),
                 samplerConfig = SamplerConfig(topK = 64, topP = 0.95, temperature = 0.85, seed = 0),
@@ -57,15 +56,6 @@ class LiteRtStoryGenerator(private val context: Context) {
     private fun textDelta(message: Message): String {
         return message.contents.contents.joinToString("") { part ->
             (part as? Content.Text)?.text.orEmpty()
-        }
-    }
-
-    private fun buildUserMessage(vocabulary: List<String>): String {
-        return buildString {
-            appendLine("Here is vocabulary from my current Anki study queue (one entry per line):")
-            vocabulary.forEach { appendLine("- $it") }
-            appendLine()
-            append("Write a short story that naturally weaves in as many of these words or phrases as makes sense. End with a brief title line on its own line starting with \"Title: \".")
         }
     }
 }
