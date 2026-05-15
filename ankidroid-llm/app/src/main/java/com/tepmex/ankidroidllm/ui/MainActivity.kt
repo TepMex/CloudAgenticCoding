@@ -1,6 +1,7 @@
 package com.tepmex.ankidroidllm.ui
 
 import android.os.Bundle
+import android.text.method.LinkMovementMethod
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,12 +14,15 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.tepmex.ankidroidllm.R
 import com.tepmex.ankidroidllm.data.AnkiContract
 import com.tepmex.ankidroidllm.databinding.ActivityMainBinding
+import io.noties.markwon.Markwon
+import io.noties.markwon.core.CorePlugin
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val viewModel: StoryViewModel by viewModels()
+    private lateinit var storyMarkwon: Markwon
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -34,8 +38,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
 
+        storyMarkwon = Markwon.builder(this)
+            .usePlugin(CorePlugin.create())
+            .build()
+        binding.storyText.movementMethod = LinkMovementMethod.getInstance()
+
         binding.generateButton.setOnClickListener {
             tryStartGeneration()
+        }
+        binding.stopButton.setOnClickListener {
+            viewModel.stopGeneration()
         }
 
         lifecycleScope.launch {
@@ -43,8 +55,20 @@ class MainActivity : AppCompatActivity() {
                 viewModel.uiState.collect { state ->
                     binding.statusText.text = state.statusMessage
                     binding.progressBar.isVisible = state.loading
+                    binding.stopButton.isVisible = state.loading
                     binding.generateButton.isEnabled = !state.loading
-                    binding.storyText.text = state.storyText
+                    binding.generateButton.text = getString(
+                        if (state.storyText.isNotBlank()) {
+                            R.string.regenerate_story
+                        } else {
+                            R.string.generate_story
+                        },
+                    )
+                    if (state.storyText.isBlank()) {
+                        binding.storyText.text = getString(R.string.story_hint)
+                    } else {
+                        storyMarkwon.setMarkdown(binding.storyText, state.storyText)
+                    }
                 }
             }
         }
