@@ -6,6 +6,8 @@
 
     <queries>
         <package android:name="com.ichi2.anki" />
+        <!-- Content provider used by the AnkiDroid API (Android 11+ package visibility). -->
+        <provider android:authorities="com.ichi2.anki.flashcards" />
     </queries>
 
     <application

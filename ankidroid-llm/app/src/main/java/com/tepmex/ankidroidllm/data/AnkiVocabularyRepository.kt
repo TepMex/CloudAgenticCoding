@@ -33,12 +33,13 @@ class AnkiVocabularyRepository(private val context: Context) {
         }
         val names = LinkedHashSet<String>()
         try {
+            // Match AnkiDroid samples: null projection uses Deck.DEFAULT_PROJECTION (see FlashCardsContract).
             context.contentResolver.query(
                 AnkiContract.DECKS_ALL_URI,
-                arrayOf(AnkiContract.DECK_NAME),
                 null,
                 null,
-                AnkiContract.DECK_NAME,
+                null,
+                null,
             )?.use { c ->
                 val col = c.getColumnIndex(AnkiContract.DECK_NAME)
                 if (col < 0) return@use
@@ -160,7 +161,7 @@ class AnkiVocabularyRepository(private val context: Context) {
     private fun loadModelFieldNames(cr: android.content.ContentResolver): Map<Long, List<String>> {
         val map = HashMap<Long, List<String>>()
         try {
-            cr.query(AnkiContract.MODELS_URI, arrayOf(AnkiContract.MODEL_ID, AnkiContract.MODEL_FIELD_NAMES), null, null, null)
+            cr.query(AnkiContract.MODELS_URI, null, null, null, null)
                 ?.use { c ->
                     val idCol = c.getColumnIndex(AnkiContract.MODEL_ID)
                     val namesCol = c.getColumnIndex(AnkiContract.MODEL_FIELD_NAMES)

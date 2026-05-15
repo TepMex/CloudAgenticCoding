@@ -1,12 +1,14 @@
 package com.tepmex.ankidroidllm.ui
 
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tepmex.ankidroidllm.AnkiLlmApp
 import com.tepmex.ankidroidllm.R
+import com.tepmex.ankidroidllm.data.AnkiContract
 import com.tepmex.ankidroidllm.data.AnkiVocabularyRepository
 import com.tepmex.ankidroidllm.data.AppPreferences
 import com.tepmex.ankidroidllm.data.StoryDeckFieldRow
@@ -18,6 +20,13 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var deckFieldAdapter: DeckFieldRowsAdapter
+    private lateinit var prefs: AppPreferences
+    private lateinit var ankiRepo: AnkiVocabularyRepository
+    private lateinit var allDecksLabel: String
+
+    private val ankiPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { refreshAnkiListsUi() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,18 +34,22 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        val prefs = (application as AnkiLlmApp).preferences
-        val repo = AnkiVocabularyRepository(this)
-        val allDecks = getString(R.string.all_decks)
+        prefs = (application as AnkiLlmApp).preferences
+        ankiRepo = AnkiVocabularyRepository(this)
+        allDecksLabel = getString(R.string.all_decks)
 
         deckFieldAdapter = DeckFieldRowsAdapter(
-            repo = repo,
+            repo = ankiRepo,
             scope = lifecycleScope,
-            allDecksLabel = allDecks,
+            allDecksLabel = allDecksLabel,
             initialRows = emptyList(),
         )
         binding.deckFieldRowsRecycler.layoutManager = LinearLayoutManager(this)
         binding.deckFieldRowsRecycler.adapter = deckFieldAdapter
+
+        binding.grantAnkiPermissionButton.setOnClickListener {
+            ankiPermissionLauncher.launch(AnkiContract.READ_WRITE_PERMISSION)
+        }
 
         lifecycleScope.launch {
             val s = prefs.settings.first()
@@ -48,13 +61,7 @@ class SettingsActivity : AppCompatActivity() {
             binding.inputModelUrl.setText(s.litertModelDownloadUrl)
 
             deckFieldAdapter.replaceAll(s.deckFieldRows)
-
-            if (repo.hasAnkiInstalled() && repo.hasAnkiPermission()) {
-                binding.ankiDataHint.isVisible = false
-                deckFieldAdapter.deckChoices = repo.loadAllDeckNames()
-            } else {
-                binding.ankiDataHint.isVisible = true
-            }
+            refreshAnkiListsUi()
         }
 
         binding.addDeckFieldRowButton.setOnClickListener {
@@ -79,6 +86,33 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 finish()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::deckFieldAdapter.isInitialized) {
+            refreshAnkiListsUi()
+        }
+    }
+
+    /**
+     * Reloads deck names and field dropdowns when AnkiDroid is installed and permission is granted,
+     * including after returning from the permission dialog or from the main screen.
+     */
+    private fun refreshAnkiListsUi() {
+        val installed = ankiRepo.hasAnkiInstalled()
+        val permitted = ankiRepo.hasAnkiPermission()
+        binding.ankiDataHint.isVisible = installed && !permitted
+        binding.grantAnkiPermissionButton.isVisible = installed && !permitted
+
+        if (!installed || !permitted) {
+            deckFieldAdapter.deckChoices = emptyList()
+            return
+        }
+
+        lifecycleScope.launch {
+            deckFieldAdapter.deckChoices = ankiRepo.loadAllDeckNames()
         }
     }
 

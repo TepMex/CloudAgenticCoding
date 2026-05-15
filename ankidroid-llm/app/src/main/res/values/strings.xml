@@ -20,5 +20,6 @@
     <string name="add_deck_field_row">Add deck</string>
     <string name="remove_row">Remove row</string>
     <string name="all_decks">(All decks)</string>
-    <string name="settings_anki_permission_hint">Grant AnkiDroid database access from the main screen to load deck and field lists here.</string>
+    <string name="settings_anki_permission_hint">Allow this app to read the AnkiDroid collection so deck and field names can load. You can grant access here or from the main screen.</string>
+    <string name="settings_grant_anki_permission">Allow AnkiDroid access</string>
 </resources>
