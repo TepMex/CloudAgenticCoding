@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AnkiDroid LLM</string>
+    <string name="settings_title">Settings</string>
+    <string name="action_settings">Settings</string>
+    <string name="generate_story">Generate story</string>
+    <string name="story_hint">Your story will appear here. Tap Generate after granting AnkiDroid access if prompted.</string>
+    <string name="status_idle">Ready</string>
+    <string name="status_loading_vocab">Reading study queue from AnkiDroid…</string>
+    <string name="status_downloading_model">Downloading on-device model (first run only, large file)…</string>
+    <string name="status_generating">Generating story…</string>
+    <string name="error_anki_permission">AnkiDroid database permission is required. Grant it in system settings for this app, then try again.</string>
+    <string name="error_anki_missing">Install AnkiDroid and enable its API (Settings → Advanced → AnkiDroid API).</string>
+    <string name="error_no_vocab">No vocabulary found for the current study queue with your deck and field settings.</string>
+    <string name="error_remote_config">Remote LLM is enabled but base URL or model name is empty.</string>
+    <string name="save">Save</string>
+</resources>

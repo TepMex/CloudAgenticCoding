@@ -34,6 +34,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 chesswatch/.gradle/
 chesswatch/**/build/
 chesswatch/local.properties
+
+# Android (ankidroid-llm)
+ankidroid-llm/.gradle/
+ankidroid-llm/**/build/
+ankidroid-llm/local.properties
 *.iml
 
 # Finder (MacOS) folder config

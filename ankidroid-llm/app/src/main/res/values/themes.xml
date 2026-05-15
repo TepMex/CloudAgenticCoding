@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AnkiDroidLlm" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/seed</item>
+        <item name="colorPrimaryContainer">#D0E4FF</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+    </style>
+
+    <style name="Theme.AnkiDroidLlm.WithActionBar" parent="Theme.Material3.Light">
+        <item name="colorPrimary">@color/seed</item>
+        <item name="colorPrimaryContainer">#D0E4FF</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+    </style>
+</resources>
