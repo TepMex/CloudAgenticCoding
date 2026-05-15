@@ -56,6 +56,7 @@ class StoryViewModel(application: Application) : AndroidViewModel(application) {
                     storyText = "",
                 )
             }
+            val vocabResult = vocabRepo.loadStudyQueueVocabulary(settings)
             val words = vocabResult.getOrNull()
             if (words == null) {
                 val err = vocabResult.exceptionOrNull()
