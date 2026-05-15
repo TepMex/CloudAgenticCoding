@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp">
@@ -82,29 +83,37 @@
                 android:inputType="textUri" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Deck names (comma-separated; empty = all decks)">
+            android:text="@string/deck_field_section_title"
+            android:textAppearance="?attr/textAppearanceTitleSmall" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/inputDecks"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-        </com.google.android.material.textfield.TextInputLayout>
+        <TextView
+            android:id="@+id/ankiDataHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/settings_anki_permission_hint"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:visibility="gone" />
 
-        <com.google.android.material.textfield.TextInputLayout
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/deckFieldRowsRecycler"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="Vocabulary field name (empty = first field of note type)">
+            android:nestedScrollingEnabled="false"
+            tools:listitem="@layout/item_deck_field_row" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/inputVocabField"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-        </com.google.android.material.textfield.TextInputLayout>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/addDeckFieldRowButton"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/add_deck_field_row" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/saveButton"

@@ -13,6 +13,7 @@ object AnkiContract {
     val AUTHORITY_URI: Uri = Uri.parse("content://$AUTHORITY")
     val NOTES_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "notes")
     val MODELS_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "models")
+    val DECKS_ALL_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "decks")
 
     const val NOTE_ID = "_id"
     const val NOTE_MID = "mid"
@@ -20,4 +21,7 @@ object AnkiContract {
 
     const val MODEL_ID = "_id"
     const val MODEL_FIELD_NAMES = "field_names"
+
+    const val DECK_ID = "deck_id"
+    const val DECK_NAME = "deck_name"
 }

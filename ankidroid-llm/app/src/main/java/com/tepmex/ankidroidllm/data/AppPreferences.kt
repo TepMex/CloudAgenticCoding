@@ -9,8 +9,36 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ankidroid_llm")
+
+private val KEY_REMOTE = booleanPreferencesKey("use_remote_llm")
+private val KEY_BASE_URL = stringPreferencesKey("llm_base_url")
+private val KEY_TOKEN = stringPreferencesKey("llm_token")
+private val KEY_REMOTE_MODEL = stringPreferencesKey("remote_model")
+private val KEY_PROMPT = stringPreferencesKey("system_prompt")
+private val KEY_MODEL_URL = stringPreferencesKey("litert_model_url")
+private val KEY_DECK_FIELD_ROWS_JSON = stringPreferencesKey("deck_field_rows_json")
+private val KEY_DECKS_LEGACY = stringPreferencesKey("deck_names_csv")
+private val KEY_FIELD_LEGACY = stringPreferencesKey("vocab_field")
+
+data class StoryDeckFieldRow(
+    val deckName: String,
+    val fieldName: String,
+)
+
+data class StorySettings(
+    val useRemoteLlm: Boolean,
+    val llmBaseUrl: String,
+    val llmToken: String,
+    val remoteModelName: String,
+    val systemPrompt: String,
+    val litertModelDownloadUrl: String,
+    /** Each row selects a deck (empty = all decks) and which note field supplies vocabulary. */
+    val deckFieldRows: List<StoryDeckFieldRow>,
+)
 
 class AppPreferences(private val context: Context) {
 
@@ -22,8 +50,7 @@ class AppPreferences(private val context: Context) {
             remoteModelName = p[KEY_REMOTE_MODEL] ?: "",
             systemPrompt = p[KEY_PROMPT] ?: DEFAULT_PROMPT,
             litertModelDownloadUrl = p[KEY_MODEL_URL] ?: DEFAULT_MODEL_URL,
-            deckNamesCsv = p[KEY_DECKS] ?: "",
-            vocabFieldName = p[KEY_FIELD] ?: "",
+            deckFieldRows = readDeckFieldRows(p),
         )
     }
 
@@ -36,8 +63,7 @@ class AppPreferences(private val context: Context) {
                 remoteModelName = prefs[KEY_REMOTE_MODEL] ?: "",
                 systemPrompt = prefs[KEY_PROMPT] ?: DEFAULT_PROMPT,
                 litertModelDownloadUrl = prefs[KEY_MODEL_URL] ?: DEFAULT_MODEL_URL,
-                deckNamesCsv = prefs[KEY_DECKS] ?: "",
-                vocabFieldName = prefs[KEY_FIELD] ?: "",
+                deckFieldRows = readDeckFieldRows(prefs),
             )
             val next = transform(cur)
             prefs[KEY_REMOTE] = next.useRemoteLlm
@@ -46,8 +72,9 @@ class AppPreferences(private val context: Context) {
             prefs[KEY_REMOTE_MODEL] = next.remoteModelName
             prefs[KEY_PROMPT] = next.systemPrompt
             prefs[KEY_MODEL_URL] = next.litertModelDownloadUrl
-            prefs[KEY_DECKS] = next.deckNamesCsv
-            prefs[KEY_FIELD] = next.vocabFieldName
+            prefs[KEY_DECK_FIELD_ROWS_JSON] = encodeDeckFieldRowsJson(next.deckFieldRows)
+            prefs -= KEY_DECKS_LEGACY
+            prefs -= KEY_FIELD_LEGACY
         }
     }
 
@@ -58,25 +85,54 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_PROMPT =
             "You write vivid, concise stories for language learners. Use the learner's vocabulary naturally. " +
                 "Prefer one continuous narrative; keep it under about 400 words unless the user asks otherwise."
-
-        private val KEY_REMOTE = booleanPreferencesKey("use_remote_llm")
-        private val KEY_BASE_URL = stringPreferencesKey("llm_base_url")
-        private val KEY_TOKEN = stringPreferencesKey("llm_token")
-        private val KEY_REMOTE_MODEL = stringPreferencesKey("remote_model")
-        private val KEY_PROMPT = stringPreferencesKey("system_prompt")
-        private val KEY_MODEL_URL = stringPreferencesKey("litert_model_url")
-        private val KEY_DECKS = stringPreferencesKey("deck_names_csv")
-        private val KEY_FIELD = stringPreferencesKey("vocab_field")
     }
 }
 
-data class StorySettings(
-    val useRemoteLlm: Boolean,
-    val llmBaseUrl: String,
-    val llmToken: String,
-    val remoteModelName: String,
-    val systemPrompt: String,
-    val litertModelDownloadUrl: String,
-    val deckNamesCsv: String,
-    val vocabFieldName: String,
-)
+private fun readDeckFieldRows(p: Preferences): List<StoryDeckFieldRow> {
+    val json = p[KEY_DECK_FIELD_ROWS_JSON]
+    if (!json.isNullOrBlank()) {
+        return decodeDeckFieldRowsJson(json)
+    }
+    return migrateLegacyDeckFieldRows(p[KEY_DECKS_LEGACY] ?: "", p[KEY_FIELD_LEGACY] ?: "")
+}
+
+private fun migrateLegacyDeckFieldRows(decksCsv: String, field: String): List<StoryDeckFieldRow> {
+    val decks = decksCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    val f = field.trim()
+    return when {
+        decks.isEmpty() && f.isEmpty() -> emptyList()
+        decks.isEmpty() -> listOf(StoryDeckFieldRow("", f))
+        else -> decks.map { StoryDeckFieldRow(it, f) }
+    }
+}
+
+private fun decodeDeckFieldRowsJson(json: String): List<StoryDeckFieldRow> {
+    return try {
+        val arr = JSONArray(json)
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                add(
+                    StoryDeckFieldRow(
+                        deckName = o.optString("deck", ""),
+                        fieldName = o.optString("field", ""),
+                    ),
+                )
+            }
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun encodeDeckFieldRowsJson(rows: List<StoryDeckFieldRow>): String {
+    val arr = JSONArray()
+    for (r in rows) {
+        arr.put(
+            JSONObject()
+                .put("deck", r.deckName)
+                .put("field", r.fieldName),
+        )
+    }
+    return arr.toString()
+}

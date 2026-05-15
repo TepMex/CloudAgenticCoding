@@ -14,4 +14,11 @@
     <string name="error_no_vocab">No vocabulary found for the current study queue with your deck and field settings.</string>
     <string name="error_remote_config">Remote LLM is enabled but base URL or model name is empty.</string>
     <string name="save">Save</string>
+    <string name="deck_field_section_title">Study queue vocabulary</string>
+    <string name="hint_anki_deck">Anki deck</string>
+    <string name="hint_note_field">Note field</string>
+    <string name="add_deck_field_row">Add deck</string>
+    <string name="remove_row">Remove row</string>
+    <string name="all_decks">(All decks)</string>
+    <string name="settings_anki_permission_hint">Grant AnkiDroid database access from the main screen to load deck and field lists here.</string>
 </resources>
