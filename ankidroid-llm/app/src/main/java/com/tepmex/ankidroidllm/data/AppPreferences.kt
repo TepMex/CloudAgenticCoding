@@ -84,7 +84,9 @@ class AppPreferences(private val context: Context) {
 
         const val DEFAULT_PROMPT =
             "You write vivid, concise stories for language learners. Use the learner's vocabulary naturally. " +
-                "Prefer one continuous narrative; keep it under about 400 words unless the user asks otherwise."
+                "Prefer one continuous narrative; keep it under about 400 words unless the user asks otherwise.\n\n" +
+                "Vocabulary from the learner's Anki study queue (due / learning / new), in card order, one item per line:\n" +
+                "{{VOCAB:25}}"
     }
 }
 

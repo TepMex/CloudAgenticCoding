@@ -12,6 +12,7 @@ object AnkiContract {
 
     val AUTHORITY_URI: Uri = Uri.parse("content://$AUTHORITY")
     val NOTES_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "notes")
+    val CARDS_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "cards")
     val MODELS_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "models")
     val DECKS_ALL_URI: Uri = Uri.withAppendedPath(AUTHORITY_URI, "decks")
 
@@ -24,4 +25,10 @@ object AnkiContract {
 
     const val DECK_ID = "deck_id"
     const val DECK_NAME = "deck_name"
+
+    /** Card columns (FlashCardsContract.Card); deck column reuses [DECK_ID]. */
+    const val CARD_ID = "_id"
+    const val CARD_NOTE_ID = "note_id"
+    const val CARD_RAW_QUEUE = "queue"
+    const val CARD_RAW_DUE = "due"
 }

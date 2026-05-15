@@ -59,7 +59,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="System / style prompt">
+            android:hint="System / style prompt (use {{VOCAB:n}} for n queue words, Anki card order)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputPrompt"

@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Monotonic per Gradle configuration; new APK installs over the old one without uninstalling (keeps downloaded LiteRT model).
+val autoVersionCode = (System.currentTimeMillis() / 1000L).toInt()
+
 android {
     namespace = "com.tepmex.ankidroidllm"
     compileSdk = 35
@@ -13,8 +16,8 @@ android {
         applicationId = "com.tepmex.ankidroidllm"
         minSdk = 34
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = autoVersionCode
+        versionName = "1.0.$autoVersionCode"
     }
 
     buildTypes {
