@@ -30,5 +30,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # IntelliJ based IDEs
 .idea
 
+# Android (chesswatch)
+chesswatch/.gradle/
+chesswatch/**/build/
+chesswatch/local.properties
+*.iml
+
 # Finder (MacOS) folder config
 .DS_Store
