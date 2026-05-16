@@ -38,6 +38,17 @@ class MainActivity : AppCompatActivity() {
 
         binding.fabAdd.setOnClickListener { showAddDialog() }
 
+        binding.toolbar.inflateMenu(R.menu.main_toolbar)
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_reset -> {
+                    viewModel.resetAll()
+                    true
+                }
+                else -> false
+            }
+        }
+
         var lastItems: List<TrackedActivity>? = null
         var lastSelected: String? = null
         lifecycleScope.launch {

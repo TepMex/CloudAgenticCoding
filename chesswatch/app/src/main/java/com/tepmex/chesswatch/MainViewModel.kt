@@ -83,6 +83,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         select(id)
     }
 
+    fun resetAll() {
+        val current = _state.value
+        val now = System.currentTimeMillis()
+        val items = current.items.map { it.copy(accumulatedMs = 0L) }
+        val selectedId =
+            if (items.any { it.id == ActivityStore.IDLE_ID }) {
+                ActivityStore.IDLE_ID
+            } else {
+                items.firstOrNull()?.id
+            }
+        _state.value =
+            UiState(
+                items = items,
+                selectedId = selectedId,
+                segmentStartMs = now,
+                nowMs = now,
+            )
+        persist()
+    }
+
     fun deleteActivity(id: String) {
         if (id == ActivityStore.IDLE_ID) return
         val current = _state.value
