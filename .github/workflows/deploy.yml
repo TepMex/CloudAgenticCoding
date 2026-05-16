@@ -30,6 +30,10 @@ jobs:
         working-directory: mandarin-koan
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (hanzi-info)
+        working-directory: hanzi-info
+        run: bun install --frozen-lockfile
+
       # Project pages are served from /<repo>/, so hashed assets must use
       # /<repo>/<app>/ — not /<app>/ (that resolves to the org/user site root).
       - name: Build (socratus)
@@ -42,6 +46,12 @@ jobs:
         working-directory: mandarin-koan
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/mandarin-koan/
+        run: bun run build
+
+      - name: Build (hanzi-info)
+        working-directory: hanzi-info
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-info/
         run: bun run build
 
       - name: Setup Java (ChessWatch)
@@ -63,9 +73,10 @@ jobs:
 
       - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan deploy/chesswatch deploy/ankidroid-llm
+          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/chesswatch deploy/ankidroid-llm
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
+          cp -r hanzi-info/dist/. deploy/hanzi-info/
           cp chesswatch/app/build/outputs/apk/release/app-release.apk deploy/chesswatch/chesswatch.apk
           cp chesswatch/site/index.html deploy/chesswatch/index.html
           cp ankidroid-llm/app/build/outputs/apk/release/app-release.apk deploy/ankidroid-llm/ankidroid-llm.apk
