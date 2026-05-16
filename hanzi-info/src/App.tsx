@@ -18,8 +18,8 @@ import "./index.css";
 
 function regularityLabel(scale: 1 | 2): string {
   return scale === 1
-    ? "Closer phonetic family (HanziJS regularity_one — same source tier as HanziCraft set 1)"
-    : "Broader phonetic family (HanziJS regularity_two — same source tier as HanziCraft set 2)";
+    ? "Regularity degree one — exact same pronunciation including tone (HanziCraft wording)"
+    : "Regularity degree two — exact same syllable but different tone (HanziCraft wording)";
 }
 
 function Glyph({ ch, className }: { ch: string; className?: string }) {
@@ -191,15 +191,16 @@ export function App() {
           </div>
           <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Hanzi Info</h1>
           <p className="text-muted-foreground max-w-2xl text-pretty text-sm leading-relaxed">
-            Explore which phonetic component ties a character to its sound family, using the same HanziJS phonetic-set
-            lists that power{" "}
+            Explore which phonetic component ties a character to its sound family, using the same published phonetic-set
+            lists as{" "}
             <a
               className="text-primary underline-offset-4 hover:underline"
-              href="https://hanzicraft.com/lists/phonetic-set"
+              href="https://hanzicraft.com/lists/phonetic-sets"
             >
-              HanziCraft&apos;s phonetic set
-            </a>
-            . English glosses come from CC-CEDICT via HanziJS.
+              HanziCraft&apos;s phonetic sets
+            </a>{" "}
+            (regularity degrees 1–2, only sets with more than two characters). English glosses come from CC-CEDICT via
+            HanziJS.
           </p>
         </header>
 
@@ -256,7 +257,7 @@ export function App() {
               <CardTitle className="font-serif text-2xl">Not in local index</CardTitle>
               <CardDescription>
                 <Glyph ch={active} className="text-3xl" /> is outside the bundled coverage (HanziJS frequency list plus
-                phonetic-set participants and their decomposition parts).
+                phonetic-set participants (degrees 1–2, 3+ characters per set) and their decomposition parts).
               </CardDescription>
             </CardHeader>
           </Card>
@@ -291,9 +292,9 @@ export function App() {
                   <h3 className="mb-2 text-sm font-semibold">Phonetic component</h3>
                   {!phonetic || phonetic.length === 0 ? (
                     <p className="text-muted-foreground text-sm leading-relaxed">
-                      No phonetic component in the HanziCraft phonetic-set index for this character. The character is
-                      treated as <strong>ideographic</strong> here (sound-shape link not listed in HanziJS phonetic
-                      sets).
+                      No phonetic component in the HanziCraft phonetic-sets index for this character (under the same
+                      filters: degrees 1–2, more than two characters per set). The character is treated as{" "}
+                      <strong>ideographic</strong> here.
                     </p>
                   ) : (
                     <div className="flex flex-col gap-6">

@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Builds `public/hanzi-db.json` from the same HanziJS data HanziCraft uses
- * (phonetic-set lists + CC-CEDICT + frequency + IDS decomposition).
+ * Builds `public/hanzi-db.json` from HanziJS, filtered to match the HanziCraft phonetic-sets page:
+ * regularity degrees 1–2 and only sets with more than two characters (see on-page copy there).
+ * Also merges CC-CEDICT, frequency data, and IDS decomposition.
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -172,8 +173,12 @@ function build() {
   const phoneticKeyComponents = new Set<string>();
   const phoneticSeriesByChar = new Map<string, PhoneticSeries[]>();
 
+  /** HanziCraft only publishes sets with more than two characters (see on-page copy). */
+  const MIN_PHONETIC_SET_SIZE = 3;
+
   function ingestPhonetic(scale: 1 | 2, obj: Record<string, string[]>) {
     for (const [key, members] of Object.entries(obj)) {
+      if (members.length < MIN_PHONETIC_SET_SIZE) continue;
       const parsed = parsePhoneticKey(key);
       if (!parsed) continue;
       phoneticKeyComponents.add(parsed.component);
@@ -212,14 +217,18 @@ function build() {
   for (const ch of freq.keys()) charSet.add(ch);
   for (const ch of phoneticSeriesByChar.keys()) charSet.add(ch);
   for (const k of Object.keys(regularity_one)) {
+    const arr = regularity_one[k];
+    if (!arr || arr.length < MIN_PHONETIC_SET_SIZE) continue;
     const p = parsePhoneticKey(k);
     if (p) charSet.add(p.component);
-    for (const x of regularity_one[k] ?? []) charSet.add(x);
+    for (const x of arr) charSet.add(x);
   }
   for (const k of Object.keys(regularity_two)) {
+    const arr = regularity_two[k];
+    if (!arr || arr.length < MIN_PHONETIC_SET_SIZE) continue;
     const p = parsePhoneticKey(k);
     if (p) charSet.add(p.component);
-    for (const x of regularity_two[k] ?? []) charSet.add(x);
+    for (const x of arr) charSet.add(x);
   }
 
   let grew = true;
@@ -303,9 +312,12 @@ function build() {
   const db: HanziDatabase = {
     version: 1,
     about:
-      "Phonetic sets are derived from HanziJS (same data as HanziCraft phonetic-set lists). " +
-      "English glosses and readings come from CC-CEDICT and frequency data bundled with HanziJS. " +
-      "Structural parts use HanziJS IDS decomposition.",
+      "Phonetic-set lists follow HanziCraft (https://hanzicraft.com/lists/phonetic-sets): regularity degree one " +
+      "(exact pronunciation including tone) and degree two (same syllable, different tone), and only sets with " +
+      "more than two characters—the same filters described on that page. Rows are taken from HanziJS " +
+      "`phonetic_sets_regularity_one` / `phonetic_sets_regularity_two` and verified against the repo snapshot " +
+      "`HanziCraft - Chinese Character Phonetic Sets`. English glosses and readings come from CC-CEDICT and " +
+      "frequency data bundled with HanziJS. Structural parts use HanziJS IDS decomposition.",
     hanzi: rows,
     hanzi2radicals,
     by_hanzi: byHanzi,
