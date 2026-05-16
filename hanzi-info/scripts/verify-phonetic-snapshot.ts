@@ -46,7 +46,11 @@ function multisetFromHanzi(obj: Record<string, string[]>) {
 }
 
 const snap1 = new Set(parseLists(s1).map(norm));
-const snap2 = new Set(parseLists(s2).map(norm));
+const snap2Lists = parseLists(s2);
+const snap2 = new Set(snap2Lists.map(norm));
+if (snap2Lists.length !== snap2.size) {
+  console.log(`Note: snapshot degree two has ${snap2Lists.length} rows, ${snap2.size} unique member sets (duplicate lists).`);
+}
 const h1 = multisetFromHanzi(one);
 const h2 = multisetFromHanzi(two);
 
