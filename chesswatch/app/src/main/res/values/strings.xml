@@ -9,4 +9,5 @@
     <string name="delete_activity_title">Remove activity</string>
     <string name="delete_activity_message">Stop tracking this activity and delete its tile?</string>
     <string name="delete">Delete</string>
+    <string name="reset">Reset</string>
 </resources>
