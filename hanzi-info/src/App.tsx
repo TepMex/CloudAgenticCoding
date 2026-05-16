@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  allHanziGraphemes,
   canonicalHanziHash,
-  firstGrapheme,
   loadHanziDatabase,
   parseHanziHash,
   radicalsForCharacter,
@@ -113,11 +113,132 @@ function PhoneticSeriesCard({ db, series }: { db: HanziDatabase; series: Phoneti
   );
 }
 
+function HanziCharacterCard({ db, ch }: { db: HanziDatabase; ch: string }) {
+  const activeRow = useMemo(() => {
+    const id = db.by_hanzi[ch];
+    if (id === undefined) return undefined;
+    return db.hanzi[id - 1];
+  }, [db, ch]);
+
+  const phonetic = db.phonetic_series_by_hanzi[ch];
+  const radicalParts = radicalsForCharacter(db, ch);
+
+  if (!activeRow) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif text-2xl">Not in local index</CardTitle>
+          <CardDescription>
+            <Glyph ch={ch} className="text-3xl" /> is outside the bundled coverage (HanziJS frequency list plus phonetic-set
+            participants (degrees 1–2, 3+ characters per set) and their decomposition parts).
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle className="font-serif text-5xl font-normal leading-none">
+            <Glyph ch={activeRow.hanzi} />
+          </CardTitle>
+          <CardDescription className="mt-3">Identifier #{activeRow.id}</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <RowDetails row={activeRow} />
+
+        <div className="border-t pt-6">
+          <h3 className="mb-2 text-sm font-semibold">Phonetic component</h3>
+          {!phonetic || phonetic.length === 0 ? (
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              No phonetic component in the HanziCraft phonetic-sets index for this character (under the same filters:
+              degrees 1–2, more than two characters per set). The character is treated as <strong>ideographic</strong> here.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {phonetic.map(s => (
+                <PhoneticSeriesCard key={`${s.set_key}-${s.regularity_scale}`} db={db} series={s} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-6">
+          <h3 className="mb-2 text-sm font-semibold">Structural parts (IDS decomposition)</h3>
+          {radicalParts.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No separate parts returned for this character.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {radicalParts.map(r => {
+                const radicalLabel = r.radical_name_en || (r.type === "Radical" ? r.meaning_en : "");
+                return (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
+                  >
+                    <span className="font-serif text-2xl">
+                      <Glyph ch={r.hanzi} />
+                    </span>
+                    <div className="min-w-0 flex flex-1 flex-col items-end gap-0.5 text-right sm:max-w-[min(100%,28rem)]">
+                      {radicalLabel ? (
+                        <span className="text-foreground text-sm font-medium leading-snug">{radicalLabel}</span>
+                      ) : null}
+                      <span className="text-muted-foreground text-xs leading-snug">
+                        {r.type}
+                        {r.reading ? ` · ${r.reading}` : ""}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+            These pieces come from HanziJS <code className="text-[0.7rem]">decompose()</code> (graphical / radical-style
+            split). They are linked in the <code className="text-[0.7rem]">hanzi2radicals</code> table as perspective schema
+            support. Radical glosses follow HanziJS Kangxi-style English names.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ShareLookupBar({
+  shareUrl,
+  copyHint,
+  onCopy,
+}: {
+  shareUrl: string;
+  copyHint: string | null;
+  onCopy: () => void;
+}) {
+  if (!shareUrl) return null;
+  return (
+    <div className="w-full min-w-0 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="text-muted-foreground flex min-w-0 flex-1 gap-2 text-xs leading-relaxed">
+          <Link2 className="size-3.5 shrink-0 translate-y-0.5" aria-hidden />
+          <span className="min-w-0 break-all font-mono">{shareUrl}</span>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onCopy} className="shrink-0 gap-1.5 sm:self-center">
+          <Copy className="size-3.5" />
+          Copy link
+        </Button>
+      </div>
+      {copyHint ? <p className="text-muted-foreground mt-2 text-xs">{copyHint}</p> : null}
+    </div>
+  );
+}
+
 export function App() {
   const [db, setDb] = useState<HanziDatabase | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [active, setActive] = useState<string | null>(null);
+  const [activeGraphemes, setActiveGraphemes] = useState<string[]>([]);
   const [copyHint, setCopyHint] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,11 +249,11 @@ export function App() {
 
   const applyHash = useCallback((hash: string) => {
     const raw = parseHanziHash(hash);
-    const g = raw ? firstGrapheme(raw) : null;
-    setActive(g);
-    setQuery(g ?? "");
-    if (g) {
-      const want = canonicalHanziHash(g);
+    const gs = raw ? allHanziGraphemes(raw) : [];
+    setActiveGraphemes(gs);
+    setQuery(raw ?? "");
+    if (gs.length > 0) {
+      const want = canonicalHanziHash(gs.join(""));
       if (typeof window !== "undefined" && window.location.hash !== want) {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${want}`);
       }
@@ -146,28 +267,18 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [applyHash]);
 
-  const activeRow = useMemo(() => {
-    if (!db || !active) return undefined;
-    const id = db.by_hanzi[active];
-    if (id === undefined) return undefined;
-    return db.hanzi[id - 1];
-  }, [db, active]);
-
-  const phonetic = db && active ? db.phonetic_series_by_hanzi[active] : undefined;
-  const radicalParts = db && active ? radicalsForCharacter(db, active) : [];
-
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
-    const g = firstGrapheme(query);
-    if (!g) return;
-    window.location.hash = canonicalHanziHash(g);
+    const gs = allHanziGraphemes(query);
+    if (gs.length === 0) return;
+    window.location.hash = canonicalHanziHash(gs.join(""));
   };
 
   const shareUrl = useMemo(() => {
-    if (!active) return "";
+    if (activeGraphemes.length === 0) return "";
     const { origin, pathname } = window.location;
-    return `${origin}${pathname}${canonicalHanziHash(active)}`;
-  }, [active]);
+    return `${origin}${pathname}${canonicalHanziHash(activeGraphemes.join(""))}`;
+  }, [activeGraphemes]);
 
   const copyShare = async () => {
     if (!shareUrl) return;
@@ -183,7 +294,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/40">
-      <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
+      <div className="mx-auto flex min-w-0 max-w-3xl flex-col gap-8 px-4 py-10">
         <header className="space-y-2 text-center sm:text-left">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm">
             <BookOpen className="size-3.5" aria-hidden />
@@ -206,18 +317,19 @@ export function App() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-serif text-xl">Look up a character</CardTitle>
+            <CardTitle className="font-serif text-xl">Look up characters</CardTitle>
             <CardDescription>
-              Type one Hanzi or open a shareable URL such as <code className="text-xs">#/hanzi/我</code>.
+              Enter one or more Hanzi (a word or phrase) or open a shareable URL such as{" "}
+              <code className="text-xs">#/hanzi/语言</code>. Each character is shown in its own card.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="flex flex-col gap-3 sm:flex-row" onSubmit={onSearch}>
               <div className="flex flex-1 flex-col gap-2">
-                <Label htmlFor="hanzi-input">Character</Label>
+                <Label htmlFor="hanzi-input">Characters</Label>
                 <Input
                   id="hanzi-input"
-                  placeholder="例如：清"
+                  placeholder="例如：清 · 你好"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   autoComplete="off"
@@ -251,97 +363,18 @@ export function App() {
           </div>
         ) : null}
 
-        {db && active && !activeRow ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif text-2xl">Not in local index</CardTitle>
-              <CardDescription>
-                <Glyph ch={active} className="text-3xl" /> is outside the bundled coverage (HanziJS frequency list plus
-                phonetic-set participants (degrees 1–2, 3+ characters per set) and their decomposition parts).
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : null}
-
-        {db && activeRow ? (
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle className="font-serif text-5xl font-normal leading-none">
-                    <Glyph ch={activeRow.hanzi} />
-                  </CardTitle>
-                  <CardDescription className="mt-3">Identifier #{activeRow.id}</CardDescription>
-                </div>
-                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
-                  <Button type="button" variant="outline" size="sm" onClick={copyShare} className="gap-1.5">
-                    <Copy className="size-3.5" />
-                    Copy link
-                  </Button>
-                  {copyHint ? <span className="text-muted-foreground text-xs">{copyHint}</span> : null}
-                  <span className="text-muted-foreground flex items-center gap-1 text-xs break-all">
-                    <Link2 className="size-3 shrink-0" />
-                    {shareUrl}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <RowDetails row={activeRow} />
-
-                <div className="border-t pt-6">
-                  <h3 className="mb-2 text-sm font-semibold">Phonetic component</h3>
-                  {!phonetic || phonetic.length === 0 ? (
-                    <p className="text-muted-foreground text-sm leading-relaxed">
-                      No phonetic component in the HanziCraft phonetic-sets index for this character (under the same
-                      filters: degrees 1–2, more than two characters per set). The character is treated as{" "}
-                      <strong>ideographic</strong> here.
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-6">
-                      {phonetic.map(s => (
-                        <PhoneticSeriesCard key={`${s.set_key}-${s.regularity_scale}`} db={db} series={s} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t pt-6">
-                  <h3 className="mb-2 text-sm font-semibold">Structural parts (IDS decomposition)</h3>
-                  {radicalParts.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No separate parts returned for this character.</p>
-                  ) : (
-                    <ul className="flex flex-col gap-3">
-                      {radicalParts.map(r => (
-                        <li
-                          key={r.id}
-                          className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
-                        >
-                          <span className="font-serif text-2xl">
-                            <Glyph ch={r.hanzi} />
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            {r.type}
-                            {r.reading ? ` · ${r.reading}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                    These pieces come from HanziJS <code className="text-[0.7rem]">decompose()</code> (graphical /
-                    radical-style split). They are linked in the <code className="text-[0.7rem]">hanzi2radicals</code>{" "}
-                    table as perspective schema support.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
+        {db && activeGraphemes.length > 0 ? (
+          <div className="flex min-w-0 flex-col gap-6">
+            <ShareLookupBar shareUrl={shareUrl} copyHint={copyHint} onCopy={copyShare} />
+            {activeGraphemes.map((ch, i) => (
+              <HanziCharacterCard key={`${i}-${ch}`} db={db} ch={ch} />
+            ))}
             <p className="text-muted-foreground text-center text-xs leading-relaxed">{db.about}</p>
           </div>
         ) : null}
 
-        {db && !active ? (
-          <p className="text-muted-foreground text-center text-sm">Enter a character above to begin.</p>
+        {db && activeGraphemes.length === 0 ? (
+          <p className="text-muted-foreground text-center text-sm">Enter one or more Hanzi above to begin.</p>
         ) : null}
       </div>
     </div>
