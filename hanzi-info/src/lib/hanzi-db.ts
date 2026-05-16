@@ -23,11 +23,26 @@ export async function loadHanziDatabase(): Promise<HanziDatabase> {
 }
 
 export function firstGrapheme(text: string): string | null {
-  const t = text.trim();
-  if (!t) return null;
-  const seg = new Intl.Segmenter("zh-Hans", { granularity: "grapheme" });
-  const first = [...seg.segment(t)][0]?.segment;
-  return first ?? [...t][0] ?? null;
+  const all = allHanziGraphemes(text);
+  return all[0] ?? null;
+}
+
+/** Ordered Han script graphemes (CJK unified + compatibility ideographs); skips spaces and Latin digits, etc. */
+export function allHanziGraphemes(text: string): string[] {
+  const t = text.trim().normalize("NFC");
+  if (!t) return [];
+  const han = /^\p{Script=Han}$/u;
+  try {
+    const seg = new Intl.Segmenter("und", { granularity: "grapheme" });
+    const out: string[] = [];
+    for (const { segment } of seg.segment(t)) {
+      const s = segment.normalize("NFC");
+      if (han.test(s)) out.push(s);
+    }
+    return out;
+  } catch {
+    return [...t].filter(ch => han.test(ch.normalize("NFC")));
+  }
 }
 
 const HASH_RE = /^#\/?hanzi\/([^/]+)$/;

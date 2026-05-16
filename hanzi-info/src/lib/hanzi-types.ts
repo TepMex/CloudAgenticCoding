@@ -4,6 +4,8 @@ export type HanziRow = {
   id: number;
   hanzi: string;
   type: HanziType;
+  /** Kangxi-style English radical gloss from HanziJS `radicalListWithMeaning` (Radical rows only). */
+  radical_name_en?: string;
   meaning_en: string;
   meaning_ru: string;
   reading: string;

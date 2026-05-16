@@ -13,6 +13,10 @@ const two = require("hanzi/lib/data/phonetic_sets_regularity_two.js").regularity
 
 const MIN = 3;
 const snapPath = path.join(import.meta.dir, "..", "HanziCraft - Chinese Character Phonetic Sets");
+if (!fs.existsSync(snapPath)) {
+  console.warn(`[verify] Snapshot missing at ${snapPath}; skipping phonetic-set parity check.`);
+  process.exit(0);
+}
 const raw = fs.readFileSync(snapPath, "utf8");
 
 const s1 = raw.slice(raw.indexOf("Regularity Degree One"), raw.indexOf("Regularity Degree Two"));

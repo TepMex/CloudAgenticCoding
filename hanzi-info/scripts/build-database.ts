@@ -16,6 +16,7 @@ type HanziRow = {
   id: number;
   hanzi: string;
   type: HanziType;
+  radical_name_en?: string;
   meaning_en: string;
   meaning_ru: string;
   reading: string;
@@ -274,11 +275,13 @@ function build() {
 
     const meaning_en = ce?.def ?? fq?.gloss ?? "";
     const type = classify(h);
+    const radicalName = radicalListWithMeaning[h];
 
     rows.push({
       id,
       hanzi: h,
       type,
+      radical_name_en: type === "Radical" && radicalName ? radicalName : undefined,
       meaning_en,
       meaning_ru: "",
       reading,
