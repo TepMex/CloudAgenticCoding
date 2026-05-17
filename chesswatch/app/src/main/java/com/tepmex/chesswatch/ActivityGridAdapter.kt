@@ -46,6 +46,7 @@ class ActivityGridAdapter(
         ) {
             val card = binding.root as MaterialCardView
             val ctx = card.context
+            card.setCardBackgroundColor(item.tileColorArgb)
             val d = ctx.resources.displayMetrics.density
             card.strokeWidth = ((if (selected) 2.5f else 1f) * d).toInt()
             card.strokeColor =
