@@ -56,6 +56,7 @@ class ActivityStore(context: Context) {
                         id = IDLE_ID,
                         name = "idle",
                         accumulatedMs = 0L,
+                        tileColorArgb = PastelTileColors.idleArgb(),
                     )
                 val now = System.currentTimeMillis()
                 return PersistedState(listOf(idle), idle.id, now)

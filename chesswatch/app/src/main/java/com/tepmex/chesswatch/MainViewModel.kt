@@ -78,7 +78,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addActivity(name: String) {
         val trimmed = name.trim().ifEmpty { return }
         val id = UUID.randomUUID().toString()
-        val newItem = TrackedActivity(id = id, name = trimmed, accumulatedMs = 0L)
+        val newItem =
+            TrackedActivity(
+                id = id,
+                name = trimmed,
+                accumulatedMs = 0L,
+                tileColorArgb = PastelTileColors.randomArgb(),
+            )
         _state.update { it.copy(items = it.items + newItem) }
         select(id)
     }
@@ -118,7 +124,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         items = items.filter { it.id != id }
         if (items.isEmpty()) {
-            items = listOf(TrackedActivity(ActivityStore.IDLE_ID, "idle", 0L))
+            items =
+                listOf(
+                    TrackedActivity(
+                        ActivityStore.IDLE_ID,
+                        "idle",
+                        0L,
+                        PastelTileColors.idleArgb(),
+                    ),
+                )
         }
         val newSelected =
             when {
