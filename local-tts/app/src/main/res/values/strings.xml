@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Local TTS</string>
+    <string name="hint_model">Offline Russian speech via Vosk ONNX (vosk-model-tts-ru-0.9-multi). First run downloads ~50 MB.</string>
+    <string name="hint_input">Text to speak</string>
+    <string name="label_speaker">Voice</string>
+    <string name="sample_text">Привет мир!</string>
+    <string name="speak">Speak</string>
+    <string name="stop">Stop</string>
+    <string name="status_idle">Ready. Type Russian text and tap Speak.</string>
+    <string name="status_downloading_model">Downloading TTS model (first run only)…</string>
+    <string name="status_downloading_model_progress">Downloading TTS model… %1$d%%</string>
+    <string name="status_synthesizing">Synthesizing speech on device…</string>
+    <string name="status_playing">Playing audio…</string>
+    <string name="status_done">Done.</string>
+    <string name="status_stopped">Stopped.</string>
+    <string name="error_empty_text">Enter some text first.</string>
+    <string name="error_synthesis">Synthesis failed: %1$s</string>
+</resources>

@@ -71,9 +71,13 @@ jobs:
         working-directory: ankidroid-llm
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build Local TTS APK
+        working-directory: local-tts
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/chesswatch deploy/ankidroid-llm
+          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/chesswatch deploy/ankidroid-llm deploy/local-tts
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
           cp -r hanzi-info/dist/. deploy/hanzi-info/
@@ -81,6 +85,8 @@ jobs:
           cp chesswatch/site/index.html deploy/chesswatch/index.html
           cp ankidroid-llm/app/build/outputs/apk/release/app-release.apk deploy/ankidroid-llm/ankidroid-llm.apk
           cp ankidroid-llm/site/index.html deploy/ankidroid-llm/index.html
+          cp local-tts/app/build/outputs/apk/release/app-release.apk deploy/local-tts/local-tts.apk
+          cp local-tts/site/index.html deploy/local-tts/index.html
           touch deploy/.nojekyll
 
       - name: Deploy to gh-pages
