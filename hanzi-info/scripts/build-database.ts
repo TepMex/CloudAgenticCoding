@@ -5,7 +5,7 @@
  * Also merges CC-CEDICT, frequency data, and IDS decomposition.
  */
 import { createRequire } from "node:module";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -61,6 +61,21 @@ const radicalListWithMeaning = require("hanzi/lib/data/radicalListWithMeaning.js
 >;
 const frequencyRaw = require("hanzi/lib/data/frequency_with_script_variants_removed.txt.js") as string;
 const cedictRaw = require("hanzi/lib/data/cedict_ts.u8.js") as string;
+
+function loadWikiZhRuSingleChar(): Map<string, string> {
+  const p = path.join(import.meta.dir, "..", "data", "wiki_zh_ru_single_char.json");
+  const raw = JSON.parse(readFileSync(p, "utf8")) as Record<string, string>;
+  return new Map(Object.entries(raw));
+}
+
+function loadGlossEnRu(): Record<string, string> {
+  const p = path.join(import.meta.dir, "..", "data", "gloss_en_to_ru.json");
+  try {
+    return JSON.parse(readFileSync(p, "utf8")) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
 
 function parsePhoneticKey(key: string) {
   const tone = parseInt(key.at(-1) ?? "", 10);
@@ -153,6 +168,8 @@ function parseCedictLine(line: string) {
 }
 
 function build() {
+  const wikiZhRu = loadWikiZhRuSingleChar();
+  const glossEnRu = loadGlossEnRu();
   const freq = new Map<string, { py: string; gloss: string }>();
   for (const line of frequencyRaw.split(/\r?\n/)) {
     const p = line.split("\t");
@@ -274,6 +291,9 @@ function build() {
     if (!reading && numbered) reading = numbered;
 
     const meaning_en = ce?.def ?? fq?.gloss ?? "";
+    const glossFromEn = meaning_en ? glossEnRu[meaning_en] : undefined;
+    const wikiRu = wikiZhRu.get(h);
+    const meaning_ru = (glossFromEn && glossFromEn.trim()) || wikiRu || "";
     const type = classify(h);
     const radicalName = radicalListWithMeaning[h];
 
@@ -283,7 +303,7 @@ function build() {
       type,
       radical_name_en: type === "Radical" && radicalName ? radicalName : undefined,
       meaning_en,
-      meaning_ru: "",
+      meaning_ru,
       reading,
       initiale: parts.initiale,
       finale: parts.finale,
@@ -320,7 +340,9 @@ function build() {
       "more than two characters—the same filters described on that page. Rows are taken from HanziJS " +
       "`phonetic_sets_regularity_one` / `phonetic_sets_regularity_two` and verified against the repo snapshot " +
       "`HanziCraft - Chinese Character Phonetic Sets`. English glosses and readings come from CC-CEDICT and " +
-      "frequency data bundled with HanziJS. Structural parts use HanziJS IDS decomposition.",
+      "frequency data bundled with HanziJS. Russian glosses prefer machine translation (MyMemory en→ru) of those " +
+      "English definitions when listed in `data/gloss_en_to_ru.json`, then single-character Wikipedia interwiki titles " +
+      "from open-dict-data (vendored in `data/wiki_zh_ru_single_char.json`). Structural parts use HanziJS IDS decomposition.",
     hanzi: rows,
     hanzi2radicals,
     by_hanzi: byHanzi,

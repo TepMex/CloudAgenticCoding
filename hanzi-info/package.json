@@ -6,6 +6,8 @@
   "description": "Hanzi phonetic component lookup (HanziCraft / HanziJS data) for GitHub Pages.",
   "scripts": {
     "build:db": "bun run scripts/build-database.ts && bun run scripts/verify-phonetic-snapshot.ts",
+    "fill:ru-gloss": "bun run scripts/fill-ru-gloss-mymemory.ts",
+    "extract:wiki-ru": "bun run scripts/extract-wiki-single-char.ts",
     "verify:snapshot": "bun run scripts/verify-phonetic-snapshot.ts",
     "predev": "bun run build:db",
     "dev": "bun --hot src/index.ts",

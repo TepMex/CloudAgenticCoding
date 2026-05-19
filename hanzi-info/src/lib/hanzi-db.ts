@@ -57,6 +57,16 @@ export function canonicalHanziHash(hanzi: string): string {
   return `#/hanzi/${encodeURIComponent(hanzi)}`;
 }
 
+const SETTINGS_HASH = /^#\/?settings\/?$/i;
+
+export function isSettingsHash(hash: string): boolean {
+  return SETTINGS_HASH.test(hash.trim());
+}
+
+export function canonicalSettingsHash(): string {
+  return "#/settings";
+}
+
 export function radicalsForCharacter(db: HanziDatabase, hanzi: string): HanziRow[] {
   const hid = db.by_hanzi[hanzi];
   if (hid === undefined) return [];
