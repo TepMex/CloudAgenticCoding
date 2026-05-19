@@ -8,7 +8,7 @@ This repository hosts multiple browser apps. Each app lives in its own top-level
 | ---------------- | -------------------------- | ---------------------------------- |
 | `socratus`       | `/<repo>/socratus/`        | Socratus · Socratic Reading Agent  |
 | `mandarin-koan`  | `/<repo>/mandarin-koan/`   | Mandarin Koan                      |
-| `hanzi-info`     | `/<repo>/hanzi-info/`      | Hanzi Info · phonetic component DB |
+| `hanzi-info`     | `/<repo>/hanzi-info/`      | Hanzi Info · phonetic DB (EN/RU UI, Russian glosses) |
 | `chesswatch`     | `/<repo>/chesswatch/`      | ChessWatch · Android time tracker (APK) |
 | `ankidroid-llm` | `/<repo>/ankidroid-llm/`   | AnkiDroid LLM · Android story from study queue (APK) |
 
