@@ -19,7 +19,7 @@ class TtsRepository(
 
     suspend fun ensureModel(onProgress: (downloaded: Long, total: Long?) -> Unit) {
         downloader.ensureModelExtracted(
-            zipUrl = VoskTtsEngine.MODEL_ZIP_URL,
+            zipUrls = VoskTtsEngine.MODEL_ZIP_URLS,
             modelDir = modelDir,
             onProgress = onProgress,
         )
