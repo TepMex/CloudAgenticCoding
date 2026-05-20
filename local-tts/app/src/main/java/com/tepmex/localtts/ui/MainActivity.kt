@@ -1,6 +1,8 @@
 package com.tepmex.localtts.ui
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ScrollView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -27,12 +29,22 @@ class MainActivity : AppCompatActivity() {
             viewModel.speak(binding.inputText.text?.toString().orEmpty(), speakerId)
         }
         binding.stopButton.setOnClickListener { viewModel.stop() }
+        binding.clearLogButton.setOnClickListener { viewModel.clearDiagnostics() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     if (state.statusMessage.isNotBlank()) {
                         binding.statusText.text = state.statusMessage
+                    }
+                    binding.diagnosticsText.text = state.diagnosticsText.ifBlank {
+                        getString(R.string.diagnostics_empty)
+                    }
+                    if (state.diagnosticsText.isNotBlank()) {
+                        binding.diagnosticsText.post {
+                            (binding.diagnosticsText.parent as? ScrollView)
+                                ?.fullScroll(View.FOCUS_DOWN)
+                        }
                     }
                     binding.progressBar.isVisible = state.loading
                     binding.stopButton.isVisible = state.loading
