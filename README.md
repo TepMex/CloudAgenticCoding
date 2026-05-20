@@ -11,5 +11,6 @@ This repository hosts multiple browser apps. Each app lives in its own top-level
 | `hanzi-info`     | `/<repo>/hanzi-info/`      | Hanzi Info · phonetic DB (EN/RU UI, Russian glosses) |
 | `chesswatch`     | `/<repo>/chesswatch/`      | ChessWatch · Android time tracker (APK) |
 | `ankidroid-llm` | `/<repo>/ankidroid-llm/`   | AnkiDroid LLM · Android story from study queue (APK) |
+| `local-tts`     | `/<repo>/local-tts/`       | Local TTS · on-device Vosk ONNX text-to-speech (APK) |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.

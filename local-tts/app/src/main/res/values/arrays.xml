@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="speaker_labels">
+        <item>Female 0</item>
+        <item>Female 1</item>
+        <item>Female 2</item>
+        <item>Male 0</item>
+        <item>Male 1</item>
+    </string-array>
+</resources>
