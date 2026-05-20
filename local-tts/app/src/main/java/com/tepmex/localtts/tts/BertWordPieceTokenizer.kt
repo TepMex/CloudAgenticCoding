@@ -52,12 +52,29 @@ class BertWordPieceTokenizer(
     }
 
     private fun basicTokenize(text: String): List<String> {
+        // Character-based split: Android ICU rejects (?U) and \p{…} in Regex (see PatternSyntaxException).
         val tokens = mutableListOf<String>()
-        for (match in BASIC_TOKEN_PATTERN.findAll(text)) {
-            val piece = match.value
-            if (piece.isNotBlank()) {
-                tokens.add(piece)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (c.isWhitespace()) {
+                i++
+                continue
             }
+            val start = i
+            when {
+                c.isLetter() -> while (i < text.length && text[i].isLetter()) i++
+                c.isDigit() -> while (i < text.length && text[i].isDigit()) i++
+                else -> while (
+                    i < text.length &&
+                    !text[i].isLetter() &&
+                    !text[i].isDigit() &&
+                    !text[i].isWhitespace()
+                ) {
+                    i++
+                }
+            }
+            tokens.add(text.substring(start, i))
         }
         return tokens
     }
@@ -92,7 +109,4 @@ class BertWordPieceTokenizer(
         return output
     }
 
-    companion object {
-        private val BASIC_TOKEN_PATTERN = Regex("""(?U)\p{L}+|\p{N}+|[^\p{L}\p{N}\s]+""")
-    }
 }
