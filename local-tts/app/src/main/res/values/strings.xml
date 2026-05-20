@@ -16,4 +16,8 @@
     <string name="status_stopped">Stopped.</string>
     <string name="error_empty_text">Enter some text first.</string>
     <string name="error_synthesis">Synthesis failed: %1$s</string>
+    <string name="error_oom">Out of memory during synthesis. Try shorter text; the app may have been killed by Android if RAM was exhausted.</string>
+    <string name="label_diagnostics">Diagnostics log</string>
+    <string name="clear_log">Clear log</string>
+    <string name="diagnostics_empty">Log will appear here when you tap Speak.</string>
 </resources>

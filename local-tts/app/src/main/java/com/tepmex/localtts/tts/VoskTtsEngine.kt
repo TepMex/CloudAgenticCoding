@@ -3,7 +3,8 @@ package com.tepmex.localtts.tts
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import android.util.Log
+import com.tepmex.localtts.util.DiagnosticsLog
+import com.tepmex.localtts.util.MemoryStats
 import java.io.File
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
@@ -25,10 +26,17 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
     private val bertSession: OrtSession
 
     init {
-        val opts = OrtSession.SessionOptions()
-        ttsSession = env.createSession(File(modelDir, "model.onnx").absolutePath, opts)
-        bertSession = env.createSession(File(modelDir, "bert/model.onnx").absolutePath, opts)
-        Log.i(TAG, "Loaded Vosk TTS from ${modelDir.absolutePath} (${config.modelType})")
+        try {
+            val opts = OrtSession.SessionOptions()
+            DiagnosticsLog.i(TAG, "Loading ONNX sessions from ${modelDir.absolutePath}")
+            ttsSession = env.createSession(File(modelDir, "model.onnx").absolutePath, opts)
+            bertSession = env.createSession(File(modelDir, "bert/model.onnx").absolutePath, opts)
+            DiagnosticsLog.i(TAG, "Loaded Vosk TTS (${config.modelType}, sr=${config.sampleRate})")
+            DiagnosticsLog.i(TAG, MemoryStats.format(label = "after model load"))
+        } catch (e: Throwable) {
+            DiagnosticsLog.e(TAG, "Failed to load ONNX models", e)
+            throw e
+        }
     }
 
     val sampleRate: Int get() = config.sampleRate
@@ -51,33 +59,74 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
         val dnl = durationNoiseLevel ?: config.inference.durationNoiseLevel
         val sc = scale ?: config.inference.scale
 
-        var normalized = text.trim().replace('—', '-')
-        val bertEmbeddings = getWordBert(normalized, nopunc = true)
-        val (phonemeIds, phoneBert) = g2pMultistream(normalized, bertEmbeddings)
+        DiagnosticsLog.i(TAG, "synthesize start: chars=${text.length}, speaker=$speakerId")
+        DiagnosticsLog.i(TAG, MemoryStats.format(label = "before tokenize"))
 
-        val timeSteps = phonemeIds.size
-        val input = Array(1) { Array(5) { LongArray(timeSteps) } }
-        for (t in 0 until timeSteps) {
-            val stream = phonemeIds[t]
-            for (s in 0 until 5) {
-                input[0][s][t] = stream[s]
+        return try {
+            var normalized = text.trim().replace('—', '-')
+            DiagnosticsLog.d(TAG, "normalized preview: ${preview(normalized)}")
+
+            DiagnosticsLog.d(TAG, "BERT encode + inference…")
+            val bertEmbeddings = getWordBert(normalized, nopunc = true)
+            DiagnosticsLog.i(
+                TAG,
+                "BERT words=${bertEmbeddings.size}; ${MemoryStats.format(label = "after BERT")}",
+            )
+
+            DiagnosticsLog.d(TAG, "G2P multistream…")
+            val (phonemeIds, phoneBert) = g2pMultistream(normalized, bertEmbeddings)
+            val timeSteps = phonemeIds.size
+            DiagnosticsLog.i(
+                TAG,
+                "phoneme timeSteps=$timeSteps; bert dim=768; " +
+                    "input tensor est ${MemoryStats.estimateTensorMb(timeSteps * 5L, 8)}; " +
+                    "bert tensor est ${MemoryStats.estimateTensorMb(timeSteps * 768L, 4)}",
+            )
+            if (timeSteps > WARN_TIME_STEPS) {
+                DiagnosticsLog.w(
+                    TAG,
+                    "Long input ($timeSteps phoneme steps) may cause high RAM use or OOM; try shorter text.",
+                )
             }
-        }
 
-        val bert = Array(1) { Array(768) { FloatArray(timeSteps) } }
-        for (t in 0 until timeSteps) {
-            val emb = phoneBert[t]
-            for (d in 0 until 768) {
-                bert[0][d][t] = emb[d]
+            val input = Array(1) { Array(5) { LongArray(timeSteps) } }
+            for (t in 0 until timeSteps) {
+                val stream = phonemeIds[t]
+                for (s in 0 until 5) {
+                    input[0][s][t] = stream[s]
+                }
             }
+
+            val bert = Array(1) { Array(768) { FloatArray(timeSteps) } }
+            for (t in 0 until timeSteps) {
+                val emb = phoneBert[t]
+                for (d in 0 until 768) {
+                    bert[0][d][t] = emb[d]
+                }
+            }
+
+            val scales = floatArrayOf(nl, 1.0f / sr, dnl)
+            val sid = longArrayOf(speakerId.toLong())
+            val inputLengths = longArrayOf(timeSteps.toLong())
+
+            DiagnosticsLog.d(TAG, "ONNX TTS inference…")
+            DiagnosticsLog.i(TAG, MemoryStats.format(label = "before ONNX run"))
+            val audio = runTts(input, inputLengths, scales, sid, bert)
+            DiagnosticsLog.i(
+                TAG,
+                "ONNX output samples=${audio.size}; ${MemoryStats.format(label = "after ONNX run")}",
+            )
+
+            val pcm = audioFloatToInt16(audio, sc)
+            DiagnosticsLog.i(TAG, "PCM int16 samples=${pcm.size} (${pcm.size * 2} bytes)")
+            pcm
+        } catch (e: OutOfMemoryError) {
+            DiagnosticsLog.e(TAG, "OutOfMemoryError during synthesis — try shorter text", e)
+            throw SynthesisException("Out of memory during synthesis. Try shorter text.", e)
+        } catch (e: Throwable) {
+            DiagnosticsLog.e(TAG, "Synthesis failed", e)
+            throw if (e is SynthesisException) e else SynthesisException(e.message ?: e.javaClass.simpleName, e)
         }
-
-        val scales = floatArrayOf(nl, 1.0f / sr, dnl)
-        val sid = longArrayOf(speakerId.toLong())
-        val inputLengths = longArrayOf(timeSteps.toLong())
-
-        val audio = runTts(input, inputLengths, scales, sid, bert)
-        return audioFloatToInt16(audio, sc)
     }
 
     private fun runTts(
@@ -91,31 +140,40 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
         val streams = input[0].size
         val time = input[0][0].size
 
-        OnnxTensor.createTensor(env, LongBuffer.wrap(flattenInput(input)), longArrayOf(batch.toLong(), streams.toLong(), time.toLong())).use { inputTensor ->
-            OnnxTensor.createTensor(env, LongBuffer.wrap(inputLengths), longArrayOf(batch.toLong())).use { lenTensor ->
-                OnnxTensor.createTensor(env, FloatBuffer.wrap(scales), longArrayOf(3)).use { scalesTensor ->
-                    OnnxTensor.createTensor(env, LongBuffer.wrap(sid), longArrayOf(batch.toLong())).use { sidTensor ->
-                        OnnxTensor.createTensor(
-                            env,
-                            FloatBuffer.wrap(flattenBert(bert)),
-                            longArrayOf(batch.toLong(), 768, time.toLong()),
-                        ).use { bertTensor ->
-                            val results = ttsSession.run(
-                                mapOf(
-                                    "input" to inputTensor,
-                                    "input_lengths" to lenTensor,
-                                    "scales" to scalesTensor,
-                                    "sid" to sidTensor,
-                                    "bert" to bertTensor,
-                                ),
-                            )
-                            val floats = extractAudio(raw = results[0].value)
-                            results.close()
-                            return floats
+        try {
+            OnnxTensor.createTensor(env, LongBuffer.wrap(flattenInput(input)), longArrayOf(batch.toLong(), streams.toLong(), time.toLong())).use { inputTensor ->
+                OnnxTensor.createTensor(env, LongBuffer.wrap(inputLengths), longArrayOf(batch.toLong())).use { lenTensor ->
+                    OnnxTensor.createTensor(env, FloatBuffer.wrap(scales), longArrayOf(3)).use { scalesTensor ->
+                        OnnxTensor.createTensor(env, LongBuffer.wrap(sid), longArrayOf(batch.toLong())).use { sidTensor ->
+                            OnnxTensor.createTensor(
+                                env,
+                                FloatBuffer.wrap(flattenBert(bert)),
+                                longArrayOf(batch.toLong(), 768, time.toLong()),
+                            ).use { bertTensor ->
+                                DiagnosticsLog.d(TAG, "ttsSession.run (time=$time)…")
+                                val results = ttsSession.run(
+                                    mapOf(
+                                        "input" to inputTensor,
+                                        "input_lengths" to lenTensor,
+                                        "scales" to scalesTensor,
+                                        "sid" to sidTensor,
+                                        "bert" to bertTensor,
+                                    ),
+                                )
+                                val floats = extractAudio(raw = results[0].value)
+                                results.close()
+                                if (floats.isEmpty()) {
+                                    DiagnosticsLog.w(TAG, "ONNX returned empty audio buffer")
+                                }
+                                return floats
+                            }
                         }
                     }
                 }
             }
+        } catch (e: OutOfMemoryError) {
+            DiagnosticsLog.e(TAG, "OutOfMemoryError building ONNX tensors or running session", e)
+            throw e
         }
     }
 
@@ -156,34 +214,40 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
         val inputIds = encoding.ids
         val attention = encoding.attentionMask
         val typeIds = encoding.typeIds
+        DiagnosticsLog.d(TAG, "tokenizer tokens=${encoding.tokens.size}, ids=${inputIds.size}")
 
-        OnnxTensor.createTensor(env, LongBuffer.wrap(inputIds), longArrayOf(1, inputIds.size.toLong())).use { idsTensor ->
-            OnnxTensor.createTensor(env, LongBuffer.wrap(attention), longArrayOf(1, attention.size.toLong())).use { maskTensor ->
-                OnnxTensor.createTensor(env, LongBuffer.wrap(typeIds), longArrayOf(1, typeIds.size.toLong())).use { typeTensor ->
-                    val results = bertSession.run(
-                        mapOf(
-                            "input_ids" to idsTensor,
-                            "attention_mask" to maskTensor,
-                            "token_type_ids" to typeTensor,
-                        ),
-                    )
-                    @Suppress("UNCHECKED_CAST")
-                    val output = results[0].value as Array<Array<FloatArray>>
-                    results.close()
-                    val seq = output[0]
-                    val puncPattern = Regex("""[-,.?!;:"]""")
-                    val selected = mutableListOf<FloatArray>()
-                    for (i in encoding.tokens.indices) {
-                        val token = encoding.tokens[i]
-                        if (token.isNotEmpty() && token[0] != '#') {
-                            if (!(nopunc && puncPattern.matches(token))) {
-                                selected.add(seq[i])
+        try {
+            OnnxTensor.createTensor(env, LongBuffer.wrap(inputIds), longArrayOf(1, inputIds.size.toLong())).use { idsTensor ->
+                OnnxTensor.createTensor(env, LongBuffer.wrap(attention), longArrayOf(1, attention.size.toLong())).use { maskTensor ->
+                    OnnxTensor.createTensor(env, LongBuffer.wrap(typeIds), longArrayOf(1, typeIds.size.toLong())).use { typeTensor ->
+                        val results = bertSession.run(
+                            mapOf(
+                                "input_ids" to idsTensor,
+                                "attention_mask" to maskTensor,
+                                "token_type_ids" to typeTensor,
+                            ),
+                        )
+                        @Suppress("UNCHECKED_CAST")
+                        val output = results[0].value as Array<Array<FloatArray>>
+                        results.close()
+                        val seq = output[0]
+                        val puncPattern = Regex("""[-,.?!;:"]""")
+                        val selected = mutableListOf<FloatArray>()
+                        for (i in encoding.tokens.indices) {
+                            val token = encoding.tokens[i]
+                            if (token.isNotEmpty() && token[0] != '#') {
+                                if (!(nopunc && puncPattern.matches(token))) {
+                                    selected.add(seq[i])
+                                }
                             }
                         }
+                        return selected
                     }
-                    return selected
                 }
             }
+        } catch (e: OutOfMemoryError) {
+            DiagnosticsLog.e(TAG, "OutOfMemoryError in BERT session", e)
+            throw e
         }
     }
 
@@ -286,10 +350,12 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
                 probs[word] = prob
             }
         }
+        DiagnosticsLog.d(TAG, "dictionary entries=${dic.size}")
         return dic
     }
 
     override fun close() {
+        DiagnosticsLog.d(TAG, "Closing ONNX sessions")
         ttsSession.close()
         bertSession.close()
     }
@@ -312,8 +378,14 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
         }
     }
 
+    private fun preview(text: String, max: Int = 80): String =
+        if (text.length <= max) text else text.take(max) + "…"
+
+    class SynthesisException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
     companion object {
         private const val TAG = "VoskTtsEngine"
+        private const val WARN_TIME_STEPS = 400
         const val MODEL_NAME = "vosk-model-tts-ru-0.9-multi"
 
         /** Official Vosk model archive (same layout as the zip from alphacephei.com). */
