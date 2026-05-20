@@ -227,10 +227,8 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
                                 "token_type_ids" to typeTensor,
                             ),
                         )
-                        @Suppress("UNCHECKED_CAST")
-                        val output = results[0].value as Array<Array<FloatArray>>
+                        val seq = extractBertSequence(results[0].value)
                         results.close()
-                        val seq = output[0]
                         val puncPattern = Regex("""[-,.?!;:"]""")
                         val selected = mutableListOf<FloatArray>()
                         for (i in encoding.tokens.indices) {
@@ -366,6 +364,26 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
         val inQuote: Int,
         val bertIndex: Int,
     )
+
+    /**
+     * BERT ONNX output is [batch, seq, hidden] or [seq, hidden] when batch=1.
+     * ONNX Runtime Java may return either float[][][] or float[][].
+     */
+    private fun extractBertSequence(raw: Any?): Array<FloatArray> {
+        if (raw !is Array<*> || raw.isEmpty()) return emptyArray()
+        return when (val first = raw[0]) {
+            is FloatArray -> {
+                @Suppress("UNCHECKED_CAST")
+                raw as Array<FloatArray>
+            }
+            is Array<*> -> {
+                if (first.isEmpty() || first[0] !is FloatArray) return emptyArray()
+                @Suppress("UNCHECKED_CAST")
+                first as Array<FloatArray>
+            }
+            else -> emptyArray()
+        }
+    }
 
     private fun extractAudio(raw: Any?): FloatArray {
         return when (raw) {
