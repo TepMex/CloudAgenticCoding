@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Local TTS</string>
-    <string name="hint_model">Offline Russian speech via Vosk ONNX (vosk-model-tts-ru-0.9-multi). First run downloads ~50 MB.</string>
+    <string name="hint_model">Offline Russian speech via Vosk ONNX (vosk-model-tts-ru-0.9-multi). First run downloads ~750 MB (Wi‑Fi recommended).</string>
     <string name="hint_input">Text to speak</string>
     <string name="label_speaker">Voice</string>
     <string name="sample_text">Привет мир!</string>

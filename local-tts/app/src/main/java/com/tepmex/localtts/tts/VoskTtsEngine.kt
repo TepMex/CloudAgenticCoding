@@ -315,6 +315,30 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
     companion object {
         private const val TAG = "VoskTtsEngine"
         const val MODEL_NAME = "vosk-model-tts-ru-0.9-multi"
-        const val MODEL_ZIP_URL = "https://alphacephei.com/vosk/models/vosk-model-tts-ru-0.9-multi.zip"
+
+        /** Official Vosk model archive (same layout as the zip from alphacephei.com). */
+        val MODEL_ZIP_URLS = listOf(
+            "https://alphacephei.com/vosk/models/vosk-model-tts-ru-0.9-multi.zip",
+        )
+
+        /** Hugging Face mirror (file-by-file) when zip hosts are unreachable. */
+        const val HUGGING_FACE_REPO =
+            "https://huggingface.co/drakulavich/vosk-tts-ru-0.9-multi/resolve/main"
+
+        val HUGGING_FACE_FILES = listOf(
+            "config.json",
+            "dictionary",
+            "model.onnx",
+            "bert/model.onnx",
+            "bert/vocab.txt",
+        )
+
+        /** IPv4 for alphacephei.com when system DNS cannot resolve the hostname. */
+        val ALPHACEPHEI_FALLBACK_IPV4 = byteArrayOf(
+            188.toByte(),
+            40,
+            21,
+            16,
+        )
     }
 }
