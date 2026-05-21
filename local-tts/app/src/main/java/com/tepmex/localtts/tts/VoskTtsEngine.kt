@@ -312,11 +312,11 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
             val map = config.phonemeIdMap
             lpPhonemes.add(
                 longArrayOf(
-                    map[p.phone]!!.toLong(),
-                    map[curPuncToken]!!.toLong(),
+                    phonemeId(map, p.phone).toLong(),
+                    phonemeId(map, curPuncToken).toLong(),
                     p.inQuote.toLong(),
-                    map[lastPunc]!!.toLong(),
-                    map[lastSentencePunc]!!.toLong(),
+                    phonemeId(map, lastPunc).toLong(),
+                    phonemeId(map, lastSentencePunc).toLong(),
                 ),
             )
             if (bertEmbeddings != null) {
