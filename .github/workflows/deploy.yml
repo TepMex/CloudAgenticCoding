@@ -75,6 +75,13 @@ jobs:
         working-directory: local-tts
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Verify APK sideload signing
+        run: |
+          chmod +x android/verify-apk-sideload-cert.sh
+          android/verify-apk-sideload-cert.sh chesswatch/app/build/outputs/apk/release/app-release.apk
+          android/verify-apk-sideload-cert.sh ankidroid-llm/app/build/outputs/apk/release/app-release.apk
+          android/verify-apk-sideload-cert.sh local-tts/app/build/outputs/apk/release/app-release.apk
+
       - name: Prepare GitHub Pages site
         run: |
           mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/chesswatch deploy/ankidroid-llm deploy/local-tts

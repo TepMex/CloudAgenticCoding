@@ -1,21 +1,47 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
+extra["sideloadPropertyPrefix"] = "chesswatch"
+apply(from = rootProject.file("../android/sideload-signing.gradle.kts"))
+
+val autoVersionCode: Int = extra["autoVersionCode"] as Int
+val useCustomSigning: Boolean = extra["useCustomSigning"] as Boolean
+
 android {
     namespace = "com.tepmex.chesswatch"
     compileSdk = 35
+
+    signingConfigs {
+        if (useCustomSigning) {
+            create("sideload") {
+                storeFile = extra["sideloadStoreFile"] as File
+                storePassword = extra["sideloadStorePassword"] as String
+                keyAlias = extra["sideloadKeyAlias"] as String
+                keyPassword = extra["sideloadKeyPassword"] as String
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.tepmex.chesswatch"
         minSdk = 34
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = autoVersionCode
+        versionName = "1.0.$autoVersionCode"
     }
 
     buildTypes {
+        debug {
+            signingConfig = if (useCustomSigning) {
+                signingConfigs.getByName("sideload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -23,7 +49,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (useCustomSigning) {
+                signingConfigs.getByName("sideload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

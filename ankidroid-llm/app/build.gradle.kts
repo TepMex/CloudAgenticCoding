@@ -1,4 +1,4 @@
-import java.util.Properties
+import java.io.File
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,44 +6,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val autoVersionCode = (System.currentTimeMillis() / 1000L).toInt()
+extra["sideloadPropertyPrefix"] = "ankidroidllm"
+apply(from = rootProject.file("../android/sideload-signing.gradle.kts"))
 
-val localProps = Properties()
-val localPropsFile = rootProject.file("local.properties")
-if (localPropsFile.exists()) {
-    localPropsFile.inputStream().use { localProps.load(it) }
-}
-
-fun propLocal(name: String): String? =
-    localProps.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
-
-val overrideStoreFile = propLocal("ankidroidllm.signingStoreFile")
-val overrideStorePassword = propLocal("ankidroidllm.signingStorePassword")
-val overrideKeyAlias = propLocal("ankidroidllm.signingKeyAlias")
-val overrideKeyPassword = propLocal("ankidroidllm.signingKeyPassword")
-val useOverrideSigning = overrideStoreFile != null &&
-    overrideStorePassword != null &&
-    overrideKeyAlias != null &&
-    overrideKeyPassword != null
-
-val sideloadProps = Properties()
-val sideloadPropsFile = rootProject.file("sideload-signing.properties")
-val sideloadKs = rootProject.file("sideload.keystore")
-if (!useOverrideSigning && sideloadPropsFile.exists() && sideloadKs.exists()) {
-    sideloadPropsFile.inputStream().use { sideloadProps.load(it) }
-}
-
-fun propSideload(name: String): String? =
-    sideloadProps.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
-
-val useCommittedSideload = !useOverrideSigning &&
-    sideloadKs.exists() &&
-    propSideload("storeFile") != null &&
-    propSideload("storePassword") != null &&
-    propSideload("keyAlias") != null &&
-    propSideload("keyPassword") != null
-
-val useCustomSigning = useOverrideSigning || useCommittedSideload
+val autoVersionCode: Int = extra["autoVersionCode"] as Int
+val useCustomSigning: Boolean = extra["useCustomSigning"] as Boolean
 
 android {
     namespace = "com.tepmex.ankidroidllm"
@@ -52,17 +19,10 @@ android {
     signingConfigs {
         if (useCustomSigning) {
             create("sideload") {
-                if (useOverrideSigning) {
-                    storeFile = rootProject.file(overrideStoreFile!!)
-                    storePassword = overrideStorePassword!!
-                    keyAlias = overrideKeyAlias!!
-                    keyPassword = overrideKeyPassword!!
-                } else {
-                    storeFile = rootProject.file(propSideload("storeFile")!!)
-                    storePassword = propSideload("storePassword")!!
-                    keyAlias = propSideload("keyAlias")!!
-                    keyPassword = propSideload("keyPassword")!!
-                }
+                storeFile = extra["sideloadStoreFile"] as File
+                storePassword = extra["sideloadStorePassword"] as String
+                keyAlias = extra["sideloadKeyAlias"] as String
+                keyPassword = extra["sideloadKeyPassword"] as String
             }
         }
     }

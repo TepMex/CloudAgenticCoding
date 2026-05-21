@@ -22,4 +22,6 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 - PoC targets the Russian multi-speaker model (5 voices). English models are not bundled yet.
 - Requires network on first launch to download the model (~750 MB).
-- Same sideload signing pattern as `ankidroid-llm` / `chesswatch` for CI and GitHub Pages APK hosting.
+- Release builds use the committed **sideload keystore** (`sideload.keystore` + `sideload-signing.properties`) so CI and local builds share one signing key. Updates install over the previous app and keep downloaded models in app storage.
+- Optional: `localtts.signing*` in `local.properties` to override the keystore.
+- **Updating:** install the latest APK from GitHub Pages over the existing app. If Android refuses (older build with a different signature), uninstall once, reinstall, then later updates stay in place.

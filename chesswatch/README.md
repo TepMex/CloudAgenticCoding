@@ -14,10 +14,17 @@ Install [Android Studio](https://developer.android.com/studio) or the command-li
 ./gradlew assembleRelease
 ```
 
-Release builds in this repo use the debug keystore for signing so CI can produce an installable APK without secrets.
+Release builds are signed with the committed **sideload keystore** (`sideload.keystore` + `sideload-signing.properties`) so every CI and local build uses the same key. New APKs install **over** the previous version.
 
 APK output: `app/build/outputs/apk/release/app-release.apk`.
 
+Optional: override signing via `chesswatch.signing*` entries in `local.properties`.
+
+### Updating on your phone
+
+1. Download the latest `chesswatch.apk` from GitHub Pages and install it over the existing app.
+2. If Android refuses (e.g. you installed an older build signed with a different key), **uninstall once**, install the latest APK, then future updates install in place.
+
 ## CI and download
 
-On push to `master`, `.github/workflows/deploy.yml` builds the release APK and publishes it on GitHub Pages at `/<repository>/chesswatch/chesswatch.apk` together with a small `index.html` landing page.
+On push to `master`, `.github/workflows/deploy.yml` builds the release APK, verifies sideload signing, and publishes it on GitHub Pages at `/<repository>/chesswatch/chesswatch.apk` together with a small `index.html` landing page.
