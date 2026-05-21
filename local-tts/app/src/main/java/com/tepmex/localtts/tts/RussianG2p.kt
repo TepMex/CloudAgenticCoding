@@ -66,10 +66,13 @@ object RussianG2p {
                     newPhones.add("j")
                 }
             }
-            if (ch.length == 1 && ch[0] in vowels) {
-                newPhones.add(vowels[ch[0]]!! + phone.second)
-            } else {
-                newPhones.add(ch)
+            when {
+                ch.length == 1 && ch[0] in vowels ->
+                    newPhones.add(vowels[ch[0]]!! + phone.second)
+                ch.length == 1 && ch[0] in latinVowels ->
+                    newPhones.add(latinVowels[ch[0]]!! + phone.second)
+                else ->
+                    newPhones.add(ch)
             }
             prev = if (ch.isNotEmpty()) ch[0].toString() else ""
         }
