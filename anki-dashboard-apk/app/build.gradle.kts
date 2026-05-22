@@ -88,5 +88,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.github.luben:zstd-jni:1.5.6-3")
+    // Android needs the AAR (jniLibs per ABI); the plain JAR only ships linux/*.so paths.
+    implementation("com.github.luben:zstd-jni:1.5.6-3@aar")
 }
