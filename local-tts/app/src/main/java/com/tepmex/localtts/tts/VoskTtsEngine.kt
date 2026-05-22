@@ -399,6 +399,13 @@ class VoskTtsEngine(modelDir: File) : AutoCloseable {
     private fun preview(text: String, max: Int = 80): String =
         if (text.length <= max) text else text.take(max) + "…"
 
+    private fun phonemeId(map: Map<String, Int>, phone: String): Int {
+        map[phone]?.let { return it }
+        val withStress0 = phone + "0"
+        map[withStress0]?.let { return it }
+        throw SynthesisException("Unknown phoneme \"$phone\" (not in phoneme_id_map)")
+    }
+
     class SynthesisException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     companion object {

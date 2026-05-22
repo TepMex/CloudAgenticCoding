@@ -23,6 +23,12 @@ object RussianG2p {
         'э' to "e", 'е' to "e", 'и' to "i", 'ы' to "y",
     )
 
+    /** Latin vowels in mixed/foreign text; map to stressed phoneme forms (a0, e0, …). */
+    private val latinVowels = mapOf(
+        'a' to "a", 'e' to "e", 'i' to "i", 'o' to "o", 'u' to "u", 'y' to "y",
+        'A' to "a", 'E' to "e", 'I' to "i", 'O' to "o", 'U' to "u", 'Y' to "y",
+    )
+
     fun convert(stressWord: String): String {
         val chars = ("#$stressWord#").toList()
         val stressPhones = mutableListOf<Pair<String, Int>>()
