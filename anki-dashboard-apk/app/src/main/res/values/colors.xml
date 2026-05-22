@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dashboard_bg">#FF1E2128</color>
+    <color name="dashboard_surface">#FF282C34</color>
+    <color name="dashboard_text">#FFF3F3F3</color>
+    <color name="dashboard_text_muted">#FFB0B8C4</color>
+    <color name="dashboard_accent">#FF61DAFB</color>
+    <color name="dashboard_warning_bg">#FF3A3040</color>
+    <color name="chip_bg">#FF3A3F4B</color>
+    <color name="plate_review">#FF2E3A4F</color>
+    <color name="plate_words">#FF2E4A3F</color>
+    <color name="plate_hours">#FF4A3F2E</color>
+    <color name="plate_memory">#FF3F2E4A</color>
+    <color name="progress_track">#FF3A3F4B</color>
+    <color name="chart_words">#FF61DAFB</color>
+    <color name="chart_mistakes">#FFE57373</color>
+    <color name="chart_reviews">#FF81C784</color>
+    <color name="heatmap_empty">#FF2D333B</color>
+    <color name="heatmap_anki_1">#FF0E4429</color>
+    <color name="heatmap_anki_2">#FF006D32</color>
+    <color name="heatmap_anki_3">#FF26A641</color>
+    <color name="heatmap_anki_4">#FF39D353</color>
+    <color name="heatmap_anki_5">#FF57E876</color>
+    <color name="heatmap_anki_6">#FF6CF08A</color>
+    <color name="heatmap_anki_7">#FF85F5A0</color>
+    <color name="heatmap_anki_8">#FF9EFAB6</color>
+    <color name="heatmap_anki_9">#FFB7FFCC</color>
+    <color name="heatmap_anki_10">#FFD0FFE2</color>
+    <color name="heatmap_mistake_1">#FF3D1F2B</color>
+    <color name="heatmap_mistake_2">#FF6B2737</color>
+    <color name="heatmap_mistake_3">#FF9B3045</color>
+    <color name="heatmap_mistake_4">#FFC93A52</color>
+    <color name="heatmap_mistake_5">#FFF85149</color>
+    <color name="ic_launcher_background">#FF282C34</color>
+</resources>

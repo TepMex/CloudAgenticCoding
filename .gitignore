@@ -44,6 +44,14 @@ ankidroid-llm/local.properties
 local-tts/.gradle/
 local-tts/**/build/
 local-tts/local.properties
+
+# Android (anki-dashboard-apk)
+anki-dashboard-apk/.gradle/
+anki-dashboard-apk/**/build/
+anki-dashboard-apk/local.properties
+
+# Local Android SDK (cloud agent bootstrap)
+android-sdk/
 *.iml
 
 # Finder (MacOS) folder config

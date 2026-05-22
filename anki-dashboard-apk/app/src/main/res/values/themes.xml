@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AnkiDashboard" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/dashboard_accent</item>
+        <item name="colorOnPrimary">@color/dashboard_bg</item>
+        <item name="android:statusBarColor">@color/dashboard_bg</item>
+        <item name="android:navigationBarColor">@color/dashboard_bg</item>
+        <item name="android:windowBackground">@color/dashboard_bg</item>
+    </style>
+</resources>
