@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Copy, Link2, Loader2, Search, Settings } from "lucide-react";
 
+import { DeployFooter } from "@/components/DeployFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -485,6 +486,8 @@ export function App() {
         {db && !settingsOpen && activeGraphemes.length === 0 ? (
           <p className="text-muted-foreground text-center text-sm">{t(lang, "emptyPrompt")}</p>
         ) : null}
+
+        <DeployFooter />
       </div>
     </div>
   );

@@ -36,6 +36,9 @@ jobs:
 
       # Project pages are served from /<repo>/, so hashed assets must use
       # /<repo>/<app>/ — not /<app>/ (that resolves to the org/user site root).
+      - name: Set deployment timestamp
+        run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
+
       - name: Build (socratus)
         working-directory: socratus
         env:
@@ -102,6 +105,14 @@ jobs:
           cp local-tts/app/build/outputs/apk/release/app-release.apk deploy/local-tts/local-tts.apk
           cp anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk deploy/anki-dashboard-apk/anki-dashboard-apk.apk
           touch deploy/.nojekyll
+
+      - name: Inject deploy footers (static landing pages)
+        run: |
+          bun run scripts/inject-static-site-footer.ts \
+            deploy/chesswatch/index.html \
+            deploy/ankidroid-llm/index.html \
+            deploy/local-tts/index.html \
+            deploy/anki-dashboard-apk/index.html
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
