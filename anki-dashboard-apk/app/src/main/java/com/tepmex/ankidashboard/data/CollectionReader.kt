@@ -40,9 +40,16 @@ class CollectionReader(private val context: Context) {
     fun openCachedCollection(): Boolean {
         close()
         val file = com.tepmex.ankidashboard.data.sync.CollectionStore.collectionFile(context)
-        return if (file.isFile && file.canRead()) {
-            openFile(file)
-        } else {
+        if (!file.isFile || !file.canRead()) return false
+        // Copy before open: avoids SQLITE_CANTOPEN on some devices and matches openFromUri.
+        return try {
+            val tmp = File(context.cacheDir, "collection-ankiweb-copy.anki2")
+            file.inputStream().use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+            openFile(tmp)
+        } catch (e: Exception) {
+            Log.e(TAG, "openCachedCollection failed", e)
             false
         }
     }
@@ -299,9 +306,13 @@ class CollectionReader(private val context: Context) {
 
     private fun resolveDeckIds(deckName: String): List<Int> {
         val ids = ArrayList<Int>()
+        val target = deckName.trim()
+        if (target.isEmpty()) return ids
         for ((id, deck) in decksById) {
             val name = deck.name
-            if (name == deckName || name.startsWith("$deckName::")) {
+            if (name.equals(target, ignoreCase = true) ||
+                name.startsWith("$target::", ignoreCase = true)
+            ) {
                 id.toIntOrNull()?.let { ids.add(it) }
             }
         }

@@ -78,6 +78,10 @@ class AnkiWebSync(
 
         onProgress?.invoke(SyncProgress("meta"))
         var serverMeta = fetchMeta()
+        if (serverMeta == null && !password.isNullOrBlank()) {
+            login(username, password)
+            serverMeta = fetchMeta()
+        }
         if (serverMeta == null && client.hasResolvedShard()) {
             serverMeta = fetchMeta()
         }
