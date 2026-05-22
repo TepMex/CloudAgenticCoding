@@ -121,3 +121,26 @@ body {
 .card a:not(.download) {
   color: var(--accent);
 }
+
+.site-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.site-footer__line {
+  margin: 0;
+}
+
+.site-footer__line + .site-footer__line {
+  margin-top: 0.35rem;
+}
+
+.site-footer__label {
+  font-weight: 600;
+  color: var(--text);
+}
