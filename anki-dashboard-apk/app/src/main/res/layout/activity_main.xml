@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dashboard_bg">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/dashboard_surface"
+            app:title="@string/app_name"
+            app:titleTextColor="@color/dashboard_text" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <ScrollView
+            android:id="@+id/mainScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/statusBanner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/dashboard_warning_bg"
+                    android:padding="12dp"
+                    android:textColor="@color/dashboard_text"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/select_decks_title"
+                    android:textColor="@color/dashboard_accent"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/deckRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:clipToPadding="false"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/emptyDecksHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/select_decks_hint"
+                    android:textColor="@color/dashboard_text_muted" />
+
+                <LinearLayout
+                    android:id="@+id/statsSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@color/plate_review"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/stat_review_score"
+                                android:textColor="@color/dashboard_text_muted"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/reviewScoreValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/dashboard_text"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:background="@color/plate_words"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/stat_words"
+                                android:textColor="@color/dashboard_text_muted"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/wordsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/dashboard_text"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:background="@color/plate_hours"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/stat_hours"
+                                android:textColor="@color/dashboard_text_muted"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/hoursValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/dashboard_text"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <FrameLayout
+                        android:id="@+id/progressTrack"
+                        android:layout_width="match_parent"
+                        android:layout_height="12dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@color/progress_track">
+
+                        <View
+                            android:id="@+id/progressFill"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:background="@color/chart_words" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/progressPercent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/dashboard_text_muted" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@color/plate_memory"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/stat_long_memory"
+                            android:textColor="@color/dashboard_text_muted"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/longMemoryValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/dashboard_text"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/chartsSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/section_vocab_progress"
+                        android:textColor="@color/dashboard_accent"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/chartPlaceholder"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/charts_need_collection"
+                        android:textColor="@color/dashboard_text_muted"
+                        android:visibility="gone" />
+
+                    <com.github.mikephil.charting.charts.CombinedChart
+                        android:id="@+id/vocabChart"
+                        android:layout_width="match_parent"
+                        android:layout_height="220dp"
+                        android:layout_marginTop="8dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="@string/section_review_hardness"
+                        android:textColor="@color/dashboard_accent"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <com.tepmex.ankidashboard.ui.CalendarHeatmapView
+                        android:id="@+id/mistakesHeatmap"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:layout_marginTop="8dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="@string/section_review_intensity"
+                        android:textColor="@color/dashboard_accent"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <com.tepmex.ankidashboard.ui.CalendarHeatmapView
+                        android:id="@+id/reviewHeatmap"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:layout_marginTop="8dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="@string/section_new_vocab"
+                        android:textColor="@color/dashboard_accent"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <com.github.mikephil.charting.charts.BarChart
+                        android:id="@+id/monthlyChart"
+                        android:layout_width="match_parent"
+                        android:layout_height="180dp"
+                        android:layout_marginTop="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/section_leeches"
+                            android:textColor="@color/dashboard_accent"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <ImageButton
+                            android:id="@+id/leechesSettingsButton"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/leech_field_title"
+                            android:src="@android:drawable/ic_menu_preferences"
+                            app:tint="@color/dashboard_text" />
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/leechesRecycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:nestedScrollingEnabled="false" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/errorPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/errorTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/dashboard_accent"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/errorMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:textColor="@color/dashboard_text" />
+
+            <Button
+                android:id="@+id/grantPermissionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/grant_anki_permission" />
+
+            <Button
+                android:id="@+id/pickCollectionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/action_pick_collection" />
+
+            <Button
+                android:id="@+id/retryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/retry" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/loadingOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#88000000"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center" />
+        </FrameLayout>
+    </FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

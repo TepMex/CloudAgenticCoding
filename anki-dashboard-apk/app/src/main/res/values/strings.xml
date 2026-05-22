@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Anki Dashboard</string>
+    <string name="select_decks_title">Select Anki Decks</string>
+    <string name="select_decks_hint">Select one or more decks to view statistics.</string>
+    <string name="stat_review_score">7 reviews/card</string>
+    <string name="stat_words">Words memorised</string>
+    <string name="stat_hours">total hours spent</string>
+    <string name="stat_long_memory">Long memory</string>
+    <string name="words_fraction">%1$d / %2$d</string>
+    <string name="section_vocab_progress">Vocab Learning Progress</string>
+    <string name="section_review_hardness">Anki Review Hardness</string>
+    <string name="section_review_intensity">Anki Reviews Intensity</string>
+    <string name="section_new_vocab">New vocab per month</string>
+    <string name="section_leeches">Leeches</string>
+    <string name="chart_words_learned">Words Learned</string>
+    <string name="chart_mistakes">Mistakes</string>
+    <string name="chart_reviews">Cards Reviewed</string>
+    <string name="chart_new_vocab">New vocab</string>
+    <string name="charts_need_collection">History charts need access to collection.anki2. Use the menu to pick your AnkiDroid folder file, or set a public AnkiDroid directory.</string>
+    <string name="error_anki_missing_title">Install AnkiDroid</string>
+    <string name="error_permission_title">Grant database access</string>
+    <string name="error_generic_title">Error</string>
+    <string name="grant_anki_permission">Grant AnkiDroid access</string>
+    <string name="retry">Retry</string>
+    <string name="action_reload">Reload</string>
+    <string name="action_pick_collection">Pick collection.anki2</string>
+    <string name="leech_reviews">Reviews: %d</string>
+    <string name="leech_field_title">Leech field per deck</string>
+</resources>
