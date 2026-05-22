@@ -20,12 +20,34 @@ object CollectionStore {
 
     fun saveCollection(context: Context, data: ByteArray, meta: Map<String, Any?> = emptyMap()) {
         val dir = File(context.filesDir, DIR_NAME)
-        dir.mkdirs()
-        collectionFile(context).writeBytes(data)
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw SyncException(
+                message = "Cannot create storage directory: ${dir.absolutePath}",
+                phase = "saving",
+            )
+        }
+        val collection = collectionFile(context)
+        try {
+            collection.writeBytes(data)
+        } catch (e: Exception) {
+            throw SyncException(
+                message = "Cannot write collection file: ${e.message ?: e.javaClass.simpleName}",
+                phase = "saving",
+                cause = e,
+            )
+        }
         val metaJson = JSONObject()
         meta.forEach { (key, value) -> metaJson.put(key, value) }
         metaJson.put("savedAt", System.currentTimeMillis())
-        File(dir, META_FILE).writeText(metaJson.toString())
+        try {
+            File(dir, META_FILE).writeText(metaJson.toString())
+        } catch (e: Exception) {
+            throw SyncException(
+                message = "Collection saved but metadata write failed: ${e.message ?: e.javaClass.simpleName}",
+                phase = "saving",
+                cause = e,
+            )
+        }
     }
 
     fun loadMeta(context: Context): JSONObject? {

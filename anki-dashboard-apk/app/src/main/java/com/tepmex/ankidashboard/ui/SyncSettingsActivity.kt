@@ -1,6 +1,9 @@
 package com.tepmex.ankidashboard.ui
 
 import android.os.Bundle
+import android.text.method.ScrollingMovementMethod
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -8,8 +11,11 @@ import com.tepmex.ankidashboard.AnkiDashboardApp
 import com.tepmex.ankidashboard.R
 import com.tepmex.ankidashboard.data.AppPreferences
 import com.tepmex.ankidashboard.data.sync.AnkiWebSync
+import com.tepmex.ankidashboard.data.sync.SyncDiagnostics
+import com.tepmex.ankidashboard.data.sync.SyncException
 import com.tepmex.ankidashboard.data.sync.SyncHttpClient
 import com.tepmex.ankidashboard.databinding.ActivitySyncSettingsBinding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -81,7 +87,11 @@ class SyncSettingsActivity : AppCompatActivity() {
         val password = binding.passwordInput.text?.toString().orEmpty()
         val endpoint = SyncHttpClient.resolveSyncBaseUrl(binding.endpointInput.text?.toString())
         if (username.isBlank()) {
-            showError(getString(R.string.ankiweb_username_required))
+            showSyncError(
+                summary = getString(R.string.ankiweb_username_required),
+                details = getString(R.string.ankiweb_username_required),
+                phase = "validation",
+            )
             return
         }
 
@@ -93,17 +103,29 @@ class SyncSettingsActivity : AppCompatActivity() {
         binding.syncStatusText.text = getString(R.string.ankiweb_sync_starting)
 
         lifecycleScope.launch {
+            var syncClient: SyncHttpClient? = null
+            var reusedSession = false
             try {
                 val auth = preferences.getAnkiWebAuth()
+                val canReuseSession = password.isBlank() &&
+                    !auth.hkey.isNullOrBlank() &&
+                    auth.username == username &&
+                    SyncHttpClient.resolveSyncBaseUrl(auth.endpoint) == endpoint
+                reusedSession = canReuseSession
+
+                val syncEndpoint = if (canReuseSession && auth.endpoint != null) {
+                    auth.endpoint
+                } else {
+                    endpoint
+                }
+
                 val sync = AnkiWebSync(
                     context = this@SyncSettingsActivity,
-                    endpoint = if (!auth.hkey.isNullOrBlank() && auth.endpoint != null) {
-                        auth.endpoint
-                    } else {
-                        endpoint
-                    },
-                    hkey = auth.hkey.orEmpty(),
+                    endpoint = syncEndpoint,
+                    hkey = if (canReuseSession) auth.hkey.orEmpty() else "",
                 )
+                syncClient = sync.clientForDiagnostics()
+
                 val result = sync.sync(
                     username = username,
                     password = password.ifBlank { null },
@@ -129,8 +151,23 @@ class SyncSettingsActivity : AppCompatActivity() {
                 binding.logoutButton.isVisible = true
                 updateLastSync(System.currentTimeMillis())
                 setResult(RESULT_OK)
-            } catch (e: Exception) {
-                showError(e.message ?: getString(R.string.ankiweb_sync_failed))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                SyncDiagnostics.logFailure(
+                    phase = (e as? SyncException)?.phase,
+                    throwable = e,
+                )
+                val report = SyncDiagnostics.buildReport(
+                    throwable = e,
+                    phase = (e as? SyncException)?.phase,
+                    username = username,
+                    endpoint = endpoint,
+                    syncHost = syncClient?.syncHost,
+                    baseUrl = syncClient?.baseUrl,
+                    reusedSession = reusedSession,
+                )
+                showSyncError(report.summary, report.details, (e as? SyncException)?.phase)
             } finally {
                 binding.syncButton.isEnabled = true
                 binding.saveButton.isEnabled = true
@@ -148,8 +185,29 @@ class SyncSettingsActivity : AppCompatActivity() {
         binding.lastSyncText.text = getString(R.string.ankiweb_last_sync, label)
     }
 
-    private fun showError(message: String) {
+    private fun showSyncError(summary: String, details: String, phase: String?) {
         binding.syncErrorText.isVisible = true
-        binding.syncErrorText.text = message
+        binding.syncErrorText.text = summary
+        binding.syncStatusText.isVisible = false
+
+        val messageView = TextView(this).apply {
+            text = details
+            movementMethod = ScrollingMovementMethod()
+            setTextIsSelectable(true)
+            setPadding(48, 24, 48, 8)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                phase?.let { getString(R.string.ankiweb_sync_error_title_phase, it) }
+                    ?: getString(R.string.ankiweb_sync_error_title),
+            )
+            .setMessage(summary)
+            .setView(messageView)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.ankiweb_copy_error) { _, _ ->
+                SyncDiagnostics.copyToClipboard(this, details)
+            }
+            .show()
     }
 }

@@ -5,6 +5,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 import java.net.URL
@@ -39,13 +40,30 @@ class SyncHttpClient(
     fun login(username: String, password: String): String {
         val decompressed = post(
             method = "hostKey",
+            phase = "login",
             body = mapOf("u" to username, "p" to password),
             useSessionKey = false,
         )
-        val json = JSONObject(String(decompressed, Charsets.UTF_8))
+        val jsonText = String(decompressed, Charsets.UTF_8)
+        val json = try {
+            JSONObject(jsonText)
+        } catch (e: JSONException) {
+            throw syncError(
+                phase = "login",
+                method = "hostKey",
+                message = "Login response was not valid JSON",
+                cause = e,
+                responseSnippet = jsonText.take(500),
+            )
+        }
         val key = json.optString("key")
         if (key.isBlank()) {
-            throw IOException("Login failed: no host key returned")
+            throw syncError(
+                phase = "login",
+                method = "hostKey",
+                message = "Login failed: no host key returned",
+                responseSnippet = jsonText.take(500),
+            )
         }
         hkey = key
         return key
@@ -55,20 +73,33 @@ class SyncHttpClient(
     fun meta(): JSONObject {
         val decompressed = post(
             method = "meta",
+            phase = "meta",
             body = mapOf("v" to SYNC_VERSION, "cv" to CLIENT_VERSION),
             useSessionKey = false,
         )
-        return JSONObject(String(decompressed, Charsets.UTF_8))
+        val jsonText = String(decompressed, Charsets.UTF_8)
+        return try {
+            JSONObject(jsonText)
+        } catch (e: JSONException) {
+            throw syncError(
+                phase = "meta",
+                method = "meta",
+                message = "Server meta response was not valid JSON",
+                cause = e,
+                responseSnippet = jsonText.take(500),
+            )
+        }
     }
 
     @Throws(IOException::class)
     fun download(onProgress: ((received: Long, total: Long?) -> Unit)? = null): ByteArray {
-        return post(method = "download", body = emptyMap(), onProgress = onProgress)
+        return post(method = "download", phase = "download", body = emptyMap(), onProgress = onProgress)
     }
 
     @Throws(IOException::class)
     private fun post(
         method: String,
+        phase: String,
         body: Map<String, Any>,
         useSessionKey: Boolean = true,
         onProgress: ((received: Long, total: Long?) -> Unit)? = null,
@@ -76,65 +107,117 @@ class SyncHttpClient(
         retriedRedirect: Boolean = false,
     ): ByteArray {
         val url = "${baseUrl}sync/$method"
-        val compressedBody = compressJson(body)
+        val compressedBody = try {
+            compressJson(body)
+        } catch (e: Exception) {
+            throw syncError(
+                phase = phase,
+                method = method,
+                message = "Failed to compress sync request",
+                cause = e,
+            )
+        }
+
         val request = Request.Builder()
             .url(url)
             .post(compressedBody.toRequestBody(OCTET_STREAM))
             .headers(buildHeaders(useSessionKey).build())
             .build()
 
-        http.newCall(request).execute().use { response ->
-            val previousSyncHost = syncHost
-            val resolvedSyncHost = response.header("x-resolved-sync-host")
-            if (!resolvedSyncHost.isNullOrBlank() && isNumberedSyncShard(resolvedSyncHost)) {
-                syncHost = resolvedSyncHost
-            }
+        try {
+            http.newCall(request).execute().use { response ->
+                val previousSyncHost = syncHost
+                val resolvedSyncHost = response.header("x-resolved-sync-host")
+                if (!resolvedSyncHost.isNullOrBlank() && isNumberedSyncShard(resolvedSyncHost)) {
+                    applyResolvedSyncHost(resolvedSyncHost)
+                }
 
-            if (
-                !response.isSuccessful &&
-                !resolvedSyncHost.isNullOrBlank() &&
-                isNumberedSyncShard(resolvedSyncHost) &&
-                resolvedSyncHost != previousSyncHost &&
-                !retriedShard
-            ) {
-                return post(
-                    method = method,
-                    body = body,
-                    useSessionKey = useSessionKey,
-                    onProgress = onProgress,
-                    retriedShard = true,
-                    retriedRedirect = retriedRedirect,
-                )
-            }
-
-            if (response.code == 308 && !retriedRedirect) {
-                val location = response.header("location")
-                if (!location.isNullOrBlank()) {
-                    applySyncRedirect(location)
+                if (
+                    !response.isSuccessful &&
+                    !resolvedSyncHost.isNullOrBlank() &&
+                    isNumberedSyncShard(resolvedSyncHost) &&
+                    resolvedSyncHost != previousSyncHost &&
+                    !retriedShard
+                ) {
                     return post(
                         method = method,
+                        phase = phase,
                         body = body,
                         useSessionKey = useSessionKey,
                         onProgress = onProgress,
-                        retriedShard = retriedShard,
-                        retriedRedirect = true,
+                        retriedShard = true,
+                        retriedRedirect = retriedRedirect,
+                    )
+                }
+
+                if (response.code == 308 && !retriedRedirect) {
+                    val location = response.header("location")
+                    if (!location.isNullOrBlank()) {
+                        applySyncRedirect(location)
+                        return post(
+                            method = method,
+                            phase = phase,
+                            body = body,
+                            useSessionKey = useSessionKey,
+                            onProgress = onProgress,
+                            retriedShard = retriedShard,
+                            retriedRedirect = true,
+                        )
+                    }
+                }
+
+                if (!response.isSuccessful) {
+                    val errText = response.body?.string().orEmpty()
+                    throw syncError(
+                        phase = phase,
+                        method = method,
+                        message = "Sync $method failed (HTTP ${response.code})",
+                        httpStatus = response.code,
+                        responseSnippet = errText.take(1000),
+                    )
+                }
+
+                val originalSize = response.header("anki-original-size")?.toLongOrNull() ?: 0L
+                val bodyBytes = response.body?.bytes()
+                    ?: throw syncError(
+                        phase = phase,
+                        method = method,
+                        message = "Sync response has no body",
+                    )
+                onProgress?.invoke(bodyBytes.size.toLong(), originalSize.takeIf { it > 0 })
+                return try {
+                    decompressBody(bodyBytes, originalSize)
+                } catch (e: Exception) {
+                    throw syncError(
+                        phase = phase,
+                        method = method,
+                        message = "Failed to decompress sync response",
+                        cause = e,
                     )
                 }
             }
-
-            if (!response.isSuccessful) {
-                val errText = response.body?.string().orEmpty()
-                throw IOException(
-                    "Sync $method failed (${response.code})${if (errText.isNotBlank()) ": $errText" else ""}",
-                )
-            }
-
-            val originalSize = response.header("anki-original-size")?.toLongOrNull() ?: 0L
-            val bodyBytes = response.body?.bytes()
-                ?: throw IOException("Sync response has no body")
-            onProgress?.invoke(bodyBytes.size.toLong(), originalSize.takeIf { it > 0 })
-            return decompressBody(bodyBytes, originalSize)
+        } catch (e: SyncException) {
+            throw e
+        } catch (e: IOException) {
+            throw syncError(
+                phase = phase,
+                method = method,
+                message = e.message ?: "Network error during sync $method",
+                cause = e,
+            )
+        } catch (e: Exception) {
+            throw syncError(
+                phase = phase,
+                method = method,
+                message = e.message ?: "Unexpected error during sync $method",
+                cause = e,
+            )
         }
+    }
+
+    private fun applyResolvedSyncHost(hostname: String) {
+        syncHost = hostname
+        baseUrl = "https://$hostname/"
     }
 
     private fun applySyncRedirect(location: String) {
@@ -142,6 +225,25 @@ class SyncHttpClient(
         syncHost = url.host
         baseUrl = "${url.protocol}://${url.host}/"
     }
+
+    private fun syncError(
+        phase: String,
+        method: String,
+        message: String,
+        httpStatus: Int? = null,
+        responseSnippet: String? = null,
+        cause: Throwable? = null,
+    ): SyncException = SyncException(
+        message = message,
+        phase = phase,
+        method = method,
+        url = "${baseUrl}sync/$method",
+        httpStatus = httpStatus,
+        responseSnippet = responseSnippet,
+        syncHost = syncHost,
+        baseUrl = baseUrl,
+        cause = cause,
+    )
 
     private fun buildHeaders(useSessionKey: Boolean): okhttp3.Headers.Builder {
         val headerJson = JSONObject().apply {
