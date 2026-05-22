@@ -38,6 +38,9 @@
     <string name="ankiweb_sync_saving">Saving locally…</string>
     <string name="ankiweb_sync_complete">Sync complete (%.1f MB). Server mod: %2$s</string>
     <string name="ankiweb_sync_failed">Sync failed</string>
+    <string name="ankiweb_sync_error_title">Sync failed</string>
+    <string name="ankiweb_sync_error_title_phase">Sync failed (%1$s)</string>
+    <string name="ankiweb_copy_error">Copy details</string>
     <string name="ankiweb_username_required">Username is required</string>
     <string name="error_anki_missing_title">Install AnkiDroid</string>
     <string name="error_permission_title">Grant database access</string>
