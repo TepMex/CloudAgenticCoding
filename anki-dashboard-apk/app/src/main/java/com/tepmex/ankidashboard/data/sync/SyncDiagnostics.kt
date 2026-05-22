@@ -64,7 +64,7 @@ object SyncDiagnostics {
             }
             appendLine()
             appendLine("--- Cause chain ---")
-            appendCauseChain(throwable)
+            appendCauseChain(this, throwable)
             appendLine()
             appendLine("--- Stack trace ---")
             append(stackTraceString(throwable))
@@ -91,11 +91,11 @@ object SyncDiagnostics {
         }
     }
 
-    private fun appendCauseChain(throwable: Throwable) {
+    private fun appendCauseChain(builder: StringBuilder, throwable: Throwable) {
         var current: Throwable? = throwable
         var depth = 0
         while (current != null && depth < 8) {
-            appendLine("#$depth ${current.javaClass.name}: ${current.message.orEmpty()}")
+            builder.appendLine("#$depth ${current.javaClass.name}: ${current.message.orEmpty()}")
             current = current.cause
             depth++
         }
