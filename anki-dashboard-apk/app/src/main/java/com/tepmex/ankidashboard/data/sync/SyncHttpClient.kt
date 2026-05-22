@@ -15,7 +15,8 @@ import kotlin.random.Random
 
 /**
  * AnkiWeb sync v11 HTTP client (download-only).
- * Mirrors [anki-dashboard SyncHttpClient](https://github.com/TepMex/anki-dashboard).
+ * Redirect handling follows [anki meta_with_redirect](https://github.com/ankitects/anki/blob/main/rslib/src/sync/collection/meta.rs)
+ * and the web dashboard proxy in [anki-dashboard vite.config.js](https://github.com/TepMex/anki-dashboard).
  */
 class SyncHttpClient(
     endpoint: String,
@@ -25,6 +26,10 @@ class SyncHttpClient(
     var baseUrl: String = resolveSyncBaseUrl(endpoint)
         private set
     var syncHost: String? = parseSyncHostFromEndpoint(endpoint)
+        private set
+
+    /** True when the last request changed [syncHost] / [baseUrl] (e.g. HTTP 308). */
+    var hostChangedOnLastRequest: Boolean = false
         private set
 
     private val http = OkHttpClient.Builder()
@@ -78,7 +83,7 @@ class SyncHttpClient(
             useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
-        return try {
+        val json = try {
             JSONObject(jsonText)
         } catch (e: JSONException) {
             throw syncError(
@@ -89,6 +94,8 @@ class SyncHttpClient(
                 responseSnippet = jsonText.take(500),
             )
         }
+        applyHostNumberFromMeta(json)
+        return json
     }
 
     @Throws(IOException::class)
@@ -103,10 +110,7 @@ class SyncHttpClient(
         body: Map<String, Any>,
         useSessionKey: Boolean = true,
         onProgress: ((received: Long, total: Long?) -> Unit)? = null,
-        retriedShard: Boolean = false,
-        retriedRedirect: Boolean = false,
     ): ByteArray {
-        val url = "${baseUrl}sync/$method"
         val compressedBody = try {
             compressJson(body)
         } catch (e: Exception) {
@@ -118,112 +122,122 @@ class SyncHttpClient(
             )
         }
 
-        val request = Request.Builder()
-            .url(url)
-            .post(compressedBody.toRequestBody(OCTET_STREAM))
-            .headers(buildHeaders(useSessionKey).build())
-            .build()
+        var redirectHops = 0
+        var retriedResolvedHost = false
+        while (true) {
+            hostChangedOnLastRequest = false
+            val requestUrl = "${baseUrl}sync/$method"
+            val request = Request.Builder()
+                .url(requestUrl)
+                .post(compressedBody.toRequestBody(OCTET_STREAM))
+                .headers(buildHeaders(useSessionKey).build())
+                .build()
 
-        try {
-            http.newCall(request).execute().use { response ->
-                val previousSyncHost = syncHost
-                val resolvedSyncHost = response.header("x-resolved-sync-host")
-                if (!resolvedSyncHost.isNullOrBlank() && isNumberedSyncShard(resolvedSyncHost)) {
-                    applyResolvedSyncHost(resolvedSyncHost)
-                }
+            try {
+                http.newCall(request).execute().use { response ->
+                    if (response.code in REDIRECT_STATUS_CODES && redirectHops < MAX_REDIRECT_HOPS) {
+                        val location = response.header("Location")
+                        if (!location.isNullOrBlank()) {
+                            applySyncRedirect(location, requestUrl)
+                            redirectHops++
+                            continue
+                        }
+                    }
 
-                if (
-                    !response.isSuccessful &&
-                    !resolvedSyncHost.isNullOrBlank() &&
-                    isNumberedSyncShard(resolvedSyncHost) &&
-                    resolvedSyncHost != previousSyncHost &&
-                    !retriedShard
-                ) {
-                    return post(
-                        method = method,
-                        phase = phase,
-                        body = body,
-                        useSessionKey = useSessionKey,
-                        onProgress = onProgress,
-                        retriedShard = true,
-                        retriedRedirect = retriedRedirect,
-                    )
-                }
+                    val previousSyncHost = syncHost
+                    val resolvedSyncHost = response.header("x-resolved-sync-host")
+                    if (!resolvedSyncHost.isNullOrBlank() && isNumberedSyncShard(resolvedSyncHost)) {
+                        applyResolvedSyncHost(resolvedSyncHost)
+                    }
 
-                if (response.code == 308 && !retriedRedirect) {
-                    val location = response.header("location")
-                    if (!location.isNullOrBlank()) {
-                        applySyncRedirect(location)
-                        return post(
-                            method = method,
+                    if (
+                        !response.isSuccessful &&
+                        !resolvedSyncHost.isNullOrBlank() &&
+                        isNumberedSyncShard(resolvedSyncHost) &&
+                        resolvedSyncHost != previousSyncHost &&
+                        !retriedResolvedHost
+                    ) {
+                        retriedResolvedHost = true
+                        continue
+                    }
+
+                    if (!response.isSuccessful) {
+                        val errText = response.body?.string().orEmpty()
+                        throw syncError(
                             phase = phase,
-                            body = body,
-                            useSessionKey = useSessionKey,
-                            onProgress = onProgress,
-                            retriedShard = retriedShard,
-                            retriedRedirect = true,
+                            method = method,
+                            message = "Sync $method failed (HTTP ${response.code})",
+                            httpStatus = response.code,
+                            responseSnippet = errText.take(1000),
+                        )
+                    }
+
+                    val originalSize = response.header("anki-original-size")?.toLongOrNull() ?: 0L
+                    val bodyBytes = response.body?.bytes()
+                        ?: throw syncError(
+                            phase = phase,
+                            method = method,
+                            message = "Sync response has no body",
+                        )
+                    onProgress?.invoke(bodyBytes.size.toLong(), originalSize.takeIf { it > 0 })
+                    return try {
+                        decompressBody(bodyBytes, originalSize)
+                    } catch (e: Exception) {
+                        throw syncError(
+                            phase = phase,
+                            method = method,
+                            message = "Failed to decompress sync response",
+                            cause = e,
                         )
                     }
                 }
-
-                if (!response.isSuccessful) {
-                    val errText = response.body?.string().orEmpty()
-                    throw syncError(
-                        phase = phase,
-                        method = method,
-                        message = "Sync $method failed (HTTP ${response.code})",
-                        httpStatus = response.code,
-                        responseSnippet = errText.take(1000),
-                    )
-                }
-
-                val originalSize = response.header("anki-original-size")?.toLongOrNull() ?: 0L
-                val bodyBytes = response.body?.bytes()
-                    ?: throw syncError(
-                        phase = phase,
-                        method = method,
-                        message = "Sync response has no body",
-                    )
-                onProgress?.invoke(bodyBytes.size.toLong(), originalSize.takeIf { it > 0 })
-                return try {
-                    decompressBody(bodyBytes, originalSize)
-                } catch (e: Exception) {
-                    throw syncError(
-                        phase = phase,
-                        method = method,
-                        message = "Failed to decompress sync response",
-                        cause = e,
-                    )
-                }
+            } catch (e: SyncException) {
+                throw e
+            } catch (e: IOException) {
+                throw syncError(
+                    phase = phase,
+                    method = method,
+                    message = e.message ?: "Network error during sync $method",
+                    cause = e,
+                )
+            } catch (e: Exception) {
+                throw syncError(
+                    phase = phase,
+                    method = method,
+                    message = e.message ?: "Unexpected error during sync $method",
+                    cause = e,
+                )
             }
-        } catch (e: SyncException) {
-            throw e
-        } catch (e: IOException) {
-            throw syncError(
-                phase = phase,
-                method = method,
-                message = e.message ?: "Network error during sync $method",
-                cause = e,
-            )
-        } catch (e: Exception) {
-            throw syncError(
-                phase = phase,
-                method = method,
-                message = e.message ?: "Unexpected error during sync $method",
-                cause = e,
-            )
+        }
+    }
+
+    private fun applyHostNumberFromMeta(meta: JSONObject) {
+        if (!meta.has("hostNum") || meta.isNull("hostNum")) return
+        val hostNum = meta.optInt("hostNum", 0)
+        if (hostNum <= 0) return
+        val hostname = "sync$hostNum.ankiweb.net"
+        if (syncHost != hostname) {
+            applyResolvedSyncHost(hostname)
         }
     }
 
     private fun applyResolvedSyncHost(hostname: String) {
+        val previous = syncHost
         syncHost = hostname
         baseUrl = "https://$hostname/"
+        if (previous != hostname) {
+            hostChangedOnLastRequest = true
+        }
     }
 
-    private fun applySyncRedirect(location: String) {
-        val url = URL(location)
-        syncHost = url.host
-        baseUrl = "${url.protocol}://${url.host}/"
+    private fun applySyncRedirect(location: String, requestUrl: String) {
+        val resolved = resolveRedirectTarget(requestUrl, location)
+        val previous = syncHost
+        syncHost = resolved.host
+        baseUrl = "https://${resolved.host}/"
+        if (previous != resolved.host) {
+            hostChangedOnLastRequest = true
+        }
     }
 
     private fun syncError(
@@ -282,6 +296,8 @@ class SyncHttpClient(
         private const val CLIENT_VERSION = "anki-dashboard-android/1.0"
         private val OCTET_STREAM = "application/octet-stream".toMediaType()
         private const val DEFAULT_ENDPOINT = "https://sync.ankiweb.net/"
+        private const val MAX_REDIRECT_HOPS = 5
+        private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
         private const val SESSION_TABLE =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -303,6 +319,20 @@ class SyncHttpClient(
 
         fun isNumberedSyncShard(hostname: String?): Boolean =
             hostname != null && Regex("^sync\\d+\\.").containsMatchIn(hostname)
+
+        /**
+         * Resolve AnkiWeb 308 Location against the request URL, preserving the sync path when
+         * the server redirects to a bare origin (same as the web dashboard dev proxy).
+         */
+        fun resolveRedirectTarget(requestUrl: String, location: String): URL {
+            val current = URL(requestUrl)
+            val redirect = URL(current, location)
+            if (redirect.path == "/" || redirect.path.isNullOrEmpty()) {
+                val path = current.path + (current.query?.let { "?$it" } ?: "")
+                return URL(redirect.protocol, redirect.host, redirect.port, path)
+            }
+            return redirect
+        }
 
         fun generateSessionKey(): String {
             var n = Random.nextLong().absoluteValue + 1L
