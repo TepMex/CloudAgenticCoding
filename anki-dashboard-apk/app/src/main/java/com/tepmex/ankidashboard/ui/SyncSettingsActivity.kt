@@ -150,6 +150,8 @@ class SyncSettingsActivity : AppCompatActivity() {
                 binding.passwordInput.text?.clear()
                 binding.logoutButton.isVisible = true
                 updateLastSync(System.currentTimeMillis())
+                // Drop manual collection pick so the fresh AnkiWeb cache is used on the dashboard.
+                preferences.setCollectionUri(null)
                 setResult(RESULT_OK)
             } catch (e: CancellationException) {
                 throw e

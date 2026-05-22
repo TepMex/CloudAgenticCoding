@@ -1,9 +1,10 @@
 package com.tepmex.ankidashboard.data
 
 import android.content.Context
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.tepmex.ankidashboard.data.sync.CollectionStore
+
 class DashboardRepository(
     private val context: Context,
     private val anki: AnkiDroidRepository,
@@ -12,10 +13,11 @@ class DashboardRepository(
 
     suspend fun ensureCollectionOpen(collectionUri: String?): Boolean = withContext(Dispatchers.IO) {
         if (collection.isOpen()) return@withContext true
-        if (!collectionUri.isNullOrBlank() && collection.openFromUri(collectionUri)) {
+        // Prefer AnkiWeb download — a stale manual pick should not shadow a fresh sync.
+        if (CollectionStore.hasCollection(context) && collection.openCachedCollection()) {
             return@withContext true
         }
-        if (collection.openCachedCollection()) {
+        if (!collectionUri.isNullOrBlank() && collection.openFromUri(collectionUri)) {
             return@withContext true
         }
         collection.openDefaultPath()
@@ -68,12 +70,7 @@ class DashboardRepository(
 
         val cardIds = ArrayList<Long>()
         for (deckName in selectedDecks) {
-            val ids = if (hasCollection) {
-                collection.findCards(buildDeckSearch(deckName))
-            } else {
-                anki.findCardIds(deckName)
-            }
-            cardIds.addAll(ids)
+            cardIds.addAll(resolveCardIds(deckName, hasCollection))
         }
         val distinctCardIds = cardIds.distinct()
 
@@ -163,7 +160,11 @@ class DashboardRepository(
     ): List<LeechCard> {
         if (hasCollection) {
             val ids = selectedDecks.flatMap { deck ->
-                collection.findCards("${buildDeckSearch(deck)} tag:leech")
+                resolveCardIdsForSearch(
+                    search = "${buildDeckSearch(deck)} tag:leech",
+                    hasCollection = true,
+                    deckNameForAnkiFallback = deck,
+                )
             }.distinct()
             return collection.cardsInfo(ids).map { row ->
                 val deckKey = resolveSelectedDeck(selectedDecks, row.deckName) ?: row.deckName
@@ -183,6 +184,30 @@ class DashboardRepository(
                 fields = card.noteFields,
                 reviewCount = card.reps,
             )
+        }
+    }
+
+    /**
+     * Resolve card IDs for [deckName]. Uses the synced/opened collection when possible;
+     * falls back to AnkiDroid when the collection is missing or deck lookup returns nothing.
+     */
+    private suspend fun resolveCardIds(deckName: String, hasCollection: Boolean): List<Long> =
+        resolveCardIdsForSearch(buildDeckSearch(deckName), hasCollection, deckName)
+
+    private suspend fun resolveCardIdsForSearch(
+        search: String,
+        hasCollection: Boolean,
+        deckNameForAnkiFallback: String? = null,
+    ): List<Long> {
+        if (hasCollection) {
+            val fromCollection = collection.findCards(search)
+            if (fromCollection.isNotEmpty()) return fromCollection
+        }
+        return if (deckNameForAnkiFallback != null) {
+            val leech = search.contains("tag:leech")
+            anki.findCardIds(deckNameForAnkiFallback, leechesOnly = leech)
+        } else {
+            emptyList()
         }
     }
 

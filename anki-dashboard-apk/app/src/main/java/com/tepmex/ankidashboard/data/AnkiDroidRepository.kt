@@ -3,6 +3,7 @@ package com.tepmex.ankidashboard.data
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.database.Cursor
 import android.text.Html
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -66,7 +67,9 @@ class AnkiDroidRepository(private val context: Context) {
             } else {
                 """deck:"$escaped""""
             }
-            queryCardIds(search)
+            val fromCards = queryCardIds(search)
+            if (fromCards.isNotEmpty()) return@withContext fromCards
+            findCardIdsViaNotes(search)
         }
 
     suspend fun getIntervals(cardIds: List<Long>): List<Int> = withContext(Dispatchers.IO) {
@@ -159,16 +162,64 @@ class AnkiDroidRepository(private val context: Context) {
                 null,
                 null,
             )?.use { c ->
-                val col = c.getColumnIndex(AnkiContract.CARD_ID)
-                if (col < 0) return@use
-                while (c.moveToNext()) {
-                    ids.add(c.getLong(col))
-                }
+                collectCardIds(c, ids)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Card search failed: $search", e)
         }
         return ids
+    }
+
+    /**
+     * Older AnkiDroid builds ignore search on [AnkiContract.CARDS_URI]; notes search is supported.
+     */
+    private fun findCardIdsViaNotes(search: String): List<Long> {
+        val noteIds = ArrayList<Long>()
+        try {
+            context.contentResolver.query(
+                AnkiContract.NOTES_URI,
+                arrayOf(AnkiContract.NOTE_ID),
+                search,
+                null,
+                null,
+            )?.use { c ->
+                val col = c.getColumnIndex(AnkiContract.NOTE_ID)
+                if (col < 0) return@use
+                while (c.moveToNext() && noteIds.size < MAX_NOTE_SCAN) {
+                    noteIds.add(c.getLong(col))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Note search failed: $search", e)
+            return emptyList()
+        }
+        if (noteIds.isEmpty()) return emptyList()
+
+        val cardIds = LinkedHashSet<Long>()
+        for (noteId in noteIds) {
+            val noteUri = Uri.withAppendedPath(AnkiContract.NOTES_URI, noteId.toString())
+            val cardsUri = Uri.withAppendedPath(noteUri, "cards")
+            try {
+                context.contentResolver.query(
+                    cardsUri,
+                    arrayOf(AnkiContract.CARD_ID),
+                    null,
+                    null,
+                    null,
+                )?.use { c -> collectCardIds(c, cardIds) }
+            } catch (e: Exception) {
+                Log.w(TAG, "cards for note $noteId failed", e)
+            }
+        }
+        return cardIds.toList()
+    }
+
+    private fun collectCardIds(c: Cursor, out: MutableCollection<Long>) {
+        val col = c.getColumnIndex(AnkiContract.CARD_ID)
+        if (col < 0) return
+        while (c.moveToNext()) {
+            out.add(c.getLong(col))
+        }
     }
 
     private fun loadCardInfo(
@@ -284,4 +335,9 @@ class AnkiDroidRepository(private val context: Context) {
         val noteFields: Map<String, String>,
         val reps: Int,
     )
+
+    companion object {
+        /** Cap note expansion when falling back from CARDS_URI (large decks). */
+        private const val MAX_NOTE_SCAN = 20_000
+    }
 }
