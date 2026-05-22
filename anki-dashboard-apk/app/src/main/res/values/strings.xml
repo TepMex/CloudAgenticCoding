@@ -17,7 +17,8 @@
     <string name="chart_mistakes">Mistakes</string>
     <string name="chart_reviews">Cards Reviewed</string>
     <string name="chart_new_vocab">New vocab</string>
-    <string name="charts_need_collection">History charts need collection.anki2. Sync from AnkiWeb (menu) or pick the file manually.</string>
+    <string name="deck_no_cards_hint">No cards found for the selected deck(s). Try re-selecting them — names must match your synced collection.</string>
+    <string name="chart_no_data">No review history for the selected decks yet.</string>
     <string name="action_ankiweb_sync">Sync from AnkiWeb</string>
     <string name="ankiweb_settings_title">AnkiWeb sync</string>
     <string name="ankiweb_sync_description">Download-only sync: fetches your collection from AnkiWeb and stores it on this device. Nothing is uploaded.</string>
@@ -37,15 +38,14 @@
     <string name="ankiweb_sync_download">Downloading collection (%.1f MB)…</string>
     <string name="ankiweb_sync_saving">Saving locally…</string>
     <string name="ankiweb_sync_complete">Sync complete (%.1f MB). Server mod: %2$s</string>
+    <string name="ankiweb_mod_unknown">unknown</string>
     <string name="ankiweb_sync_failed">Sync failed</string>
     <string name="ankiweb_sync_error_title">Sync failed</string>
     <string name="ankiweb_sync_error_title_phase">Sync failed (%1$s)</string>
     <string name="ankiweb_copy_error">Copy details</string>
     <string name="ankiweb_username_required">Username is required</string>
-    <string name="error_anki_missing_title">Install AnkiDroid</string>
-    <string name="error_permission_title">Grant database access</string>
+    <string name="error_no_collection_title">Connect your collection</string>
     <string name="error_generic_title">Error</string>
-    <string name="grant_anki_permission">Grant AnkiDroid access</string>
     <string name="retry">Retry</string>
     <string name="action_reload">Reload</string>
     <string name="action_pick_collection">Pick collection.anki2</string>

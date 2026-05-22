@@ -36,13 +36,21 @@ class AnkiWebSync(
         client.login(username, password)
 
     @Throws(IOException::class)
-    private fun fetchMeta(): JSONObject? {
+    private fun fetchMeta(): JSONObject {
         return try {
             client.meta()
-        } catch (e: IOException) {
-            if (!client.hasResolvedShard()) throw e
-            SyncDiagnostics.logFailure("meta (first attempt)", e)
-            null
+        } catch (first: IOException) {
+            if (!client.hasResolvedShard()) throw first
+            SyncDiagnostics.logFailure("meta (first attempt)", first)
+            try {
+                client.meta()
+            } catch (second: IOException) {
+                throw SyncException(
+                    message = "Could not read server metadata after resolving sync host",
+                    phase = "meta",
+                    cause = second,
+                )
+            }
         }
     }
 
@@ -77,13 +85,12 @@ class AnkiWebSync(
         }
 
         onProgress?.invoke(SyncProgress("meta"))
-        var serverMeta = fetchMeta()
-        if (serverMeta == null && !password.isNullOrBlank()) {
+        val serverMeta = try {
+            fetchMeta()
+        } catch (e: IOException) {
+            if (password.isNullOrBlank()) throw e
             login(username, password)
-            serverMeta = fetchMeta()
-        }
-        if (serverMeta == null && client.hasResolvedShard()) {
-            serverMeta = fetchMeta()
+            fetchMeta()
         }
 
         onProgress?.invoke(SyncProgress("download"))

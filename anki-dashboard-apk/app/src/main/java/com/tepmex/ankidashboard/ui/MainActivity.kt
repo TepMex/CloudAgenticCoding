@@ -25,7 +25,6 @@ import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.tepmex.ankidashboard.R
-import com.tepmex.ankidashboard.data.AnkiContract
 import com.tepmex.ankidashboard.data.DashboardData
 import com.tepmex.ankidashboard.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
@@ -40,12 +39,6 @@ class MainActivity : AppCompatActivity() {
     private val deckAdapter = DeckChipsAdapter { viewModel.setSelectedDecks(it) }
     private val leechesAdapter = LeechesAdapter()
     private var leechFieldByDeck: Map<String, String> = emptyMap()
-
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) viewModel.reload()
-    }
 
     private val openCollectionLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -75,9 +68,9 @@ class MainActivity : AppCompatActivity() {
         binding.leechesRecycler.layoutManager = LinearLayoutManager(this)
         binding.leechesRecycler.adapter = leechesAdapter
 
-        binding.retryButton.setOnClickListener { tryLoadWithPermission() }
-        binding.grantPermissionButton.setOnClickListener {
-            permissionLauncher.launch(AnkiContract.READ_WRITE_PERMISSION)
+        binding.retryButton.setOnClickListener { viewModel.reload() }
+        binding.openSyncButton.setOnClickListener {
+            syncSettingsLauncher.launch(Intent(this, SyncSettingsActivity::class.java))
         }
         binding.pickCollectionButton.setOnClickListener {
             openCollectionLauncher.launch(arrayOf("*/*"))
@@ -104,7 +97,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        tryLoadWithPermission()
+        viewModel.reload()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -121,9 +114,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
             MENU_ANKIWEB -> {
-                syncSettingsLauncher.launch(
-                    android.content.Intent(this, SyncSettingsActivity::class.java),
-                )
+                syncSettingsLauncher.launch(Intent(this, SyncSettingsActivity::class.java))
                 return true
             }
             MENU_COLLECTION -> {
@@ -134,35 +125,23 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    private fun tryLoadWithPermission() {
-        val repo = viewModel.ankiRepository
-        when {
-            !repo.hasAnkiInstalled() -> viewModel.reload()
-            repo.hasAnkiPermission() -> viewModel.reload()
-            else -> permissionLauncher.launch(AnkiContract.READ_WRITE_PERMISSION)
-        }
-    }
-
     private fun render(state: DashboardUiState) {
         binding.loadingOverlay.isVisible = state.loading
         binding.errorPanel.isVisible = state.errorCode != null
         binding.mainScroll.isVisible = state.errorCode == null && !state.loading
 
         when (state.errorCode) {
-            "anki_missing" -> {
-                binding.errorTitle.text = getString(R.string.error_anki_missing_title)
+            "no_collection" -> {
+                binding.errorTitle.text = getString(R.string.error_no_collection_title)
                 binding.errorMessage.text = state.errorMessage
-                binding.grantPermissionButton.isVisible = false
-            }
-            "anki_permission" -> {
-                binding.errorTitle.text = getString(R.string.error_permission_title)
-                binding.errorMessage.text = state.errorMessage
-                binding.grantPermissionButton.isVisible = true
+                binding.openSyncButton.isVisible = true
+                binding.pickCollectionButton.isVisible = true
             }
             else -> {
                 binding.errorTitle.text = getString(R.string.error_generic_title)
                 binding.errorMessage.text = state.errorMessage ?: ""
-                binding.grantPermissionButton.isVisible = false
+                binding.openSyncButton.isVisible = false
+                binding.pickCollectionButton.isVisible = state.errorCode == "load_failed"
             }
         }
 
@@ -193,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             binding.progressFill.requestLayout()
         }
 
-        if (data.historyAvailable && data.plotData.isNotEmpty()) {
+        if (data.plotData.isNotEmpty()) {
             bindVocabChart(data)
             binding.reviewHeatmap.setData(data.reviewsStats, CalendarHeatmapView.ColorScheme.ANKI)
             binding.mistakesHeatmap.setData(data.mistakesData, CalendarHeatmapView.ColorScheme.MISTAKE)

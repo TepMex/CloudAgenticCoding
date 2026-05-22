@@ -11,6 +11,7 @@ import com.tepmex.ankidashboard.AnkiDashboardApp
 import com.tepmex.ankidashboard.R
 import com.tepmex.ankidashboard.data.AppPreferences
 import com.tepmex.ankidashboard.data.sync.AnkiWebSync
+import com.tepmex.ankidashboard.data.sync.CollectionStore
 import com.tepmex.ankidashboard.data.sync.SyncDiagnostics
 import com.tepmex.ankidashboard.data.sync.SyncException
 import com.tepmex.ankidashboard.data.sync.SyncHttpClient
@@ -144,7 +145,13 @@ class SyncSettingsActivity : AppCompatActivity() {
                         }
                     }
                 }
-                val mod = result.serverMeta?.opt("mod")?.toString() ?: "?"
+                val mod = result.serverMeta?.let { meta ->
+                    when {
+                        meta.has("mod") && !meta.isNull("mod") -> meta.get("mod").toString()
+                        else -> null
+                    }
+                } ?: CollectionStore.serverModLabel(this@SyncSettingsActivity)
+                    ?: getString(R.string.ankiweb_mod_unknown)
                 val mb = result.byteLength / (1024.0 * 1024.0)
                 binding.syncStatusText.text = getString(R.string.ankiweb_sync_complete, mb, mod)
                 binding.passwordInput.text?.clear()

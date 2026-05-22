@@ -59,4 +59,10 @@ object CollectionStore {
             null
         }
     }
+
+    fun serverModLabel(context: Context): String? {
+        val meta = loadMeta(context) ?: return null
+        if (!meta.has("serverMod") || meta.isNull("serverMod")) return null
+        return meta.get("serverMod").toString()
+    }
 }
