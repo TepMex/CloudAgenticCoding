@@ -4,15 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ChessWatch</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-    a { font-weight: 600; }
-  </style>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <h1>ChessWatch</h1>
-  <p>Android app (API 34+) for tracking which activity you are in right now. Install by sideloading the APK.</p>
-  <p><a href="chesswatch.apk">Download chesswatch.apk</a></p>
-  <p><strong>Updating:</strong> install the new APK over the existing app. If Android blocks the install, uninstall once and reinstall—only needed when the signing key changed from an older build.</p>
+  <main class="page">
+    <header class="hero">
+      <img src="logo.svg" alt="" width="72" height="72" class="logo" />
+      <h1>ChessWatch</h1>
+      <p class="tagline">Know what you are doing right now.</p>
+    </header>
+    <div class="card">
+      <p>Android app (API 34+): a grid of activity tiles with timers. Exactly one activity runs at a time so you always see your current focus.</p>
+      <a class="download" href="chesswatch.apk">Download chesswatch.apk</a>
+    </div>
+    <p class="note"><strong>Updating:</strong> install the new APK over the existing app. If Android blocks the install, uninstall once and reinstall—only needed when the signing key changed from an older build.</p>
+  </main>
 </body>
 </html>

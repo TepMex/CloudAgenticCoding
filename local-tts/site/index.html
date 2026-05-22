@@ -4,11 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Local TTS</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <h1>Local TTS</h1>
-  <p>Android app: type Russian text and hear it spoken on-device with the Vosk ONNX TTS model (<a href="https://github.com/alphacep/vosk-tts">vosk-tts</a>).</p>
-  <p><a href="local-tts.apk">Download local-tts.apk</a></p>
-  <p><strong>Updating:</strong> install the new APK over the existing app (downloaded TTS models stay). If Android blocks the install, uninstall once and reinstall—only needed when the signing key changed from an older build.</p>
+  <main class="page">
+    <header class="hero">
+      <img src="logo.svg" alt="" width="72" height="72" class="logo" />
+      <h1>Local TTS</h1>
+      <p class="tagline">Russian speech synthesis on your device.</p>
+    </header>
+    <div class="card">
+      <p>Android app: type Russian text and hear it spoken on-device with the Vosk ONNX TTS model (<a href="https://github.com/alphacep/vosk-tts">vosk-tts</a>).</p>
+      <a class="download" href="local-tts.apk">Download local-tts.apk</a>
+    </div>
+    <p class="note"><strong>Updating:</strong> install the new APK over the existing app (downloaded TTS models stay). If Android blocks the install, uninstall once and reinstall—only needed when the signing key changed from an older build.</p>
+  </main>
 </body>
 </html>

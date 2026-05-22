@@ -93,14 +93,14 @@ jobs:
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
           cp -r hanzi-info/dist/. deploy/hanzi-info/
+          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk; do
+            cp -r "$app/site/." "deploy/$app/"
+            cp android/landing/styles.css "deploy/$app/styles.css"
+          done
           cp chesswatch/app/build/outputs/apk/release/app-release.apk deploy/chesswatch/chesswatch.apk
-          cp chesswatch/site/index.html deploy/chesswatch/index.html
           cp ankidroid-llm/app/build/outputs/apk/release/app-release.apk deploy/ankidroid-llm/ankidroid-llm.apk
-          cp ankidroid-llm/site/index.html deploy/ankidroid-llm/index.html
           cp local-tts/app/build/outputs/apk/release/app-release.apk deploy/local-tts/local-tts.apk
-          cp local-tts/site/index.html deploy/local-tts/index.html
           cp anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk deploy/anki-dashboard-apk/anki-dashboard-apk.apk
-          cp anki-dashboard-apk/site/index.html deploy/anki-dashboard-apk/index.html
           touch deploy/.nojekyll
 
       - name: Deploy to gh-pages
