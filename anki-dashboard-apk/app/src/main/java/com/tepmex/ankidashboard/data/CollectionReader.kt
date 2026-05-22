@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -87,7 +88,8 @@ class CollectionReader(private val context: Context) {
 
     fun findCards(query: String): List<Long> {
         val db = db ?: return emptyList()
-        val deckMatch = Regex(""""deck:([^"]+)"""").find(query) ?: return emptyList()
+        // Web app uses `"deck:Name"`; older builds used `deck:"Name"`.
+        val deckMatch = DECK_QUERY_PATTERN.find(query) ?: return emptyList()
         val deckName = deckMatch.groupValues[1]
         val deckIds = resolveDeckIds(deckName)
         if (deckIds.isEmpty()) return emptyList()
@@ -265,7 +267,8 @@ class CollectionReader(private val context: Context) {
             if (!c.moveToFirst()) return
             val raw = c.getString(0) ?: return
             if (raw.isBlank() || raw == "{}") return
-            val parsed = parseDecksJson(raw)
+            val parsed = parseDecksJsonObject(raw) ?: parseDecksJsonRegex(raw)
+            if (parsed.isEmpty()) return
             decksById = parsed
             deckNameById = parsed.mapValues { it.value.name }
         }
@@ -295,7 +298,8 @@ class CollectionReader(private val context: Context) {
                 modelsById = emptyMap()
                 return
             }
-            modelsById = parseModelsJson(c.getString(0).orEmpty())
+            val modelsRaw = c.getString(0).orEmpty()
+            modelsById = parseModelsJsonObject(modelsRaw) ?: parseModelsJsonRegex(modelsRaw)
         }
     }
 
@@ -349,6 +353,7 @@ class CollectionReader(private val context: Context) {
     companion object {
         private const val TAG = "CollectionReader"
         private const val FIELD_SEP = '\u001f'
+        private val DECK_QUERY_PATTERN = Regex("""(?:"deck:|deck:")([^"]+)""")
 
         fun defaultCollectionPaths(): List<String> {
             val base = Environment.getExternalStorageDirectory()
@@ -363,7 +368,27 @@ class CollectionReader(private val context: Context) {
         private fun humanizeDeckName(name: String?): String =
             (name ?: "").replace('\u001f', ':')
 
-        private fun parseDecksJson(raw: String): Map<String, DeckEntry> {
+        private fun parseDecksJsonObject(raw: String): Map<String, DeckEntry>? {
+            return try {
+                val root = JSONObject(raw)
+                val out = linkedMapOf<String, DeckEntry>()
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    val deck = root.optJSONObject(id) ?: continue
+                    val name = humanizeDeckName(deck.optString("name", ""))
+                    if (name.isNotEmpty()) {
+                        out[id] = DeckEntry(name)
+                    }
+                }
+                out.takeIf { it.isNotEmpty() }
+            } catch (e: Exception) {
+                Log.w(TAG, "parseDecksJsonObject failed, using regex fallback", e)
+                null
+            }
+        }
+
+        private fun parseDecksJsonRegex(raw: String): Map<String, DeckEntry> {
             val out = linkedMapOf<String, DeckEntry>()
             val idPattern = Regex(""""(\d+)"\s*:\s*\{""")
             val namePattern = Regex(""""name"\s*:\s*"((?:\\.|[^"\\])*)"""")
@@ -380,7 +405,34 @@ class CollectionReader(private val context: Context) {
             return out
         }
 
-        private fun parseModelsJson(raw: String): Map<String, ModelEntry> {
+        private fun parseModelsJsonObject(raw: String): Map<String, ModelEntry>? {
+            if (raw.isBlank() || raw == "{}") return emptyMap()
+            return try {
+                val root = JSONObject(raw)
+                val out = linkedMapOf<String, ModelEntry>()
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    val model = root.optJSONObject(id) ?: continue
+                    val flds = model.optJSONArray("flds") ?: continue
+                    val names = ArrayList<String>()
+                    for (i in 0 until flds.length()) {
+                        val fld = flds.optJSONObject(i) ?: continue
+                        val name = fld.optString("name", "")
+                        if (name.isNotEmpty()) names.add(name)
+                    }
+                    if (names.isNotEmpty()) {
+                        out[id] = ModelEntry(names)
+                    }
+                }
+                out
+            } catch (e: Exception) {
+                Log.w(TAG, "parseModelsJsonObject failed, using regex fallback", e)
+                null
+            }
+        }
+
+        private fun parseModelsJsonRegex(raw: String): Map<String, ModelEntry> {
             if (raw.isBlank() || raw == "{}") return emptyMap()
             val out = linkedMapOf<String, ModelEntry>()
             val idPattern = Regex(""""(\d+)"\s*:\s*\{""")

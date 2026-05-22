@@ -4,10 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tepmex.ankidashboard.AnkiDashboardApp
-import com.tepmex.ankidashboard.data.AnkiDroidRepository
 import com.tepmex.ankidashboard.data.CollectionReader
 import com.tepmex.ankidashboard.data.DashboardData
 import com.tepmex.ankidashboard.data.DashboardRepository
+import com.tepmex.ankidashboard.data.NoCollectionException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,11 +27,9 @@ data class DashboardUiState(
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as AnkiDashboardApp
-    val ankiRepository = AnkiDroidRepository(application)
     private val collectionReader = CollectionReader(application)
     private val dashboardRepository = DashboardRepository(
         application,
-        ankiRepository,
         collectionReader,
     )
 
@@ -100,13 +98,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _loading.value = true
             _error.value = null
             try {
-                if (!ankiRepository.hasAnkiInstalled()) {
-                    _error.value = "anki_missing" to "Install AnkiDroid to use this dashboard."
-                    _data.value = null
-                    return@launch
-                }
-                if (!ankiRepository.hasAnkiPermission()) {
-                    _error.value = "anki_permission" to "Grant AnkiDroid database access to load statistics."
+                if (!dashboardRepository.hasDataSource(collectionUri)) {
+                    _error.value = "no_collection" to
+                        "Sync from AnkiWeb in the menu or pick your collection.anki2 file to load statistics."
                     _data.value = null
                     return@launch
                 }
@@ -122,7 +116,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     _data.value = dashboard
                 }.onFailure { e ->
-                    _error.value = "load_failed" to (e.message ?: "Failed to load dashboard")
+                    val code = when (e) {
+                        is NoCollectionException -> "no_collection"
+                        else -> "load_failed"
+                    }
+                    _error.value = code to (e.message ?: "Failed to load dashboard")
                     _data.value = null
                 }
             } finally {

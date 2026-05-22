@@ -12,7 +12,7 @@ This repository hosts multiple browser apps. Each app lives in its own top-level
 | `chesswatch`     | `/<repo>/chesswatch/`      | ChessWatch · Android time tracker (APK) |
 | `ankidroid-llm` | `/<repo>/ankidroid-llm/`   | AnkiDroid LLM · Android story from study queue (APK) |
 | `local-tts`     | `/<repo>/local-tts/`       | Local TTS · on-device Vosk ONNX text-to-speech (APK) |
-| `anki-dashboard-apk` | `/<repo>/anki-dashboard-apk/` | Anki Dashboard · Android stats from AnkiDroid (APK) |
+| `anki-dashboard-apk` | `/<repo>/anki-dashboard-apk/` | Anki Dashboard · Android stats from synced collection.anki2 (APK) |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
