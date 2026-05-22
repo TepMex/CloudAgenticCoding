@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Loader2, Settings2, Sparkles } from "lucide-react";
 
+import { DeployFooter } from "@/components/DeployFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -374,6 +375,8 @@ export function App() {
             </CardHeader>
           </Card>
         )}
+
+        <DeployFooter />
       </div>
     </div>
   );

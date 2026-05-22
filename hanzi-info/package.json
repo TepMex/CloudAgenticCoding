@@ -9,7 +9,7 @@
     "fill:ru-gloss": "bun run scripts/fill-ru-gloss-mymemory.ts",
     "extract:wiki-ru": "bun run scripts/extract-wiki-single-char.ts",
     "verify:snapshot": "bun run scripts/verify-phonetic-snapshot.ts",
-    "predev": "bun run build:db",
+    "predev": "bun run build:db && bun ../scripts/write-deploy-info.ts .",
     "dev": "bun --hot src/index.ts",
     "start": "NODE_ENV=production bun src/index.ts",
     "build": "bun run build:db && bun run build.ts --public-path=${GH_PAGES_PUBLIC_PATH:-./}"

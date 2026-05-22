@@ -3,6 +3,7 @@ import plugin from "bun-plugin-tailwind";
 import { existsSync } from "fs";
 import { copyFile, readdir, readFile, rm, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { writeDeployInfoTs } from "../scripts/write-deploy-info.ts";
 
 /** Static assets not pulled in by the HTML/JS bundle (PWA icons are emitted by the bundler). */
 const STATIC_ASSETS = ["logo.svg"] as const;
@@ -109,6 +110,8 @@ const formatFileSize = (bytes: number): string => {
 };
 
 console.log("\n🚀 Starting build process...\n");
+
+await writeDeployInfoTs(path.join(process.cwd(), "src/lib/deploy-info.ts"));
 
 const cliConfig = parseArgs();
 const outdir = cliConfig.outdir || path.join(process.cwd(), "dist");

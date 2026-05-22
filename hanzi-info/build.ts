@@ -3,6 +3,7 @@ import plugin from "bun-plugin-tailwind";
 import { existsSync } from "fs";
 import { copyFile, readdir, readFile, rm, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { writeDeployInfoTs } from "../scripts/write-deploy-info.ts";
 
 const STATIC_FROM_SRC = ["logo.svg"] as const;
 const STATIC_FROM_PUBLIC = ["hanzi-db.json"] as const;
@@ -73,6 +74,8 @@ const formatFileSize = (bytes: number): string => {
   }
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 };
+
+await writeDeployInfoTs(path.join(process.cwd(), "src/lib/deploy-info.ts"));
 
 const cliConfig = parseArgs();
 const outdir = cliConfig.outdir || path.join(process.cwd(), "dist");
