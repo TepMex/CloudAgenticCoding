@@ -1,3 +1,3 @@
 /** Generated at build/dev time — do not edit by hand. */
-export const DEPLOYED_AT = "2026-05-22T19:26:29 UTC";
-export const COMMIT_MESSAGE = "Merge pull request #41 from TepMex/cursor/fix-zstd-jni-android-sync-636e";
+export const DEPLOYED_AT = "local development";
+export const COMMIT_MESSAGE = "local development";
