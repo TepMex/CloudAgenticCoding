@@ -37,6 +37,16 @@ class CollectionReader(private val context: Context) {
         }
     }
 
+    fun openCachedCollection(): Boolean {
+        close()
+        val file = com.tepmex.ankidashboard.data.sync.CollectionStore.collectionFile(context)
+        return if (file.isFile && file.canRead()) {
+            openFile(file)
+        } else {
+            false
+        }
+    }
+
     fun openDefaultPath(): Boolean {
         close()
         for (path in defaultCollectionPaths()) {
@@ -332,8 +342,10 @@ class CollectionReader(private val context: Context) {
         fun defaultCollectionPaths(): List<String> {
             val base = Environment.getExternalStorageDirectory()
             return listOf(
+                File(base, "com.ichi2.anki/collection.anki2").absolutePath,
                 File(base, "AnkiDroid/collection.anki2").absolutePath,
                 File(base, "Download/AnkiDroid/collection.anki2").absolutePath,
+                File(base, "Android/data/com.ichi2.anki/files/collection.anki2").absolutePath,
             )
         }
 

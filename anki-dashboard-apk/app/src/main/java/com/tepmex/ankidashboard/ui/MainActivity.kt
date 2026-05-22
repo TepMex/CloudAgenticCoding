@@ -56,6 +56,14 @@ class MainActivity : AppCompatActivity() {
         viewModel.setCollectionUri(uri.toString())
     }
 
+    private val syncSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            viewModel.reloadAfterAnkiWebSync()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -101,7 +109,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menu.add(0, MENU_RELOAD, 0, R.string.action_reload)
-        menu.add(0, MENU_COLLECTION, 1, R.string.action_pick_collection)
+        menu.add(0, MENU_ANKIWEB, 1, R.string.action_ankiweb_sync)
+        menu.add(0, MENU_COLLECTION, 2, R.string.action_pick_collection)
         return true
     }
 
@@ -109,6 +118,12 @@ class MainActivity : AppCompatActivity() {
         when (item.itemId) {
             MENU_RELOAD -> {
                 viewModel.reload()
+                return true
+            }
+            MENU_ANKIWEB -> {
+                syncSettingsLauncher.launch(
+                    android.content.Intent(this, SyncSettingsActivity::class.java),
+                )
                 return true
             }
             MENU_COLLECTION -> {
@@ -324,6 +339,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val MENU_RELOAD = 1001
-        private const val MENU_COLLECTION = 1002
+        private const val MENU_ANKIWEB = 1002
+        private const val MENU_COLLECTION = 1003
     }
 }

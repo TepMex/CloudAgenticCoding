@@ -15,7 +15,15 @@ class DashboardRepository(
         if (!collectionUri.isNullOrBlank() && collection.openFromUri(collectionUri)) {
             return@withContext true
         }
+        if (collection.openCachedCollection()) {
+            return@withContext true
+        }
         collection.openDefaultPath()
+    }
+
+    companion object {
+        const val STATUS_NEED_COLLECTION =
+            "History charts need collection.anki2 — sync from AnkiWeb (menu) or pick the file manually."
     }
 
     suspend fun loadDashboard(
@@ -53,11 +61,7 @@ class DashboardRepository(
                     leeches = emptyList(),
                     deckFieldOptions = emptyMap(),
                     historyAvailable = hasCollection,
-                    statusMessage = if (!hasCollection) {
-                        "History charts need collection.anki2 — open Settings to pick your AnkiDroid folder file."
-                    } else {
-                        null
-                    },
+                    statusMessage = if (!hasCollection) STATUS_NEED_COLLECTION else null,
                 ),
             )
         }
@@ -132,11 +136,7 @@ class DashboardRepository(
                 leeches = leeches,
                 deckFieldOptions = deckFieldOptions,
                 historyAvailable = hasCollection,
-                statusMessage = if (!hasCollection) {
-                    "History charts need collection.anki2 — open Settings to pick your AnkiDroid folder file."
-                } else {
-                    null
-                },
+                statusMessage = if (!hasCollection) STATUS_NEED_COLLECTION else null,
             ),
         )
     }
@@ -197,7 +197,4 @@ class DashboardRepository(
         return selectedDecks.find { deckName.startsWith("$it::") }
     }
 
-    companion object {
-        private const val TAG = "DashboardRepo"
-    }
 }

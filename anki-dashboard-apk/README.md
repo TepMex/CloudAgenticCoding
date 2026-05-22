@@ -1,11 +1,16 @@
 # Anki Dashboard (Android)
 
-Native Android port of [anki-dashboard](https://github.com/TepMex/anki-dashboard): Anki statistics, progress charts, review heatmaps, and leeches — powered by **AnkiDroid** on your phone (no AnkiConnect or AnkiWeb sync).
+Native Android port of [anki-dashboard](https://github.com/TepMex/anki-dashboard): Anki statistics, progress charts, review heatmaps, and leeches — powered by **AnkiDroid** on your phone.
 
 ## Data sources
 
 1. **AnkiDroid API** — deck list, card counts, intervals, and leeches via the [content provider](https://github.com/ankidroid/Anki-Android/wiki/AnkiDroid-API) (`READ_WRITE_DATABASE` permission), same pattern as `ankidroid-llm`.
-2. **collection.anki2** — review history (revlog) for charts and calendars. The app tries `/storage/emulated/0/AnkiDroid/collection.anki2` when readable, or you can pick the file once from the menu (persisted URI).
+2. **collection.anki2** — review history (revlog) for charts and calendars. Loaded from (in order):
+   - **AnkiWeb sync** (menu → *Sync from AnkiWeb*) — download-only, same protocol as the [web dashboard](https://github.com/TepMex/anki-dashboard); cached locally in app storage.
+   - A file you pick once from the menu (persisted URI).
+   - Default paths when readable: `com.ichi2.anki/collection.anki2`, `AnkiDroid/collection.anki2`, etc.
+
+On modern Android, AnkiDroid’s collection folder is often not readable by other apps; **AnkiWeb sync is the recommended way** to enable history charts.
 
 ## Requirements
 

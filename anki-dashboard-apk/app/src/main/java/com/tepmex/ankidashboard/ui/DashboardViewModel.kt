@@ -90,6 +90,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _reloadToken.value++
     }
 
+    fun reloadAfterAnkiWebSync() {
+        collectionReader.close()
+        _reloadToken.value++
+    }
+
     private fun loadDashboard(selectedDecks: List<String>, collectionUri: String?) {
         viewModelScope.launch {
             _loading.value = true
