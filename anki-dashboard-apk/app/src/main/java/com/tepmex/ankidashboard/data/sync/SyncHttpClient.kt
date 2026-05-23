@@ -54,7 +54,6 @@ class SyncHttpClient(
             method = "hostKey",
             phase = "login",
             body = mapOf("u" to username, "p" to password),
-            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -94,7 +93,6 @@ class SyncHttpClient(
             method = "meta",
             phase = "meta",
             body = mapOf("v" to SYNC_VERSION, "cv" to CLIENT_VERSION),
-            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -122,7 +120,6 @@ class SyncHttpClient(
         method: String,
         phase: String,
         body: Map<String, Any>,
-        useSessionKey: Boolean = true,
         onProgress: ((received: Long, total: Long?) -> Unit)? = null,
     ): ByteArray {
         val compressedBody = try {
@@ -144,7 +141,7 @@ class SyncHttpClient(
             val request = Request.Builder()
                 .url(requestUrl)
                 .post(compressedBody.toRequestBody(OCTET_STREAM))
-                .headers(buildHeaders(useSessionKey).build())
+                .headers(buildHeaders().build())
                 .build()
 
             try {
@@ -281,17 +278,16 @@ class SyncHttpClient(
         cause = cause,
     )
 
-    private fun buildHeaders(useSessionKey: Boolean = true): okhttp3.Headers.Builder {
+    private fun buildHeaders(): okhttp3.Headers.Builder {
         val headerJson = JSONObject().apply {
             put("v", SYNC_VERSION)
             put("k", hkey)
-            put("s", if (useSessionKey) sessionKey else "")
+            put("s", sessionKey)
             put("c", CLIENT_VERSION)
         }
         return okhttp3.Headers.Builder()
             .add("Content-Type", "application/octet-stream")
             .add("anki-sync", headerJson.toString())
-            .add("Accept-Encoding", "identity")
     }
 
     private fun compressJson(data: Map<String, Any>): ByteArray {
@@ -316,7 +312,7 @@ class SyncHttpClient(
 
     companion object {
         private const val SYNC_VERSION = 11
-        private const val CLIENT_VERSION = "anki-dashboard-android/1.0"
+        private const val CLIENT_VERSION = "anki-dashboard/1.0"
         private val OCTET_STREAM = "application/octet-stream".toMediaType()
         private const val DEFAULT_ENDPOINT = "https://sync.ankiweb.net/"
         private const val MAX_REDIRECT_HOPS = 5
