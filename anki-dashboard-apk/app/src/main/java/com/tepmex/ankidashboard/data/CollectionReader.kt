@@ -10,7 +10,8 @@ import java.io.File
 
 /**
  * Read-only access to Anki's collection.anki2 for revlog-based statistics.
- * Mirrors the web app's collection.worker.js queries.
+ * Mirrors the web app's [collection.worker.js](https://github.com/TepMex/anki-dashboard/blob/6221def/src/workers/collection.worker.js)
+ * (AnkiWeb sync + schema 15+ deck/field tables from commit 6221def).
  */
 class CollectionReader(private val context: Context) {
 
@@ -234,22 +235,51 @@ class CollectionReader(private val context: Context) {
         val db = db ?: return
         decksById = emptyMap()
         deckNameById = emptyMap()
+        var deckSource = "none"
         if (tableExists(db, "decks")) {
-            loadDecksFromTable(db)
+            try {
+                if (loadDecksFromTable(db)) {
+                    deckSource = "decks-table"
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "loadDecksFromTable failed, falling back to col.decks JSON", e)
+                decksById = emptyMap()
+                deckNameById = emptyMap()
+            }
         }
         if (decksById.isEmpty()) {
-            loadDecksFromColJson(db)
+            if (loadDecksFromColJson(db)) {
+                deckSource = if (deckSource == "none") "col-json" else "$deckSource+col-json"
+            }
         }
         fieldsByNotetypeId = emptyMap()
+        var fieldSource = "none"
         if (tableExists(db, "fields")) {
-            loadFieldsFromTable(db)
+            try {
+                if (loadFieldsFromTable(db)) {
+                    fieldSource = "fields-table"
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "loadFieldsFromTable failed, using col.models JSON", e)
+            }
         }
         loadModelsFromColJson(db)
+        if (fieldSource == "none" && modelsById.isNotEmpty()) {
+            fieldSource = "col-json"
+        }
+        val cardCount = queryLongColumn(db, "SELECT COUNT(*) FROM cards").firstOrNull() ?: 0L
+        Log.i(
+            TAG,
+            "loaded metadata: deckSource=$deckSource fieldSource=$fieldSource " +
+                "deckCount=${decksById.size} cardCount=$cardCount " +
+                "sampleDecks=${decksById.values.take(3).map { it.name }}",
+        )
     }
 
-    private fun loadDecksFromTable(db: SQLiteDatabase) {
+    private fun loadDecksFromTable(db: SQLiteDatabase): Boolean {
         val map = linkedMapOf<String, DeckEntry>()
         val names = hashMapOf<String, String>()
+        // COLLATE BINARY avoids Anki's custom unicase collation (see anki-dashboard 6221def).
         db.rawQuery("SELECT id, name FROM decks", null).use { c ->
             while (c.moveToNext()) {
                 val id = c.getLong(0).toString()
@@ -258,23 +288,25 @@ class CollectionReader(private val context: Context) {
                 names[id] = name
             }
         }
+        if (map.isEmpty()) return false
         decksById = map
         deckNameById = names
+        return true
     }
 
-    private fun loadDecksFromColJson(db: SQLiteDatabase) {
+    private fun loadDecksFromColJson(db: SQLiteDatabase): Boolean =
         db.rawQuery("SELECT decks FROM col WHERE id = 1", null).use { c ->
-            if (!c.moveToFirst()) return
-            val raw = c.getString(0) ?: return
-            if (raw.isBlank() || raw == "{}") return
+            if (!c.moveToFirst()) return@use false
+            val raw = c.getString(0) ?: return@use false
+            if (raw.isBlank() || raw == "{}") return@use false
             val parsed = parseDecksJsonObject(raw) ?: parseDecksJsonRegex(raw)
-            if (parsed.isEmpty()) return
+            if (parsed.isEmpty()) return@use false
             decksById = parsed
             deckNameById = parsed.mapValues { it.value.name }
+            true
         }
-    }
 
-    private fun loadFieldsFromTable(db: SQLiteDatabase) {
+    private fun loadFieldsFromTable(db: SQLiteDatabase): Boolean {
         val map = hashMapOf<String, MutableList<String>>()
         db.rawQuery(
             "SELECT ntid, ord, name FROM fields ORDER BY ntid, ord",
@@ -289,7 +321,9 @@ class CollectionReader(private val context: Context) {
                 list[ord] = name
             }
         }
+        if (map.isEmpty()) return false
         fieldsByNotetypeId = map.mapValues { (_, v) -> v.filter { it.isNotEmpty() } }
+        return true
     }
 
     private fun loadModelsFromColJson(db: SQLiteDatabase) {
@@ -308,8 +342,8 @@ class CollectionReader(private val context: Context) {
         return modelsById[mid]?.fieldNames ?: emptyList()
     }
 
-    private fun resolveDeckIds(deckName: String): List<Int> {
-        val ids = ArrayList<Int>()
+    private fun resolveDeckIds(deckName: String): List<Long> {
+        val ids = ArrayList<Long>()
         val target = deckName.trim()
         if (target.isEmpty()) return ids
         for ((id, deck) in decksById) {
@@ -317,7 +351,7 @@ class CollectionReader(private val context: Context) {
             if (name.equals(target, ignoreCase = true) ||
                 name.startsWith("$target::", ignoreCase = true)
             ) {
-                id.toIntOrNull()?.let { ids.add(it) }
+                id.toLongOrNull()?.let { ids.add(it) }
             }
         }
         return ids
@@ -366,7 +400,7 @@ class CollectionReader(private val context: Context) {
         }
 
         private fun humanizeDeckName(name: String?): String =
-            (name ?: "").replace('\u001f', ':')
+            (name ?: "").replace("\u001f", "::")
 
         private fun parseDecksJsonObject(raw: String): Map<String, DeckEntry>? {
             return try {
