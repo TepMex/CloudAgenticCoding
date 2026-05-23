@@ -116,6 +116,10 @@ class AnkiWebSync(
             }
         }
 
+        if (!password.isNullOrBlank() && client.hasResolvedShard()) {
+            login(username, password)
+        }
+
         onProgress?.invoke(SyncProgress("meta"))
         val serverMeta = try {
             fetchMeta(username, password)
@@ -141,8 +145,8 @@ class AnkiWebSync(
         }
 
         onProgress?.invoke(SyncProgress("download"))
-        if (!password.isNullOrBlank() && client.hostChangedOnLastRequest) {
-            loginOnResolvedHost(username, password)
+        if (!password.isNullOrBlank() && client.hasResolvedShard()) {
+            login(username, password)
         }
         val collectionData = client.download { received, total ->
             onProgress?.invoke(SyncProgress("download", received, total))

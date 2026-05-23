@@ -16,7 +16,8 @@ import kotlin.random.Random
 /**
  * AnkiWeb sync v11 HTTP client (download-only).
  * Redirect handling follows [anki meta_with_redirect](https://github.com/ankitects/anki/blob/main/rslib/src/sync/collection/meta.rs)
- * and the web dashboard proxy in [anki-dashboard vite.config.js](https://github.com/TepMex/anki-dashboard).
+ * and the web dashboard [SyncHttpClient.js](https://github.com/TepMex/anki-dashboard).
+ * [hostKey] and [meta] omit the session key in the anki-sync header (empty `s`), matching the browser client.
  */
 class SyncHttpClient(
     endpoint: String,
@@ -54,6 +55,7 @@ class SyncHttpClient(
             method = "hostKey",
             phase = "login",
             body = mapOf("u" to username, "p" to password),
+            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -93,6 +95,7 @@ class SyncHttpClient(
             method = "meta",
             phase = "meta",
             body = mapOf("v" to SYNC_VERSION, "cv" to CLIENT_VERSION),
+            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -120,6 +123,7 @@ class SyncHttpClient(
         method: String,
         phase: String,
         body: Map<String, Any>,
+        useSessionKey: Boolean = true,
         onProgress: ((received: Long, total: Long?) -> Unit)? = null,
     ): ByteArray {
         val compressedBody = try {
@@ -141,7 +145,7 @@ class SyncHttpClient(
             val request = Request.Builder()
                 .url(requestUrl)
                 .post(compressedBody.toRequestBody(OCTET_STREAM))
-                .headers(buildHeaders().build())
+                .headers(buildHeaders(useSessionKey).build())
                 .build()
 
             try {
@@ -278,16 +282,17 @@ class SyncHttpClient(
         cause = cause,
     )
 
-    private fun buildHeaders(): okhttp3.Headers.Builder {
+    private fun buildHeaders(useSessionKey: Boolean = true): okhttp3.Headers.Builder {
         val headerJson = JSONObject().apply {
             put("v", SYNC_VERSION)
             put("k", hkey)
-            put("s", sessionKey)
+            put("s", if (useSessionKey) sessionKey else "")
             put("c", CLIENT_VERSION)
         }
         return okhttp3.Headers.Builder()
             .add("Content-Type", "application/octet-stream")
             .add("anki-sync", headerJson.toString())
+            .add("Accept-Encoding", "identity")
     }
 
     private fun compressJson(data: Map<String, Any>): ByteArray {
