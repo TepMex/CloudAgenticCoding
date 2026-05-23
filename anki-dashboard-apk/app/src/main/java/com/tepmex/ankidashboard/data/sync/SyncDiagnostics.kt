@@ -56,11 +56,13 @@ object SyncDiagnostics {
                 throwable.method?.let { appendLine("HTTP method: $it") }
                 throwable.url?.let { appendLine("Request URL: $it") }
                 throwable.httpStatus?.let { appendLine("HTTP status: $it") }
-                throwable.responseSnippet?.takeIf { it.isNotBlank() }?.let {
-                    appendLine("Response snippet: $it")
-                }
                 throwable.syncHost?.let { appendLine("Client sync host: $it") }
                 throwable.baseUrl?.let { appendLine("Client base URL: $it") }
+                throwable.responseSnippet?.takeIf { it.isNotBlank() }?.let {
+                    appendLine()
+                    appendLine("--- Server response body ---")
+                    appendLine(it)
+                }
             }
             appendLine()
             appendLine("--- Cause chain ---")
@@ -81,14 +83,16 @@ object SyncDiagnostics {
         val root = rootCause(throwable)
         val explicit = throwable.message?.takeIf { it.isNotBlank() }
             ?: root.message?.takeIf { it.isNotBlank() }
-        if (explicit != null) return explicit
-        return when (root) {
+        val serverHint = (throwable as? SyncException)?.responseSnippet?.takeIf { it.isNotBlank() }
+            ?: (root as? SyncException)?.responseSnippet?.takeIf { it.isNotBlank() }
+        val base = explicit ?: when (root) {
             is UnknownHostException -> "Cannot reach sync server (DNS/network)."
             is SocketTimeoutException -> "Sync timed out. Try again on a stable connection."
             is SSLException -> "Secure connection failed (TLS/SSL)."
             is SyncException -> "Sync failed."
             else -> "${root.javaClass.simpleName}"
         }
+        return if (serverHint != null) "$base\nServer: $serverHint" else base
     }
 
     private fun appendCauseChain(builder: StringBuilder, throwable: Throwable) {
