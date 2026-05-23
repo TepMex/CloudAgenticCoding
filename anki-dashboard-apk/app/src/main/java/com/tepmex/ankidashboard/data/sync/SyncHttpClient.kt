@@ -16,8 +16,9 @@ import kotlin.random.Random
 /**
  * AnkiWeb sync v11 HTTP client (download-only).
  * Redirect handling follows [anki meta_with_redirect](https://github.com/ankitects/anki/blob/main/rslib/src/sync/collection/meta.rs)
- * and the web dashboard [SyncHttpClient.js](https://github.com/TepMex/anki-dashboard).
- * [hostKey] and [meta] omit the session key in the anki-sync header (empty `s`), matching the browser client.
+ * and the web dashboard [SyncHttpClient.js](https://github.com/TepMex/anki-dashboard/blob/97e7425/src/services/SyncHttpClient.js).
+ * [syncHost] starts null (set only from redirects / `x-resolved-sync-host`).
+ * [hostKey] and [meta] omit the session key in the anki-sync header (empty `s`).
  */
 class SyncHttpClient(
     endpoint: String,
@@ -26,7 +27,8 @@ class SyncHttpClient(
 ) {
     var baseUrl: String = resolveSyncBaseUrl(endpoint)
         private set
-    var syncHost: String? = parseSyncHostFromEndpoint(endpoint)
+    /** Set from redirects or `x-resolved-sync-host`, not from the saved endpoint URL. */
+    var syncHost: String? = null
         private set
 
     /** True when the last request changed [syncHost] / [baseUrl] (e.g. HTTP 308). */
@@ -150,7 +152,10 @@ class SyncHttpClient(
 
             try {
                 http.newCall(request).execute().use { response ->
-                    if (response.code in REDIRECT_STATUS_CODES && redirectHops < MAX_REDIRECT_HOPS) {
+                    if (
+                        response.code == 308 &&
+                        redirectHops < MAX_REDIRECT_HOPS
+                    ) {
                         val location = response.header("Location")
                         if (!location.isNullOrBlank()) {
                             applySyncRedirect(location, requestUrl)
@@ -321,7 +326,6 @@ class SyncHttpClient(
         private val OCTET_STREAM = "application/octet-stream".toMediaType()
         private const val DEFAULT_ENDPOINT = "https://sync.ankiweb.net/"
         private const val MAX_REDIRECT_HOPS = 5
-        private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
         private const val SESSION_TABLE =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
