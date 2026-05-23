@@ -41,13 +41,19 @@ class SyncHttpClient(
 
     fun hasResolvedShard(): Boolean = isNumberedSyncShard(syncHost)
 
+    /** Point the client at the public AnkiWeb entry host before a fresh login. */
+    fun resetToDefaultEntryHost() {
+        baseUrl = resolveSyncBaseUrl(null)
+        syncHost = null
+        hostChangedOnLastRequest = false
+    }
+
     @Throws(IOException::class)
     fun login(username: String, password: String): String {
         val decompressed = post(
             method = "hostKey",
             phase = "login",
             body = mapOf("u" to username, "p" to password),
-            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -76,11 +82,17 @@ class SyncHttpClient(
 
     @Throws(IOException::class)
     fun meta(): JSONObject {
+        if (hkey.isBlank()) {
+            throw syncError(
+                phase = "meta",
+                method = "meta",
+                message = "Not logged in (missing host key). Enter your AnkiWeb password and try again.",
+            )
+        }
         val decompressed = post(
             method = "meta",
             phase = "meta",
             body = mapOf("v" to SYNC_VERSION, "cv" to CLIENT_VERSION),
-            useSessionKey = false,
         )
         val jsonText = String(decompressed, Charsets.UTF_8)
         val json = try {
@@ -108,7 +120,6 @@ class SyncHttpClient(
         method: String,
         phase: String,
         body: Map<String, Any>,
-        useSessionKey: Boolean = true,
         onProgress: ((received: Long, total: Long?) -> Unit)? = null,
     ): ByteArray {
         val compressedBody = try {
@@ -130,7 +141,7 @@ class SyncHttpClient(
             val request = Request.Builder()
                 .url(requestUrl)
                 .post(compressedBody.toRequestBody(OCTET_STREAM))
-                .headers(buildHeaders(useSessionKey).build())
+                .headers(buildHeaders().build())
                 .build()
 
             try {
@@ -163,10 +174,18 @@ class SyncHttpClient(
 
                     if (!response.isSuccessful) {
                         val errText = response.body?.string().orEmpty()
+                        val message = when {
+                            response.code == 400 && hkey.isBlank() ->
+                                "Sync $method failed (HTTP 400): not logged in. Enter your AnkiWeb password."
+                            response.code == 400 ->
+                                "Sync $method failed (HTTP 400)"
+                            else ->
+                                "Sync $method failed (HTTP ${response.code})"
+                        }
                         throw syncError(
                             phase = phase,
                             method = method,
-                            message = "Sync $method failed (HTTP ${response.code})",
+                            message = message,
                             httpStatus = response.code,
                             responseSnippet = errText.take(1000),
                         )
@@ -259,11 +278,11 @@ class SyncHttpClient(
         cause = cause,
     )
 
-    private fun buildHeaders(useSessionKey: Boolean): okhttp3.Headers.Builder {
+    private fun buildHeaders(): okhttp3.Headers.Builder {
         val headerJson = JSONObject().apply {
             put("v", SYNC_VERSION)
             put("k", hkey)
-            put("s", if (useSessionKey) sessionKey else "")
+            put("s", sessionKey)
             put("c", CLIENT_VERSION)
         }
         return okhttp3.Headers.Builder()
@@ -319,6 +338,19 @@ class SyncHttpClient(
 
         fun isNumberedSyncShard(hostname: String?): Boolean =
             hostname != null && Regex("^sync\\d+\\.").containsMatchIn(hostname)
+
+        /**
+         * Treat the public entry host and a numbered shard as the same saved session.
+         * AnkiWeb redirects accounts to syncN.ankiweb.net after login/meta.
+         */
+        fun endpointsEquivalent(savedEndpoint: String?, formEndpoint: String?): Boolean {
+            val saved = resolveSyncBaseUrl(savedEndpoint)
+            val form = resolveSyncBaseUrl(formEndpoint)
+            if (saved == form) return true
+            val entry = resolveSyncBaseUrl(null)
+            return (parseSyncHostFromEndpoint(savedEndpoint) != null && form == entry) ||
+                (parseSyncHostFromEndpoint(formEndpoint) != null && saved == entry)
+        }
 
         /**
          * Resolve AnkiWeb 308 Location against the request URL, preserving the sync path when

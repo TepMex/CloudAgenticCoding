@@ -52,8 +52,10 @@ class AnkiWebSync(
             client.meta()
         } catch (first: IOException) {
             val hostChanged = client.syncHost != null && client.syncHost != hostBefore
-            if (!password.isNullOrBlank() && (hostChanged || client.hostChangedOnLastRequest)) {
-                SyncDiagnostics.logFailure("meta (host changed, re-login)", first)
+            val authFailure = (first as? SyncException)?.httpStatus in setOf(400, 403)
+            if (!password.isNullOrBlank() && (hostChanged || client.hostChangedOnLastRequest || authFailure)) {
+                SyncDiagnostics.logFailure("meta (host/auth changed, re-login)", first)
+                client.resetToDefaultEntryHost()
                 loginOnResolvedHost(username, password)
                 return client.meta()
             }
@@ -64,6 +66,7 @@ class AnkiWebSync(
             } catch (second: IOException) {
                 if (!password.isNullOrBlank()) {
                     SyncDiagnostics.logFailure("meta (second attempt, re-login)", second)
+                    client.resetToDefaultEntryHost()
                     loginOnResolvedHost(username, password)
                     return client.meta()
                 }
@@ -85,38 +88,53 @@ class AnkiWebSync(
         onProgress: ((SyncProgress) -> Unit)? = null,
     ): SyncResult = withContext(Dispatchers.IO) {
         val existingAuth = preferences.getAnkiWebAuth()
-        val normalizedEndpoint = SyncHttpClient.resolveSyncBaseUrl(endpoint)
-        val canReuseSession = password.isNullOrBlank() &&
+        val wantsExplicitLogin = !password.isNullOrBlank()
+        val canReuseSession = !wantsExplicitLogin &&
             !existingAuth.hkey.isNullOrBlank() &&
             existingAuth.username == username &&
-            SyncHttpClient.resolveSyncBaseUrl(existingAuth.endpoint) == normalizedEndpoint
+            SyncHttpClient.endpointsEquivalent(existingAuth.endpoint, endpoint)
 
-        if (!canReuseSession) {
-            if (password.isNullOrBlank()) {
+        when {
+            wantsExplicitLogin -> {
+                client.resetToDefaultEntryHost()
+                loginOnResolvedHost(username, password!!)
+            }
+            canReuseSession -> {
+                client.hkey = existingAuth.hkey.orEmpty()
+                if (client.hkey.isBlank()) {
+                    throw SyncException(
+                        message = "Saved AnkiWeb session is incomplete. Enter your password to sync.",
+                        phase = "login",
+                    )
+                }
+            }
+            else -> {
                 throw SyncException(
                     message = "Password required for login (no saved session for this username/endpoint)",
                     phase = "login",
                 )
             }
-            loginOnResolvedHost(username, password)
-        } else {
-            client.hkey = existingAuth.hkey.orEmpty()
         }
 
         onProgress?.invoke(SyncProgress("meta"))
         val serverMeta = try {
             fetchMeta(username, password)
         } catch (e: IOException) {
+            val httpStatus = (e as? SyncException)?.httpStatus
+            val authFailure = httpStatus == 400 || httpStatus == 403
             if (password.isNullOrBlank()) {
-                if (client.hostChangedOnLastRequest || client.hasResolvedShard()) {
+                if (authFailure || client.hostChangedOnLastRequest || client.hasResolvedShard()) {
                     throw SyncException(
-                        message = "AnkiWeb redirected to ${client.syncHost ?: "another server"}. " +
+                        message = "AnkiWeb session expired or moved to ${client.syncHost ?: "another server"}. " +
                             "Enter your password to sync again.",
                         phase = "meta",
                         cause = e,
                     )
                 }
                 throw e
+            }
+            if (authFailure || client.hostChangedOnLastRequest) {
+                client.resetToDefaultEntryHost()
             }
             loginOnResolvedHost(username, password)
             fetchMeta(username, password)

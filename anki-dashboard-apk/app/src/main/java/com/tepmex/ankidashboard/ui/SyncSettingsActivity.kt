@@ -111,13 +111,16 @@ class SyncSettingsActivity : AppCompatActivity() {
                 val canReuseSession = password.isBlank() &&
                     !auth.hkey.isNullOrBlank() &&
                     auth.username == username &&
-                    SyncHttpClient.resolveSyncBaseUrl(auth.endpoint) == endpoint
+                    SyncHttpClient.endpointsEquivalent(auth.endpoint, endpoint)
                 reusedSession = canReuseSession
 
-                val syncEndpoint = if (canReuseSession && auth.endpoint != null) {
-                    auth.endpoint
-                } else {
-                    endpoint
+                val syncEndpoint = when {
+                    password.isNotBlank() ->
+                        SyncHttpClient.resolveSyncBaseUrl(null)
+                    canReuseSession && auth.endpoint != null ->
+                        auth.endpoint
+                    else ->
+                        endpoint
                 }
 
                 val sync = AnkiWebSync(
@@ -129,7 +132,7 @@ class SyncSettingsActivity : AppCompatActivity() {
 
                 val result = sync.sync(
                     username = username,
-                    password = password.ifBlank { null },
+                    password = password.takeIf { it.isNotBlank() },
                     endpoint = endpoint,
                     preferences = preferences,
                 ) { progress ->
