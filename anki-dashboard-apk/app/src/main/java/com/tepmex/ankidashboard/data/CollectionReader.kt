@@ -308,8 +308,8 @@ class CollectionReader(private val context: Context) {
         return modelsById[mid]?.fieldNames ?: emptyList()
     }
 
-    private fun resolveDeckIds(deckName: String): List<Int> {
-        val ids = ArrayList<Int>()
+  private fun resolveDeckIds(deckName: String): List<Long> {
+        val ids = ArrayList<Long>()
         val target = deckName.trim()
         if (target.isEmpty()) return ids
         for ((id, deck) in decksById) {
@@ -317,7 +317,7 @@ class CollectionReader(private val context: Context) {
             if (name.equals(target, ignoreCase = true) ||
                 name.startsWith("$target::", ignoreCase = true)
             ) {
-                id.toIntOrNull()?.let { ids.add(it) }
+                id.toLongOrNull()?.let { ids.add(it) }
             }
         }
         return ids
