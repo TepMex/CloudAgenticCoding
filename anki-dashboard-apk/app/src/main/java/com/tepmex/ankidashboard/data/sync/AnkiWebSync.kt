@@ -19,7 +19,8 @@ data class SyncResult(
 )
 
 /**
- * Download-only AnkiWeb sync — mirrors web [AnkiWebSync].
+ * Download-only AnkiWeb sync — mirrors web [AnkiWebSync.js] at
+ * [97e7425](https://github.com/TepMex/anki-dashboard/commit/97e742545188380d02192818437aada9d8b9ccdb).
  */
 class AnkiWebSync(
     private val context: Context,
@@ -42,41 +43,6 @@ class AnkiWebSync(
         while (client.hostChangedOnLastRequest && attempts < MAX_HOST_LOGIN_ATTEMPTS) {
             login(username, password)
             attempts++
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun fetchMeta(username: String, password: String?): JSONObject {
-        val hostBefore = client.syncHost
-        return try {
-            client.meta()
-        } catch (first: IOException) {
-            val hostChanged = client.syncHost != null && client.syncHost != hostBefore
-            val authFailure = (first as? SyncException)?.httpStatus in setOf(400, 403)
-            if (!password.isNullOrBlank() && (hostChanged || client.hostChangedOnLastRequest || authFailure)) {
-                SyncDiagnostics.logFailure("meta (host/auth changed, re-login)", first)
-                client.resetToDefaultEntryHost()
-                loginOnResolvedHost(username, password)
-                return client.meta()
-            }
-            if (!client.hasResolvedShard()) throw first
-            SyncDiagnostics.logFailure("meta (first attempt)", first)
-            try {
-                client.meta()
-            } catch (second: IOException) {
-                if (!password.isNullOrBlank()) {
-                    SyncDiagnostics.logFailure("meta (second attempt, re-login)", second)
-                    client.resetToDefaultEntryHost()
-                    loginOnResolvedHost(username, password)
-                    return client.meta()
-                }
-                throw SyncException(
-                    message = "Could not read server metadata after resolving sync host. " +
-                        "Re-enter your AnkiWeb password and try again.",
-                    phase = "meta",
-                    cause = second,
-                )
-            }
         }
     }
 
@@ -117,33 +83,32 @@ class AnkiWebSync(
         }
 
         onProgress?.invoke(SyncProgress("meta"))
-        val serverMeta = try {
-            fetchMeta(username, password)
+        var serverMeta: JSONObject? = null
+        try {
+            serverMeta = client.meta()
         } catch (e: IOException) {
-            val httpStatus = (e as? SyncException)?.httpStatus
-            val authFailure = httpStatus == 400 || httpStatus == 403
-            if (password.isNullOrBlank()) {
-                if (authFailure || client.hostChangedOnLastRequest || client.hasResolvedShard()) {
-                    throw SyncException(
-                        message = "AnkiWeb session expired or moved to ${client.syncHost ?: "another server"}. " +
-                            "Enter your password to sync again.",
-                        phase = "meta",
-                        cause = e,
-                    )
+            if (!client.hasResolvedShard()) {
+                if (password.isNullOrBlank()) {
+                    val httpStatus = (e as? SyncException)?.httpStatus
+                    if (httpStatus == 400 || httpStatus == 403 || client.hostChangedOnLastRequest) {
+                        throw SyncException(
+                            message = "AnkiWeb session expired or moved to ${client.syncHost ?: "another server"}. " +
+                                "Enter your password to sync again.",
+                            phase = "meta",
+                            cause = e,
+                        )
+                    }
                 }
                 throw e
             }
-            if (authFailure || client.hostChangedOnLastRequest) {
-                client.resetToDefaultEntryHost()
-            }
-            loginOnResolvedHost(username, password)
-            fetchMeta(username, password)
+            SyncDiagnostics.logFailure("meta (ignored on numbered shard)", e)
+        }
+
+        if (!password.isNullOrBlank() && client.hasResolvedShard()) {
+            login(username, password)
         }
 
         onProgress?.invoke(SyncProgress("download"))
-        if (!password.isNullOrBlank() && client.hostChangedOnLastRequest) {
-            loginOnResolvedHost(username, password)
-        }
         val collectionData = client.download { received, total ->
             onProgress?.invoke(SyncProgress("download", received, total))
         }
@@ -156,8 +121,8 @@ class AnkiWebSync(
                 context,
                 collectionData,
                 mapOf(
-                    "serverMod" to serverMeta.opt("mod"),
-                    "serverUsn" to serverMeta.opt("usn"),
+                    "serverMod" to serverMeta?.opt("mod"),
+                    "serverUsn" to serverMeta?.opt("usn"),
                 ),
             )
         } catch (e: Exception) {
@@ -178,7 +143,7 @@ class AnkiWebSync(
             endpoint = savedEndpoint,
             username = username,
             syncedAt = System.currentTimeMillis(),
-            serverMod = serverMeta.optLong("mod").takeIf { it != 0L || serverMeta.has("mod") },
+            serverMod = serverMeta?.optLong("mod")?.takeIf { serverMeta.has("mod") },
         )
         preferences.saveAnkiWebSettings(username, savedEndpoint)
 
