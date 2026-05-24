@@ -38,6 +38,10 @@ jobs:
         working-directory: hanzi-info
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (hanzi-reading-roguelike)
+        working-directory: hanzi-reading-roguelike
+        run: bun install --frozen-lockfile
+
       # Project pages are served from /<repo>/, so hashed assets must use
       # /<repo>/<app>/ — not /<app>/ (that resolves to the org/user site root).
       - name: Set deployment timestamp
@@ -59,6 +63,12 @@ jobs:
         working-directory: hanzi-info
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-info/
+        run: bun run build
+
+      - name: Build (hanzi-reading-roguelike)
+        working-directory: hanzi-reading-roguelike
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-reading-roguelike/
         run: bun run build
 
       - name: Setup Java (ChessWatch)
@@ -96,10 +106,11 @@ jobs:
 
       - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/chesswatch deploy/ankidroid-llm deploy/local-tts deploy/anki-dashboard-apk
+          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/hanzi-reading-roguelike deploy/chesswatch deploy/ankidroid-llm deploy/local-tts deploy/anki-dashboard-apk
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
           cp -r hanzi-info/dist/. deploy/hanzi-info/
+          cp -r hanzi-reading-roguelike/dist/. deploy/hanzi-reading-roguelike/
           for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk; do
             cp -r "$app/site/." "deploy/$app/"
             cp android/landing/styles.css "deploy/$app/styles.css"

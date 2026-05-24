@@ -20,6 +20,14 @@ bun run build
 
 Static output is in `dist/` — serve with any static host.
 
+## GitHub Pages (this monorepo)
+
+The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) builds this app and copies `dist/` to `deploy/hanzi-reading-roguelike/` on the `gh-pages` branch. After a push to `master`, the game is available at:
+
+`https://<user-or-org>.github.io/<repository>/hanzi-reading-roguelike/`
+
+CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefix.
+
 ## Gameplay notes
 
 - **Hints:** For each Hanzi, the first five times it appears in a spawn (persisted in `localStorage`), the pinyin hint is shown above the circle — matching the “first through fifth meeting” idea.
