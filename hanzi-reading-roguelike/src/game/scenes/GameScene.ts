@@ -7,9 +7,9 @@ const GAME_HEIGHT = 844;
 const CENTER_POINT = new Phaser.Math.Vector2(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 const CENTER_RADIUS = 32;
 const ENEMY_RADIUS = 36;
-const SPAWN_EVERY_MS = 2200;
-const TICK_EVERY_MS = 750;
-const STEP_PER_TICK = 12;
+const SPAWN_EVERY_MS = 3500;
+const TICK_EVERY_MS = 1000;
+const STEP_PER_TICK = 6;
 const MAX_ACTIVE_ENEMIES = 12;
 
 type EnemyState = {
