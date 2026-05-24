@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hanzi Reading Roguelike</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-root"></div>
+      <div id="hud" class="hud hidden">
+        <span class="hud-pill" id="score-pill">Score: 0</span>
+        <span class="hud-pill" id="wave-pill">Enemies: 0</span>
+      </div>
+      <form id="answer-form" class="answer-form hidden" autocomplete="off">
+        <label class="answer-label" for="pinyin-input" id="answer-label">Type pinyin</label>
+        <input
+          id="pinyin-input"
+          type="text"
+          inputmode="latin"
+          enterkeyhint="done"
+          autocapitalize="none"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="pinyin"
+        />
+        <button type="submit">Hit</button>
+      </form>
+      <div id="toast" class="toast hidden"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
