@@ -3,6 +3,11 @@
     <style name="Theme.AnkiDashboard" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/dashboard_accent</item>
         <item name="colorOnPrimary">@color/dashboard_bg</item>
+        <item name="colorSurface">@color/dashboard_surface</item>
+        <item name="colorOnSurface">@color/dashboard_text</item>
+        <item name="android:colorBackground">@color/dashboard_bg</item>
+        <item name="android:textColorPrimary">@color/dashboard_text</item>
+        <item name="android:textColorSecondary">@color/dashboard_text_muted</item>
         <item name="android:statusBarColor">@color/dashboard_bg</item>
         <item name="android:navigationBarColor">@color/dashboard_bg</item>
         <item name="android:windowBackground">@color/dashboard_bg</item>
