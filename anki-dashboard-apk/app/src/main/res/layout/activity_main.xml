@@ -312,6 +312,15 @@
                             app:tint="@color/dashboard_text" />
                     </LinearLayout>
 
+                    <TextView
+                        android:id="@+id/leechesEmptyHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/leeches_empty"
+                        android:textColor="@color/dashboard_text_muted"
+                        android:visibility="gone" />
+
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/leechesRecycler"
                         android:layout_width="match_parent"

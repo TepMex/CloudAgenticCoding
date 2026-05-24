@@ -76,7 +76,14 @@ class DashboardRepository(
         val distinctCardIds = cardIds.distinct()
 
         val intervals = collection.getIntervals(distinctCardIds)
-        val deckFieldOptions = buildFieldOptionsFromCollection(selectedDecks, distinctCardIds)
+        val leechCardIds = selectedDecks.flatMap { deck ->
+            collection.findCards(buildLeechSearch(deck))
+        }.distinct()
+        val deckFieldOptions = buildFieldOptionsFromCollection(
+            selectedDecks,
+            distinctCardIds,
+            leechCardIds,
+        )
 
         var plotData = emptyList<Pair<String, Int>>()
         var mistakesData = emptyList<Pair<String, Int>>()
@@ -103,7 +110,7 @@ class DashboardRepository(
             longMemory = DashboardAnalytics.calculateLongMemory(cardReviews)
         }
 
-        val leeches = buildLeeches(selectedDecks, cardReviews)
+        val leeches = buildLeeches(selectedDecks, cardReviews, leechCardIds)
 
         val statusMessage = if (distinctCardIds.isEmpty()) {
             STATUS_NO_CARDS_IN_DECKS
@@ -135,8 +142,9 @@ class DashboardRepository(
     private fun buildFieldOptionsFromCollection(
         selectedDecks: List<String>,
         cardIds: List<Long>,
+        leechCardIds: List<Long> = emptyList(),
     ): Map<String, List<String>> {
-        val sampleIds = cardIds.take(20)
+        val sampleIds = (leechCardIds + cardIds).distinct().take(40)
         val infos = collection.cardsInfo(sampleIds)
         val out = linkedMapOf<String, MutableSet<String>>()
         selectedDecks.forEach { out[it] = linkedSetOf() }
@@ -150,11 +158,9 @@ class DashboardRepository(
     private fun buildLeeches(
         selectedDecks: List<String>,
         cardReviews: Map<Long, List<CardReview>>,
+        leechCardIds: List<Long>,
     ): List<LeechCard> {
-        val ids = selectedDecks.flatMap { deck ->
-            collection.findCards(buildLeechSearch(deck))
-        }.distinct()
-        return collection.cardsInfo(ids).map { row ->
+        return collection.cardsInfo(leechCardIds).map { row ->
             val deckKey = resolveSelectedDeck(selectedDecks, row.deckName) ?: row.deckName
             LeechCard(
                 id = row.cardId,
