@@ -58,6 +58,8 @@ class CalendarHeatmapView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
 
+        canvas.drawColor(emptyColor)
+
         val end = LocalDate.now()
         val start = end.minusMonths(12)
         val weeks = ChronoUnit.WEEKS.between(

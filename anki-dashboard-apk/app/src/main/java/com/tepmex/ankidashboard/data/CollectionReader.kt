@@ -178,6 +178,29 @@ class CollectionReader(private val context: Context) {
         return out
     }
 
+    /** Field names from note types used in [deckName] (fallback when card sampling has no fields). */
+    fun getFieldNamesForDeck(deckName: String): List<String> {
+        val db = db ?: return emptyList()
+        val deckIds = resolveDeckIds(deckName)
+        if (deckIds.isEmpty()) return emptyList()
+        val idList = deckIds.joinToString(",")
+        val sql = """
+            SELECT DISTINCT n.mid FROM cards c
+            JOIN notes n ON c.nid = n.id
+            WHERE c.did IN ($idList)
+            LIMIT 20
+        """.trimIndent()
+        val names = linkedSetOf<String>()
+        db.rawQuery(sql, null).use { c ->
+            while (c.moveToNext()) {
+                getFieldNames(c.getLong(0).toString()).forEach { name ->
+                    if (name.isNotBlank()) names.add(name)
+                }
+            }
+        }
+        return names.sorted()
+    }
+
     fun cardsInfo(cardIds: List<Long>): List<CardInfoRow> {
         if (cardIds.isEmpty()) return emptyList()
         val db = db ?: return emptyList()

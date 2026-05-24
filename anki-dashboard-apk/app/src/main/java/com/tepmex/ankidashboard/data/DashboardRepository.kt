@@ -79,11 +79,7 @@ class DashboardRepository(
         val leechCardIds = selectedDecks.flatMap { deck ->
             collection.findCards(buildLeechSearch(deck))
         }.distinct()
-        val deckFieldOptions = buildFieldOptionsFromCollection(
-            selectedDecks,
-            distinctCardIds,
-            leechCardIds,
-        )
+        val deckFieldOptions = buildFieldOptionsFromCollection(selectedDecks)
 
         var plotData = emptyList<Pair<String, Int>>()
         var mistakesData = emptyList<Pair<String, Int>>()
