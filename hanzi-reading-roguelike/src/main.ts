@@ -1,6 +1,5 @@
 import Phaser from "phaser";
 import "./style.css";
-import { logDebugEvent } from "./debugLog";
 import { GAME_EVENTS } from "./game/events";
 import { GameOverScene } from "./game/scenes/GameOverScene";
 import { GameScene } from "./game/scenes/GameScene";
@@ -37,18 +36,6 @@ const game = new Phaser.Game({
 });
 
 game.events.on(GAME_EVENTS.enemySelected, (payload: { hanzi: string; hint?: string }) => {
-  // #region agent log
-  logDebugEvent({
-    hypothesisId: "C",
-    location: "main.ts:49",
-    message: "enemySelected listener invoked",
-    data: {
-      hanzi: payload.hanzi,
-      hasHint: Boolean(payload.hint),
-      selectionExistsBefore: selectionExists
-    }
-  });
-  // #endregion
   selectionExists = true;
   const hintPart = payload.hint ? `Hint: ${payload.hint}` : "No hint this time";
   answerLabel.textContent = `Type pinyin for "${payload.hanzi}". ${hintPart}`;
@@ -58,16 +45,6 @@ game.events.on(GAME_EVENTS.enemySelected, (payload: { hanzi: string; hint?: stri
 });
 
 game.events.on(GAME_EVENTS.enemyCleared, () => {
-  // #region agent log
-  logDebugEvent({
-    hypothesisId: "C",
-    location: "main.ts:63",
-    message: "enemyCleared listener invoked",
-    data: {
-      selectionExistsBefore: selectionExists
-    }
-  });
-  // #endregion
   selectionExists = false;
   answerForm.classList.add("hidden");
   pinyinInput.blur();

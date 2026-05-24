@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-import { logDebugEvent } from "../../debugLog";
 import { GAME_EVENTS } from "../events";
 import { HINT_VISIBLE_FOR_ENCOUNTERS, HanziEntry, seedHanziData } from "../hanziData";
 
@@ -135,19 +134,6 @@ export class GameScene extends Phaser.Scene {
     const enemyId = this.nextEnemyId++;
     const enemy = this.createEnemyNode(enemyId, entry, encounteredCount, spawnPoint.x, spawnPoint.y);
     this.enemies.set(enemyId, enemy);
-    // #region agent log
-    logDebugEvent({
-      hypothesisId: "D",
-      location: "GameScene.ts:149",
-      message: "enemy spawned",
-      data: {
-        enemyId,
-        x: spawnPoint.x,
-        y: spawnPoint.y,
-        hanzi: entry.hanzi
-      }
-    });
-    // #endregion
     this.emitStats();
   }
 
@@ -216,19 +202,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     const hint = enemy.encounteredCount <= HINT_VISIBLE_FOR_ENCOUNTERS ? enemy.entry.pinyin : undefined;
-    // #region agent log
-    logDebugEvent({
-      hypothesisId: "C",
-      location: "GameScene.ts:216",
-      message: "emitting enemySelected",
-      data: {
-        enemyId: id,
-        hanzi: enemy.entry.hanzi,
-        hint,
-        gameFinished: this.gameFinished
-      }
-    });
-    // #endregion
     this.game.events.emit(GAME_EVENTS.enemySelected, {
       hanzi: enemy.entry.hanzi,
       hint
@@ -249,19 +222,6 @@ export class GameScene extends Phaser.Scene {
       const distance = toCenter.length();
 
       if (distance <= CENTER_RADIUS + ENEMY_RADIUS * 0.45) {
-        // #region agent log
-        logDebugEvent({
-          hypothesisId: "E",
-          location: "GameScene.ts:238",
-          message: "enemy reached center threshold",
-          data: {
-            enemyId: enemy.id,
-            distance,
-            threshold: CENTER_RADIUS + ENEMY_RADIUS * 0.45,
-            selectedEnemyId: this.selectedEnemyId
-          }
-        });
-        // #endregion
         this.endGame();
         return;
       }
@@ -373,65 +333,49 @@ export class GameScene extends Phaser.Scene {
     if (this.gameFinished) {
       return;
     }
+    const cameraPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2 | null;
+    const x = cameraPoint?.x ?? pointer.x;
+    const y = cameraPoint?.y ?? pointer.y;
 
-    // #region agent log
-    logDebugEvent({
-      hypothesisId: "A",
-      location: "GameScene.ts:355",
-      message: "pointerdown entry",
-      data: {
-        pointerX: pointer.x,
-        pointerY: pointer.y,
-        worldX: pointer.worldX,
-        worldY: pointer.worldY,
-        enemyCount: this.enemies.size
-      }
-    });
-    // #endregion
-    const hitEnemy = this.findEnemyAtPoint(pointer.worldX, pointer.worldY);
-    // #region agent log
-    logDebugEvent({
-      hypothesisId: "B",
-      location: "GameScene.ts:364",
-      message: "pointerdown hit-test result",
-      data: {
-        hitEnemyId: hitEnemy?.id ?? null,
-        selectedEnemyId: this.selectedEnemyId
-      }
-    });
-    // #endregion
+    const hitEnemy =
+      this.findEnemyAtPoint(x, y, ENEMY_RADIUS * 1.8) ??
+      this.findEnemyAtPoint(pointer.worldX, pointer.worldY, ENEMY_RADIUS * 1.8) ??
+      this.findNearestEnemyWithin(x, y, ENEMY_RADIUS * 2.7);
     if (hitEnemy) {
       this.selectEnemy(hitEnemy.id);
     }
   }
 
-  private findEnemyAtPoint(x: number, y: number): EnemyState | null {
+  private findEnemyAtPoint(x: number, y: number, hitRadius: number): EnemyState | null {
     let closest: EnemyState | null = null;
     let minDistance = Number.POSITIVE_INFINITY;
 
     for (const enemy of this.enemies.values()) {
       const distance = Phaser.Math.Distance.Between(x, y, enemy.circle.x, enemy.circle.y);
-      if (distance <= ENEMY_RADIUS && distance < minDistance) {
+      if (distance <= hitRadius && distance < minDistance) {
         closest = enemy;
         minDistance = distance;
       }
     }
 
-    // #region agent log
-    logDebugEvent({
-      hypothesisId: "B",
-      location: "GameScene.ts:383",
-      message: "findEnemyAtPoint evaluated",
-      data: {
-        x,
-        y,
-        enemyCount: this.enemies.size,
-        closestId: closest?.id ?? null,
-        minDistance: Number.isFinite(minDistance) ? minDistance : null
-      }
-    });
-    // #endregion
-
     return closest;
+  }
+
+  private findNearestEnemyWithin(x: number, y: number, maxDistance: number): EnemyState | null {
+    let closest: EnemyState | null = null;
+    let minDistance = Number.POSITIVE_INFINITY;
+
+    for (const enemy of this.enemies.values()) {
+      const distance = Phaser.Math.Distance.Between(x, y, enemy.circle.x, enemy.circle.y);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = enemy;
+      }
+    }
+
+    if (closest && minDistance <= maxDistance) {
+      return closest;
+    }
+    return null;
   }
 }
