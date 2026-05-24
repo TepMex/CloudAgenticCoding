@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -77,6 +78,7 @@ class MainActivity : AppCompatActivity() {
         binding.pickCollectionButton.setOnClickListener {
             openCollectionLauncher.launch(arrayOf("*/*"))
         }
+        binding.leechesSettingsButton.setOnClickListener { showLeechFieldDialog() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -87,14 +89,14 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 (application as com.tepmex.ankidashboard.AnkiDashboardApp)
                     .preferences.leechFieldByDeck.collect { saved ->
-                        if (saved.isNotEmpty()) {
-                            leechFieldByDeck = saved
-                            state@ run {
-                                viewModel.uiState.value.data?.let { data ->
-                                    leechesAdapter.submit(data.leeches, leechFieldByDeck)
-                                }
-                            }
-                        }
+                        val state = viewModel.uiState.value
+                        val data = state.data ?: return@collect
+                        leechFieldByDeck = buildLeechFieldMap(
+                            state.selectedDecks,
+                            data.deckFieldOptions,
+                            saved,
+                        )
+                        leechesAdapter.submit(data.leeches, leechFieldByDeck)
                     }
             }
         }
@@ -192,45 +194,66 @@ class MainActivity : AppCompatActivity() {
             binding.monthlyChart.isVisible = false
         }
 
-        leechFieldByDeck = buildLeechFieldMap(state.selectedDecks, data.deckFieldOptions)
+        leechFieldByDeck = buildLeechFieldMap(
+            state.selectedDecks,
+            data.deckFieldOptions,
+            leechFieldByDeck,
+        )
         leechesAdapter.submit(data.leeches, leechFieldByDeck)
-        binding.leechesSettingsButton.setOnClickListener { showLeechFieldDialog(state.selectedDecks, data) }
+        binding.leechesEmptyHint.isVisible = data.leeches.isEmpty()
+        binding.leechesRecycler.isVisible = data.leeches.isNotEmpty()
     }
 
     private fun buildLeechFieldMap(
         selectedDecks: Set<String>,
         options: Map<String, List<String>>,
+        saved: Map<String, String> = leechFieldByDeck,
     ): Map<String, String> {
         val out = linkedMapOf<String, String>()
         selectedDecks.forEach { deck ->
             val fields = options[deck].orEmpty()
-            out[deck] = fields.firstOrNull().orEmpty()
+            val savedField = saved[deck]
+            out[deck] = when {
+                !savedField.isNullOrBlank() && (fields.isEmpty() || savedField in fields) -> savedField
+                else -> fields.firstOrNull().orEmpty()
+            }
         }
         return out
     }
 
-    private fun showLeechFieldDialog(selectedDecks: Set<String>, data: DashboardData) {
-        val decks = selectedDecks.toList()
+    private fun showLeechFieldDialog() {
+        val state = viewModel.uiState.value
+        val data = state.data ?: return
+        val decks = state.selectedDecks.toList()
         if (decks.isEmpty()) return
-        val labels = decks.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(R.string.leech_field_title)
-            .setItems(labels) { _, which ->
+            .setItems(decks.toTypedArray()) { dialog, which ->
                 val deck = decks[which]
                 val fieldOptions = data.deckFieldOptions[deck].orEmpty()
-                if (fieldOptions.isEmpty()) return@setItems
-                AlertDialog.Builder(this)
-                    .setTitle(deck)
-                    .setItems(fieldOptions.toTypedArray()) { _, fieldIdx ->
-                        val field = fieldOptions[fieldIdx]
-                        leechFieldByDeck = leechFieldByDeck.toMutableMap().apply { put(deck, field) }
-                        lifecycleScope.launch {
-                            (application as com.tepmex.ankidashboard.AnkiDashboardApp)
-                                .preferences.setLeechField(deck, field)
-                        }
-                        leechesAdapter.submit(data.leeches, leechFieldByDeck)
-                    }
-                    .show()
+                dialog.dismiss()
+                if (fieldOptions.isEmpty()) {
+                    Toast.makeText(this, R.string.leech_no_fields, Toast.LENGTH_SHORT).show()
+                    return@setItems
+                }
+                binding.root.post { showLeechFieldPickerDialog(deck, fieldOptions) }
+            }
+            .show()
+    }
+
+    private fun showLeechFieldPickerDialog(deck: String, fieldOptions: List<String>) {
+        AlertDialog.Builder(this)
+            .setTitle(deck)
+            .setItems(fieldOptions.toTypedArray()) { _, fieldIdx ->
+                val field = fieldOptions[fieldIdx]
+                leechFieldByDeck = leechFieldByDeck.toMutableMap().apply { put(deck, field) }
+                lifecycleScope.launch {
+                    (application as com.tepmex.ankidashboard.AnkiDashboardApp)
+                        .preferences.setLeechField(deck, field)
+                }
+                viewModel.uiState.value.data?.let { current ->
+                    leechesAdapter.submit(current.leeches, leechFieldByDeck)
+                }
             }
             .show()
     }

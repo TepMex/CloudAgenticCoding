@@ -51,4 +51,6 @@
     <string name="action_pick_collection">Pick collection.anki2</string>
     <string name="leech_reviews">Reviews: %d</string>
     <string name="leech_field_title">Leech field per deck</string>
+    <string name="leeches_empty">No leeches found for the selected deck(s).</string>
+    <string name="leech_no_fields">No note fields found for this deck. Reload after syncing your collection.</string>
 </resources>
