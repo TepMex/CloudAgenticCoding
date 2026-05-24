@@ -87,15 +87,17 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:background="@color/plate_review"
+                            android:minHeight="72dp"
                             android:orientation="vertical"
                             android:padding="10dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:maxLines="2"
                                 android:text="@string/stat_review_score"
-                                android:textColor="@color/dashboard_text_muted"
-                                android:textSize="12sp" />
+                                android:textColor="@color/plate_label"
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/reviewScoreValue"
@@ -112,15 +114,17 @@
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:background="@color/plate_words"
+                            android:minHeight="72dp"
                             android:orientation="vertical"
                             android:padding="10dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:maxLines="2"
                                 android:text="@string/stat_words"
-                                android:textColor="@color/dashboard_text_muted"
-                                android:textSize="12sp" />
+                                android:textColor="@color/plate_label"
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/wordsValue"
@@ -137,15 +141,17 @@
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:background="@color/plate_hours"
+                            android:minHeight="72dp"
                             android:orientation="vertical"
                             android:padding="10dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:maxLines="2"
                                 android:text="@string/stat_hours"
-                                android:textColor="@color/dashboard_text_muted"
-                                android:textSize="12sp" />
+                                android:textColor="@color/plate_label"
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/hoursValue"
@@ -176,13 +182,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:textColor="@color/dashboard_text_muted" />
+                        android:textColor="@color/plate_label" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:background="@color/plate_memory"
+                        android:minHeight="72dp"
                         android:orientation="vertical"
                         android:padding="10dp">
 
@@ -190,8 +197,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/stat_long_memory"
-                            android:textColor="@color/dashboard_text_muted"
-                            android:textSize="12sp" />
+                            android:textColor="@color/plate_label"
+                            android:textSize="11sp" />
 
                         <TextView
                             android:id="@+id/longMemoryValue"
@@ -231,7 +238,7 @@
                     <com.github.mikephil.charting.charts.CombinedChart
                         android:id="@+id/vocabChart"
                         android:layout_width="match_parent"
-                        android:layout_height="220dp"
+                        android:layout_height="240dp"
                         android:layout_marginTop="8dp" />
 
                     <TextView
@@ -246,7 +253,7 @@
                     <com.tepmex.ankidashboard.ui.CalendarHeatmapView
                         android:id="@+id/mistakesHeatmap"
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
+                        android:layout_height="160dp"
                         android:layout_marginTop="8dp" />
 
                     <TextView
@@ -261,7 +268,7 @@
                     <com.tepmex.ankidashboard.ui.CalendarHeatmapView
                         android:id="@+id/reviewHeatmap"
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
+                        android:layout_height="160dp"
                         android:layout_marginTop="8dp" />
 
                     <TextView

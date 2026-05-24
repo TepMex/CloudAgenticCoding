@@ -15,7 +15,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
@@ -67,6 +66,9 @@ class MainActivity : AppCompatActivity() {
         binding.deckRecycler.adapter = deckAdapter
         binding.leechesRecycler.layoutManager = LinearLayoutManager(this)
         binding.leechesRecycler.adapter = leechesAdapter
+
+        ChartTheme.apply(this, binding.vocabChart)
+        ChartTheme.apply(this, binding.monthlyChart)
 
         binding.retryButton.setOnClickListener { viewModel.reload() }
         binding.openSyncButton.setOnClickListener {
@@ -272,17 +274,8 @@ class MainActivity : AppCompatActivity() {
         combined.setData(BarData(mistakeSet, reviewSet))
 
         binding.vocabChart.data = combined
-        binding.vocabChart.drawOrder = arrayOf(
-            com.github.mikephil.charting.charts.CombinedChart.DrawOrder.BAR,
-            com.github.mikephil.charting.charts.CombinedChart.DrawOrder.LINE,
-        )
         binding.vocabChart.xAxis.valueFormatter = IndexAxisValueFormatter(sparseLabels(labels))
         binding.vocabChart.xAxis.labelRotationAngle = -45f
-        binding.vocabChart.xAxis.position = XAxis.XAxisPosition.BOTTOM
-        binding.vocabChart.axisRight.isEnabled = true
-        binding.vocabChart.axisLeft.isEnabled = true
-        binding.vocabChart.description.isEnabled = false
-        binding.vocabChart.legend.isEnabled = true
         binding.vocabChart.invalidate()
     }
 
@@ -297,7 +290,6 @@ class MainActivity : AppCompatActivity() {
             monthly.map { formatMonthLabel(it.first) },
         )
         binding.monthlyChart.xAxis.labelRotationAngle = -45f
-        binding.monthlyChart.description.isEnabled = false
         binding.monthlyChart.invalidate()
     }
 

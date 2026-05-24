@@ -59,7 +59,7 @@ class CalendarHeatmapView @JvmOverloads constructor(
         if (width <= 0 || height <= 0) return
 
         val end = LocalDate.now()
-        val start = end.minusYears(2)
+        val start = end.minusMonths(12)
         val weeks = ChronoUnit.WEEKS.between(
             start.with(DayOfWeek.MONDAY),
             end,

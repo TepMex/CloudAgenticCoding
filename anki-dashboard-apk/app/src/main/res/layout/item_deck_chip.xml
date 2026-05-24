@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginEnd="8dp"
     android:checkable="true"
-    android:textColor="@color/dashboard_text"
-    app:chipBackgroundColor="@color/chip_bg"
+    android:textColor="@color/chip_text"
+    app:chipBackgroundColor="@color/chip_background"
     app:chipStrokeColor="@color/dashboard_accent"
     app:chipStrokeWidth="1dp" />
