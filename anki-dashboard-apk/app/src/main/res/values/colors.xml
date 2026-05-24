@@ -21,7 +21,7 @@
     <color name="chart_grid">#FF484F58</color>
     <color name="chip_checked_bg">#FF61DAFB</color>
     <color name="chip_checked_text">#FF1E2128</color>
-    <color name="heatmap_empty">#FF2D333B</color>
+    <color name="heatmap_empty">#FFFFFFFF</color>
     <color name="heatmap_anki_1">#FF0E4429</color>
     <color name="heatmap_anki_2">#FF006D32</color>
     <color name="heatmap_anki_3">#FF26A641</color>
