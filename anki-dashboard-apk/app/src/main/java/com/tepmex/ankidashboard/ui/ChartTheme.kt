@@ -2,6 +2,7 @@ package com.tepmex.ankidashboard.ui
 
 import android.content.Context
 import com.github.mikephil.charting.charts.BarChart
+import com.github.mikephil.charting.charts.BarLineChartBase
 import com.github.mikephil.charting.charts.CombinedChart
 import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.components.XAxis
@@ -28,7 +29,7 @@ object ChartTheme {
 
     private fun applyCommon(
         context: Context,
-        chart: com.github.mikephil.charting.charts.Chart<*>,
+        chart: BarLineChartBase<*>,
     ) {
         val axisText = context.getColor(R.color.chart_axis_text)
         val grid = context.getColor(R.color.chart_grid)
