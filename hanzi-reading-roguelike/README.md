@@ -1,16 +1,46 @@
 # Hanzi Reading Roguelike
 
-Browser game project (scaffold). Creature sprites live in `assets/` — one PNG per hanzi label, cropped from the source 8×8 grid.
+Mobile-friendly browser game: **Phaser 3**, **Bun** + **Vite**. Circles labeled with a random Hanzi drift toward a center crosshair; if one reaches the center, you lose. Tap a circle, type its **pinyin** (no tones) in the overlay input to clear it.
 
-## Asset pipeline
+## Run
 
-Regenerate creature PNGs from the source sheet:
+```bash
+cd hanzi-reading-roguelike
+bun install
+bun run dev
+```
+
+Open the printed URL on a phone (same LAN) or use `adb reverse` for USB debugging.
+
+## Build
+
+```bash
+bun run build
+```
+
+Static output is in `dist/` — serve with any static host.
+
+## GitHub Pages (this monorepo)
+
+The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) builds this app and copies `dist/` to `deploy/hanzi-reading-roguelike/` on the `gh-pages` branch. After a push to `master`, the game is available at:
+
+`https://<user-or-org>.github.io/<repository>/hanzi-reading-roguelike/`
+
+CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefix.
+
+## Gameplay notes
+
+- **Hints:** For each Hanzi, the first five times it appears in a spawn (persisted in `localStorage`), the pinyin hint is shown above the circle — matching the “first through fifth meeting” idea.
+- **Roguelike pressure:** Spawn interval shortens and drift speed increases over time.
+- **Images:** `hanziData.ts` includes `image` paths for future sprite work; the current build draws the character with `Noto Sans SC` text inside the circle.
+
+## Creature PNG pipeline (optional assets)
+
+Creature sprites can live in `assets/` — one PNG per label, cropped from the source grid. Regenerate with:
 
 ```bash
 cd hanzi-reading-roguelike
 python3 scripts/split-creature-grid.py
 ```
 
-Source grid: `source/creature-grid.png` (8 rows × 8 columns). The splitter crops each cell to the creature illustration and skips the top-left hanzi label.
-
-Duplicate labels (`书`, `手`) get suffixed filenames on repeat: `书.png`, `书-2.png`, `手.png`, `手-2.png`.
+Source grid: `source/creature-grid.png` (8×8). The splitter skips the top-left label cell.
