@@ -96,6 +96,10 @@ jobs:
         working-directory: anki-dashboard-apk
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build ZuoTasks APK
+        working-directory: zuo-tasks
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Verify APK sideload signing
         run: |
           chmod +x android/verify-apk-sideload-cert.sh
@@ -103,15 +107,16 @@ jobs:
           android/verify-apk-sideload-cert.sh ankidroid-llm/app/build/outputs/apk/release/app-release.apk
           android/verify-apk-sideload-cert.sh local-tts/app/build/outputs/apk/release/app-release.apk
           android/verify-apk-sideload-cert.sh anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk
+          android/verify-apk-sideload-cert.sh zuo-tasks/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare GitHub Pages site
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/hanzi-reading-roguelike deploy/chesswatch deploy/ankidroid-llm deploy/local-tts deploy/anki-dashboard-apk
+          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/hanzi-reading-roguelike deploy/chesswatch deploy/ankidroid-llm deploy/local-tts deploy/anki-dashboard-apk deploy/zuo-tasks
           cp -r socratus/dist/. deploy/socratus/
           cp -r mandarin-koan/dist/. deploy/mandarin-koan/
           cp -r hanzi-info/dist/. deploy/hanzi-info/
           cp -r hanzi-reading-roguelike/dist/. deploy/hanzi-reading-roguelike/
-          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk; do
+          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks; do
             cp -r "$app/site/." "deploy/$app/"
             cp android/landing/styles.css "deploy/$app/styles.css"
           done
@@ -119,6 +124,7 @@ jobs:
           cp ankidroid-llm/app/build/outputs/apk/release/app-release.apk deploy/ankidroid-llm/ankidroid-llm.apk
           cp local-tts/app/build/outputs/apk/release/app-release.apk deploy/local-tts/local-tts.apk
           cp anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk deploy/anki-dashboard-apk/anki-dashboard-apk.apk
+          cp zuo-tasks/app/build/outputs/apk/release/app-release.apk deploy/zuo-tasks/zuo-tasks.apk
           touch deploy/.nojekyll
 
       - name: Inject deploy footers (static landing pages)
@@ -127,7 +133,8 @@ jobs:
             deploy/chesswatch/index.html \
             deploy/ankidroid-llm/index.html \
             deploy/local-tts/index.html \
-            deploy/anki-dashboard-apk/index.html
+            deploy/anki-dashboard-apk/index.html \
+            deploy/zuo-tasks/index.html
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
