@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZuoTasks"
+rootProject.name = "zuo-tasks"
 include(":app")
