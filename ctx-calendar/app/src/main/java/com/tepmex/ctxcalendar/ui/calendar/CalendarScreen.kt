@@ -144,7 +144,12 @@ fun CalendarScreen(
                         yearMonth = uiState.currentMonth,
                         photosByDay = uiState.photosByDay,
                         onDayClick = onDayClick,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .monthSwipeNavigation(
+                                onSwipeToPreviousMonth = viewModel::previousMonth,
+                                onSwipeToNextMonth = viewModel::nextMonth,
+                            ),
                     )
                 }
             }
