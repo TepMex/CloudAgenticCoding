@@ -30,7 +30,7 @@ android {
 
     defaultConfig {
         applicationId = "com.tepmex.ctxcalendar"
-        minSdk = 36
+        minSdk = 34
         targetSdk = 36
         versionCode = autoVersionCode
         versionName = "1.0.$autoVersionCode"
