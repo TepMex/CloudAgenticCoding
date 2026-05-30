@@ -11,7 +11,7 @@ Android calendar in month view with photo previews from your gallery on each day
 
 ## Requirements
 
-- Android 16 (API 36) — `minSdk`, `targetSdk`, and `compileSdk` are all 36
+- Android 14 (API 34) or newer — `minSdk` 34; `targetSdk` and `compileSdk` are 36
 - `READ_MEDIA_IMAGES` permission to read the device gallery
 
 ## Build
