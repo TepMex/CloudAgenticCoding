@@ -10,7 +10,7 @@ Fast Android task manager with nested projects and recurring regular tasks. The 
 
 ## Requirements
 
-- Android 16 (API 36) — `minSdk`, `targetSdk`, and `compileSdk` are all 36
+- Android 14 (API 34) or newer — `minSdk` 34; `targetSdk` and `compileSdk` are 36
 
 ## Build
 
