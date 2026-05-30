@@ -5,143 +5,474 @@ on:
     branches:
       - master
   workflow_dispatch:
+    inputs:
+      full_deploy:
+        description: Build and deploy all projects (skip change detection)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
+env:
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike
+  ANDROID_APPS: chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar
+
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_previous: ${{ steps.plan.outputs.has_previous }}
+      full_deploy: ${{ steps.plan.outputs.full_deploy }}
+      build_socratus: ${{ steps.plan.outputs.build_socratus }}
+      build_mandarin_koan: ${{ steps.plan.outputs.build_mandarin_koan }}
+      build_hanzi_info: ${{ steps.plan.outputs.build_hanzi_info }}
+      build_hanzi_reading_roguelike: ${{ steps.plan.outputs.build_hanzi_reading_roguelike }}
+      build_chesswatch: ${{ steps.plan.outputs.build_chesswatch }}
+      build_ankidroid_llm: ${{ steps.plan.outputs.build_ankidroid_llm }}
+      build_local_tts: ${{ steps.plan.outputs.build_local_tts }}
+      build_anki_dashboard_apk: ${{ steps.plan.outputs.build_anki_dashboard_apk }}
+      build_zuo_tasks: ${{ steps.plan.outputs.build_zuo_tasks }}
+      build_ctx_calendar: ${{ steps.plan.outputs.build_ctx_calendar }}
+      refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
+      any_web_build: ${{ steps.plan.outputs.any_web_build }}
+      any_android_apk_build: ${{ steps.plan.outputs.any_android_apk_build }}
+      any_android_landing: ${{ steps.plan.outputs.any_android_landing }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 2
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            socratus:
+              - 'socratus/**'
+            mandarin-koan:
+              - 'mandarin-koan/**'
+            hanzi-info:
+              - 'hanzi-info/**'
+            hanzi-reading-roguelike:
+              - 'hanzi-reading-roguelike/**'
+            chesswatch:
+              - 'chesswatch/**'
+            ankidroid-llm:
+              - 'ankidroid-llm/**'
+            local-tts:
+              - 'local-tts/**'
+            anki-dashboard-apk:
+              - 'anki-dashboard-apk/**'
+            zuo-tasks:
+              - 'zuo-tasks/**'
+            ctx-calendar:
+              - 'ctx-calendar/**'
+            shared-android-signing:
+              - 'android/sideload-signing.gradle.kts'
+              - 'android/verify-apk-sideload-cert.sh'
+              - 'android/expected-sideload-cert-sha256.txt'
+            shared-android-landing:
+              - 'android/landing/**'
+            shared-scripts:
+              - 'scripts/**'
+            shared-workflow:
+              - '.github/workflows/deploy.yml'
+
+      - name: Fetch previous gh-pages site
+        id: previous
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: previous-site
+          fetch-depth: 1
+
+      - name: Compute deploy plan
+        id: plan
+        env:
+          FULL_DEPLOY_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.full_deploy }}
+          HAS_PREVIOUS: ${{ steps.previous.outcome == 'success' }}
+          CHANGED_SOCRATUS: ${{ steps.changes.outputs.socratus }}
+          CHANGED_MANDARIN_KOAN: ${{ steps.changes.outputs.mandarin-koan }}
+          CHANGED_HANZI_INFO: ${{ steps.changes.outputs.hanzi-info }}
+          CHANGED_HANZI_READING_ROGUELIKE: ${{ steps.changes.outputs.hanzi-reading-roguelike }}
+          CHANGED_CHESSWATCH: ${{ steps.changes.outputs.chesswatch }}
+          CHANGED_ANKIDROID_LLM: ${{ steps.changes.outputs.ankidroid-llm }}
+          CHANGED_LOCAL_TTS: ${{ steps.changes.outputs.local-tts }}
+          CHANGED_ANKI_DASHBOARD_APK: ${{ steps.changes.outputs.anki-dashboard-apk }}
+          CHANGED_ZUO_TASKS: ${{ steps.changes.outputs.zuo-tasks }}
+          CHANGED_CTX_CALENDAR: ${{ steps.changes.outputs.ctx-calendar }}
+          CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
+          CHANGED_ANDROID_LANDING: ${{ steps.changes.outputs.shared-android-landing }}
+          CHANGED_SCRIPTS: ${{ steps.changes.outputs.shared-scripts }}
+          CHANGED_WORKFLOW: ${{ steps.changes.outputs.shared-workflow }}
+        run: |
+          set -euo pipefail
+
+          is_true() { [[ "${1:-}" == "true" ]]; }
+
+          full_deploy=false
+          if is_true "$FULL_DEPLOY_INPUT"; then
+            full_deploy=true
+          fi
+          if ! is_true "$HAS_PREVIOUS"; then
+            full_deploy=true
+          fi
+          if is_true "$CHANGED_WORKFLOW"; then
+            full_deploy=true
+          fi
+
+          build_socratus=false
+          build_mandarin_koan=false
+          build_hanzi_info=false
+          build_hanzi_reading_roguelike=false
+          build_chesswatch=false
+          build_ankidroid_llm=false
+          build_local_tts=false
+          build_anki_dashboard_apk=false
+          build_zuo_tasks=false
+          build_ctx_calendar=false
+          refresh_android_landings=false
+
+          if $full_deploy; then
+            build_socratus=true
+            build_mandarin_koan=true
+            build_hanzi_info=true
+            build_hanzi_reading_roguelike=true
+            build_chesswatch=true
+            build_ankidroid_llm=true
+            build_local_tts=true
+            build_anki_dashboard_apk=true
+            build_zuo_tasks=true
+            build_ctx_calendar=true
+          else
+            is_true "$CHANGED_SOCRATUS" && build_socratus=true
+            is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
+            is_true "$CHANGED_HANZI_INFO" && build_hanzi_info=true
+            is_true "$CHANGED_HANZI_READING_ROGUELIKE" && build_hanzi_reading_roguelike=true
+            is_true "$CHANGED_CHESSWATCH" && build_chesswatch=true
+            is_true "$CHANGED_ANKIDROID_LLM" && build_ankidroid_llm=true
+            is_true "$CHANGED_LOCAL_TTS" && build_local_tts=true
+            is_true "$CHANGED_ANKI_DASHBOARD_APK" && build_anki_dashboard_apk=true
+            is_true "$CHANGED_ZUO_TASKS" && build_zuo_tasks=true
+            is_true "$CHANGED_CTX_CALENDAR" && build_ctx_calendar=true
+
+            if is_true "$CHANGED_ANDROID_SIGNING"; then
+              build_chesswatch=true
+              build_ankidroid_llm=true
+              build_local_tts=true
+              build_anki_dashboard_apk=true
+              build_zuo_tasks=true
+              build_ctx_calendar=true
+            fi
+
+            if is_true "$CHANGED_ANDROID_LANDING" || is_true "$CHANGED_SCRIPTS"; then
+              refresh_android_landings=true
+            fi
+          fi
+
+          any_web_build=false
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike && any_web_build=true
+
+          any_android_apk_build=false
+          $build_chesswatch || $build_ankidroid_llm || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar && any_android_apk_build=true
+
+          any_android_landing=false
+          $any_android_apk_build || $refresh_android_landings && any_android_landing=true
+
+          {
+            echo "has_previous=$HAS_PREVIOUS"
+            echo "full_deploy=$full_deploy"
+            echo "build_socratus=$build_socratus"
+            echo "build_mandarin_koan=$build_mandarin_koan"
+            echo "build_hanzi_info=$build_hanzi_info"
+            echo "build_hanzi_reading_roguelike=$build_hanzi_reading_roguelike"
+            echo "build_chesswatch=$build_chesswatch"
+            echo "build_ankidroid_llm=$build_ankidroid_llm"
+            echo "build_local_tts=$build_local_tts"
+            echo "build_anki_dashboard_apk=$build_anki_dashboard_apk"
+            echo "build_zuo_tasks=$build_zuo_tasks"
+            echo "build_ctx_calendar=$build_ctx_calendar"
+            echo "refresh_android_landings=$refresh_android_landings"
+            echo "any_web_build=$any_web_build"
+            echo "any_android_apk_build=$any_android_apk_build"
+            echo "any_android_landing=$any_android_landing"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Deploy plan:"
+          cat "$GITHUB_OUTPUT"
+
   build-and-deploy:
+    needs: detect
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Explicit token avoids intermittent "could not read Username" fetch failures.
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 1
 
+      - name: Fetch previous gh-pages site
+        if: needs.detect.outputs.has_previous == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: previous-site
+          fetch-depth: 1
+
+      - name: Log deploy plan
+        run: |
+          echo "full_deploy=${{ needs.detect.outputs.full_deploy }}"
+          echo "any_web_build=${{ needs.detect.outputs.any_web_build }}"
+          echo "any_android_apk_build=${{ needs.detect.outputs.any_android_apk_build }}"
+          echo "refresh_android_landings=${{ needs.detect.outputs.refresh_android_landings }}"
+
       - name: Setup Bun
+        if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install dependencies (socratus)
+        if: needs.detect.outputs.build_socratus == 'true'
         working-directory: socratus
         run: bun install --frozen-lockfile
 
       - name: Install dependencies (mandarin-koan)
+        if: needs.detect.outputs.build_mandarin_koan == 'true'
         working-directory: mandarin-koan
         run: bun install --frozen-lockfile
 
       - name: Install dependencies (hanzi-info)
+        if: needs.detect.outputs.build_hanzi_info == 'true'
         working-directory: hanzi-info
         run: bun install --frozen-lockfile
 
       - name: Install dependencies (hanzi-reading-roguelike)
+        if: needs.detect.outputs.build_hanzi_reading_roguelike == 'true'
         working-directory: hanzi-reading-roguelike
         run: bun install --frozen-lockfile
 
-      # Project pages are served from /<repo>/, so hashed assets must use
-      # /<repo>/<app>/ — not /<app>/ (that resolves to the org/user site root).
       - name: Set deployment timestamp
+        if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
 
       - name: Build (socratus)
+        if: needs.detect.outputs.build_socratus == 'true'
         working-directory: socratus
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/socratus/
         run: bun run build
 
       - name: Build (mandarin-koan)
+        if: needs.detect.outputs.build_mandarin_koan == 'true'
         working-directory: mandarin-koan
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/mandarin-koan/
         run: bun run build
 
       - name: Build (hanzi-info)
+        if: needs.detect.outputs.build_hanzi_info == 'true'
         working-directory: hanzi-info
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-info/
         run: bun run build
 
       - name: Build (hanzi-reading-roguelike)
+        if: needs.detect.outputs.build_hanzi_reading_roguelike == 'true'
         working-directory: hanzi-reading-roguelike
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-reading-roguelike/
         run: bun run build
 
-      - name: Setup Java (ChessWatch)
+      - name: Setup Java
+        if: needs.detect.outputs.any_android_apk_build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Setup Android SDK (ChessWatch)
+      - name: Setup Android SDK
+        if: needs.detect.outputs.any_android_apk_build == 'true'
         uses: android-actions/setup-android@v3
 
       - name: Build ChessWatch APK
+        if: needs.detect.outputs.build_chesswatch == 'true'
         working-directory: chesswatch
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Build AnkiDroid LLM APK
+        if: needs.detect.outputs.build_ankidroid_llm == 'true'
         working-directory: ankidroid-llm
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Build Local TTS APK
+        if: needs.detect.outputs.build_local_tts == 'true'
         working-directory: local-tts
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Build Anki Dashboard APK
+        if: needs.detect.outputs.build_anki_dashboard_apk == 'true'
         working-directory: anki-dashboard-apk
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Build ZuoTasks APK
+        if: needs.detect.outputs.build_zuo_tasks == 'true'
         working-directory: zuo-tasks
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Build ctx-calendar APK
+        if: needs.detect.outputs.build_ctx_calendar == 'true'
         working-directory: ctx-calendar
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Verify APK sideload signing
+        if: needs.detect.outputs.any_android_apk_build == 'true'
+        env:
+          BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
+          BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
+          BUILD_LOCAL_TTS: ${{ needs.detect.outputs.build_local_tts }}
+          BUILD_ANKI_DASHBOARD_APK: ${{ needs.detect.outputs.build_anki_dashboard_apk }}
+          BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
+          BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
         run: |
+          set -euo pipefail
           chmod +x android/verify-apk-sideload-cert.sh
-          android/verify-apk-sideload-cert.sh chesswatch/app/build/outputs/apk/release/app-release.apk
-          android/verify-apk-sideload-cert.sh ankidroid-llm/app/build/outputs/apk/release/app-release.apk
-          android/verify-apk-sideload-cert.sh local-tts/app/build/outputs/apk/release/app-release.apk
-          android/verify-apk-sideload-cert.sh anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk
-          android/verify-apk-sideload-cert.sh zuo-tasks/app/build/outputs/apk/release/app-release.apk
-          android/verify-apk-sideload-cert.sh ctx-calendar/app/build/outputs/apk/release/app-release.apk
+          is_true() { [[ "${1:-}" == "true" ]]; }
+          verify() {
+            android/verify-apk-sideload-cert.sh "$1/app/build/outputs/apk/release/app-release.apk"
+          }
+          is_true "$BUILD_CHESSWATCH" && verify chesswatch
+          is_true "$BUILD_ANKIDROID_LLM" && verify ankidroid-llm
+          is_true "$BUILD_LOCAL_TTS" && verify local-tts
+          is_true "$BUILD_ANKI_DASHBOARD_APK" && verify anki-dashboard-apk
+          is_true "$BUILD_ZUO_TASKS" && verify zuo-tasks
+          is_true "$BUILD_CTX_CALENDAR" && verify ctx-calendar
 
       - name: Prepare GitHub Pages site
+        env:
+          HAS_PREVIOUS: ${{ needs.detect.outputs.has_previous }}
+          BUILD_SOCRATUS: ${{ needs.detect.outputs.build_socratus }}
+          BUILD_MANDARIN_KOAN: ${{ needs.detect.outputs.build_mandarin_koan }}
+          BUILD_HANZI_INFO: ${{ needs.detect.outputs.build_hanzi_info }}
+          BUILD_HANZI_READING_ROGUELIKE: ${{ needs.detect.outputs.build_hanzi_reading_roguelike }}
+          BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
+          BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
+          BUILD_LOCAL_TTS: ${{ needs.detect.outputs.build_local_tts }}
+          BUILD_ANKI_DASHBOARD_APK: ${{ needs.detect.outputs.build_anki_dashboard_apk }}
+          BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
+          BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
+          REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
-          mkdir -p deploy/socratus deploy/mandarin-koan deploy/hanzi-info deploy/hanzi-reading-roguelike deploy/chesswatch deploy/ankidroid-llm deploy/local-tts deploy/anki-dashboard-apk deploy/zuo-tasks deploy/ctx-calendar
-          cp -r socratus/dist/. deploy/socratus/
-          cp -r mandarin-koan/dist/. deploy/mandarin-koan/
-          cp -r hanzi-info/dist/. deploy/hanzi-info/
-          cp -r hanzi-reading-roguelike/dist/. deploy/hanzi-reading-roguelike/
-          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar; do
-            cp -r "$app/site/." "deploy/$app/"
-            cp android/landing/styles.css "deploy/$app/styles.css"
-          done
-          cp chesswatch/app/build/outputs/apk/release/app-release.apk deploy/chesswatch/chesswatch.apk
-          cp ankidroid-llm/app/build/outputs/apk/release/app-release.apk deploy/ankidroid-llm/ankidroid-llm.apk
-          cp local-tts/app/build/outputs/apk/release/app-release.apk deploy/local-tts/local-tts.apk
-          cp anki-dashboard-apk/app/build/outputs/apk/release/app-release.apk deploy/anki-dashboard-apk/anki-dashboard-apk.apk
-          cp zuo-tasks/app/build/outputs/apk/release/app-release.apk deploy/zuo-tasks/zuo-tasks.apk
-          cp ctx-calendar/app/build/outputs/apk/release/app-release.apk deploy/ctx-calendar/ctx-calendar.apk
+          set -euo pipefail
+
+          is_true() { [[ "${1:-}" == "true" ]]; }
+
+          mkdir -p deploy
           touch deploy/.nojekyll
 
+          if is_true "$HAS_PREVIOUS" && [[ -d previous-site ]]; then
+            shopt -s dotglob
+            cp -a previous-site/. deploy/
+            shopt -u dotglob
+          fi
+
+          require_dir() {
+            local name="$1"
+            if [[ ! -d "deploy/$name" ]] || [[ -z "$(ls -A "deploy/$name" 2>/dev/null || true)" ]]; then
+              echo "Missing deploy artifact for $name (not built and no previous gh-pages copy)" >&2
+              exit 1
+            fi
+          }
+
+          copy_web_app() {
+            local app="$1"
+            cp -r "$app/dist/." "deploy/$app/"
+          }
+
+          copy_android_landing() {
+            local app="$1"
+            mkdir -p "deploy/$app"
+            cp -r "$app/site/." "deploy/$app/"
+            cp android/landing/styles.css "deploy/$app/styles.css"
+          }
+
+          copy_android_apk() {
+            local app="$1"
+            local apk_name="$1.apk"
+            cp "$app/app/build/outputs/apk/release/app-release.apk" "deploy/$app/$apk_name"
+          }
+
+          if is_true "$BUILD_SOCRATUS"; then copy_web_app socratus; else require_dir socratus; fi
+          if is_true "$BUILD_MANDARIN_KOAN"; then copy_web_app mandarin-koan; else require_dir mandarin-koan; fi
+          if is_true "$BUILD_HANZI_INFO"; then copy_web_app hanzi-info; else require_dir hanzi-info; fi
+          if is_true "$BUILD_HANZI_READING_ROGUELIKE"; then copy_web_app hanzi-reading-roguelike; else require_dir hanzi-reading-roguelike; fi
+
+          android_should_build() {
+            case "$1" in
+              chesswatch) is_true "$BUILD_CHESSWATCH" ;;
+              ankidroid-llm) is_true "$BUILD_ANKIDROID_LLM" ;;
+              local-tts) is_true "$BUILD_LOCAL_TTS" ;;
+              anki-dashboard-apk) is_true "$BUILD_ANKI_DASHBOARD_APK" ;;
+              zuo-tasks) is_true "$BUILD_ZUO_TASKS" ;;
+              ctx-calendar) is_true "$BUILD_CTX_CALENDAR" ;;
+              *) return 1 ;;
+            esac
+          }
+
+          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar; do
+            if android_should_build "$app"; then
+              copy_android_landing "$app"
+              copy_android_apk "$app"
+            elif is_true "$REFRESH_ANDROID_LANDINGS"; then
+              copy_android_landing "$app"
+              apk_file="deploy/$app/$app.apk"
+              if [[ ! -f "$apk_file" ]]; then
+                echo "Missing APK for $app during landing refresh" >&2
+                exit 1
+              fi
+            else
+              require_dir "$app"
+              apk_file="deploy/$app/$app.apk"
+              if [[ ! -f "$apk_file" ]]; then
+                echo "Missing APK for $app" >&2
+                exit 1
+              fi
+            fi
+          done
+
       - name: Inject deploy footers (static landing pages)
+        if: needs.detect.outputs.any_android_landing == 'true'
+        env:
+          BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
+          BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
+          BUILD_LOCAL_TTS: ${{ needs.detect.outputs.build_local_tts }}
+          BUILD_ANKI_DASHBOARD_APK: ${{ needs.detect.outputs.build_anki_dashboard_apk }}
+          BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
+          BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
+          REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
-          bun run scripts/inject-static-site-footer.ts \
-            deploy/chesswatch/index.html \
-            deploy/ankidroid-llm/index.html \
-            deploy/local-tts/index.html \
-            deploy/anki-dashboard-apk/index.html \
-            deploy/zuo-tasks/index.html \
-            deploy/ctx-calendar/index.html
+          set -euo pipefail
+          is_true() { [[ "${1:-}" == "true" ]]; }
+          should_inject() {
+            is_true "$2" || is_true "$REFRESH_ANDROID_LANDINGS"
+          }
+          pages=()
+          should_inject chesswatch "$BUILD_CHESSWATCH" && pages+=(deploy/chesswatch/index.html)
+          should_inject ankidroid-llm "$BUILD_ANKIDROID_LLM" && pages+=(deploy/ankidroid-llm/index.html)
+          should_inject local-tts "$BUILD_LOCAL_TTS" && pages+=(deploy/local-tts/index.html)
+          should_inject anki-dashboard-apk "$BUILD_ANKI_DASHBOARD_APK" && pages+=(deploy/anki-dashboard-apk/index.html)
+          should_inject zuo-tasks "$BUILD_ZUO_TASKS" && pages+=(deploy/zuo-tasks/index.html)
+          should_inject ctx-calendar "$BUILD_CTX_CALENDAR" && pages+=(deploy/ctx-calendar/index.html)
+          if [[ ${#pages[@]} -eq 0 ]]; then
+            echo "No Android landing pages to update"
+            exit 0
+          fi
+          bun run scripts/inject-static-site-footer.ts "${pages[@]}"
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4

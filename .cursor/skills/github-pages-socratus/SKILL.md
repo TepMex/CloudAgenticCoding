@@ -10,7 +10,7 @@ The site is published from the `gh-pages` branch. The app lives under **`/<repos
 ## How it works
 
 1. **Build**: from `socratus/`, `bun run build` runs `build.ts` with `public-path` from the env var `GH_PAGES_PUBLIC_PATH` (defaults to `./` for local builds).
-2. **CI** (`.github/workflows/deploy.yml`): runs install and build in `socratus/`, sets `GH_PAGES_PUBLIC_PATH` to `/<repository>/socratus/` (via `github.event.repository.name`) so hashed JS/CSS URLs resolve under the **project site** root.
+2. **CI** (`.github/workflows/deploy.yml`): on each `master` push, only apps whose folder (or shared Android/scripts paths) changed are rebuilt; unchanged apps are copied from the existing `gh-pages` branch. Use **workflow_dispatch → full_deploy** to force a full rebuild.
 3. **Deploy layout**: the workflow copies `socratus/dist/*` into `deploy/socratus/` and adds `deploy/.nojekyll`, then publishes **`deploy`** as the site root. Resulting URLs: `https://<user>.github.io/<repo>/socratus/`.
 
 ## Commands
