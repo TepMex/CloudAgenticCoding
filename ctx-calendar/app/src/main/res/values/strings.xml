@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ctx-calendar</string>
+    <string name="permission_rationale">Allow access to photos so each calendar day can show pictures taken that day.</string>
+    <string name="grant_photos_access">Grant photo access</string>
+    <string name="loading_photos">Loading photos…</string>
+    <string name="no_photos_this_day">No photos on this day</string>
+    <string name="previous_month">Previous month</string>
+    <string name="next_month">Next month</string>
+    <string name="back">Back</string>
+</resources>

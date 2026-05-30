@@ -50,6 +50,11 @@ anki-dashboard-apk/.gradle/
 anki-dashboard-apk/**/build/
 anki-dashboard-apk/local.properties
 
+# Android (ctx-calendar)
+ctx-calendar/.gradle/
+ctx-calendar/**/build/
+ctx-calendar/local.properties
+
 # Local Android SDK (cloud agent bootstrap)
 android-sdk/
 *.iml
