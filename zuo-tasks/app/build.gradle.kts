@@ -31,7 +31,7 @@ android {
 
     defaultConfig {
         applicationId = "com.tepmex.zuotasks"
-        minSdk = 36
+        minSdk = 34
         targetSdk = 36
         versionCode = autoVersionCode
         versionName = "1.0.$autoVersionCode"
