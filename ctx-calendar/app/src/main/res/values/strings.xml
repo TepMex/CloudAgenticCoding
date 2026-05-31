@@ -20,8 +20,6 @@
     <string name="no_chronology_this_day">No location history for this day.</string>
     <string name="no_youtube_searches_this_day">No YouTube searches on this day.</string>
     <string name="no_youtube_watches_this_day">No YouTube watches on this day.</string>
-    <string name="maps_api_key_missing">Add MAPS_API_KEY to local.properties for the embedded map. Timeline points are listed below.</string>
     <string name="visit">Visit</string>
     <string name="activity">Activity</string>
-    <string name="google_maps_api_key" translatable="false">YOUR_MAPS_API_KEY</string>
 </resources>

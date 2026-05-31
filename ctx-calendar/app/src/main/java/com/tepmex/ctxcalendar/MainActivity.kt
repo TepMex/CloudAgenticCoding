@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.maps.MapsInitializer
 import com.tepmex.ctxcalendar.ui.calendar.CalendarViewModelFactory
 import com.tepmex.ctxcalendar.ui.day.DayDetailViewModelFactory
 import com.tepmex.ctxcalendar.ui.navigation.CtxCalendarNavHost
@@ -20,7 +19,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        MapsInitializer.initialize(applicationContext)
 
         val app = application as CtxCalendarApp
         lifecycleScope.launch {
