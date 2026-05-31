@@ -11,14 +11,18 @@ import androidx.navigation.navArgument
 import com.tepmex.ctxcalendar.ui.calendar.CalendarScreen
 import com.tepmex.ctxcalendar.ui.calendar.CalendarViewModel
 import com.tepmex.ctxcalendar.ui.calendar.CalendarViewModelFactory
-import com.tepmex.ctxcalendar.ui.day.DayPhotosScreen
+import com.tepmex.ctxcalendar.ui.day.DayDetailScreen
+import com.tepmex.ctxcalendar.ui.day.DayDetailViewModelFactory
 import com.tepmex.ctxcalendar.ui.photo.PhotoViewerScreen
+import com.tepmex.ctxcalendar.ui.settings.SettingsScreen
+import com.tepmex.ctxcalendar.ui.settings.SettingsViewModelFactory
 import java.time.LocalDate
 
 object Routes {
     const val CALENDAR = "calendar"
     const val DAY = "day/{date}"
     const val PHOTO = "photo/{photoId}"
+    const val SETTINGS = "settings"
 
     fun day(date: LocalDate): String = "day/$date"
     fun photo(photoId: Long): String = "photo/$photoId"
@@ -27,6 +31,8 @@ object Routes {
 @Composable
 fun CtxCalendarNavHost(
     viewModelFactory: CalendarViewModelFactory,
+    dayDetailViewModelFactory: DayDetailViewModelFactory,
+    settingsViewModelFactory: SettingsViewModelFactory,
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
@@ -43,6 +49,16 @@ fun CtxCalendarNavHost(
                 onDayClick = { date ->
                     navController.navigate(Routes.day(date))
                 },
+                onSettingsClick = {
+                    navController.navigate(Routes.SETTINGS)
+                },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                viewModelFactory = settingsViewModelFactory,
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -53,9 +69,10 @@ fun CtxCalendarNavHost(
             ),
         ) { entry ->
             val date = LocalDate.parse(entry.arguments?.getString("date"))
-            DayPhotosScreen(
+            DayDetailScreen(
                 date = date,
                 photos = viewModel.photosFor(date),
+                dayDetailViewModelFactory = dayDetailViewModelFactory,
                 onBack = { navController.popBackStack() },
                 onPhotoClick = { photo ->
                     navController.navigate(Routes.photo(photo.id))

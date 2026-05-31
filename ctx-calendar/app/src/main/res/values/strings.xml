@@ -8,4 +8,20 @@
     <string name="previous_month">Previous month</string>
     <string name="next_month">Next month</string>
     <string name="back">Back</string>
+    <string name="settings">Settings</string>
+    <string name="takeout_db_description">Pick a takeout.db file (built with takeout_db) to show chronology routes and YouTube history on each day.</string>
+    <string name="pick_takeout_db">Choose takeout.db</string>
+    <string name="clear_takeout_db">Clear database</string>
+    <string name="day_tab_photos">Photos</string>
+    <string name="day_tab_chronology">Route</string>
+    <string name="day_tab_youtube_search">Searches</string>
+    <string name="day_tab_youtube_watch">Watched</string>
+    <string name="takeout_db_not_configured">Choose takeout.db in Settings to load timeline data.</string>
+    <string name="no_chronology_this_day">No location history for this day.</string>
+    <string name="no_youtube_searches_this_day">No YouTube searches on this day.</string>
+    <string name="no_youtube_watches_this_day">No YouTube watches on this day.</string>
+    <string name="maps_api_key_missing">Add MAPS_API_KEY to local.properties for the embedded map. Timeline points are listed below.</string>
+    <string name="visit">Visit</string>
+    <string name="activity">Activity</string>
+    <string name="google_maps_api_key" translatable="false">YOUR_MAPS_API_KEY</string>
 </resources>
