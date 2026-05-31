@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -70,7 +70,7 @@ fun CalendarMonthGrid(
     val days = buildMonthGrid(yearMonth, locale)
     val headers = weekdayHeaders(locale)
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.fillMaxHeight()) {
         Row(modifier = Modifier.fillMaxWidth()) {
             headers.forEach { label ->
                 Text(
@@ -86,14 +86,20 @@ fun CalendarMonthGrid(
         }
 
         days.chunked(7).forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
                 week.forEach { cell ->
                     DayCell(
                         cell = cell,
                         photos = photosByDay[cell.date].orEmpty(),
                         isToday = cell.date == LocalDate.now(),
                         onClick = { onDayClick(cell.date) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                     )
                 }
             }
@@ -117,7 +123,6 @@ private fun DayCell(
 
     Box(
         modifier = modifier
-            .aspectRatio(1f)
             .border(0.5.dp, borderColor)
             .background(
                 if (isToday) {
