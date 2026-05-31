@@ -1,3 +1,1 @@
 sdk.dir=/path/to/Android/Sdk
-# Optional: Google Maps SDK key for chronology route tab (Maps SDK for Android)
-MAPS_API_KEY=your_google_maps_api_key

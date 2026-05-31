@@ -8,7 +8,7 @@ Android calendar in month view with photo previews from your gallery on each day
 - **Day cells** — up to four photo previews per day, with a count when there are more
 - **Day detail** — tap a day, then swipe tabs or use the tab bar:
   - **Photos** — two-column gallery grid (full screen on tap)
-  - **Route** — Google Maps polyline of your movement that day (from `takeout.db` chronology)
+  - **Route** — OpenStreetMap polyline of your movement that day (from `takeout.db` chronology)
   - **Searches** — YouTube search history for the day
   - **Watched** — YouTube watch history for the day
 - **Settings** — pick a `takeout.db` SQLite file (Google Takeout timeline + YouTube, built with `takeout_db`)
@@ -21,7 +21,7 @@ Build a unified timeline database with the `takeout_db` converter, then choose t
 
 - Android 14 (API 34) or newer — `minSdk` 34; `targetSdk` and `compileSdk` are 36
 - `READ_MEDIA_IMAGES` permission to read the device gallery
-- Optional: **Google Maps API key** in `local.properties` as `MAPS_API_KEY=…` for the embedded route map (without it, chronology still shows as a timeline list)
+- Network access for OpenStreetMap tiles on the route tab
 
 ## Build
 
@@ -34,7 +34,7 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 Release builds use the committed **sideload keystore** (`sideload.keystore` + `sideload-signing.properties`). Optional override: `ctxcalendar.signing*` in `local.properties`.
 
-Copy `local.properties.example` to `local.properties` and set `sdk.dir` (and `MAPS_API_KEY` if you use the map tab).
+Copy `local.properties.example` to `local.properties` and set `sdk.dir`.
 
 ## Tech stack
 
@@ -42,5 +42,5 @@ Copy `local.properties.example` to `local.properties` and set `sdk.dir` (and `MA
 - Coil for image loading
 - MediaStore for gallery photos grouped by capture date
 - SQLite (`takeout.db`) for chronology and YouTube timeline
-- Google Maps Compose for daily route
+- OpenStreetMap (OSMDroid) for daily route — no API key required
 - Navigation Compose, ViewModel, DataStore, Coroutines

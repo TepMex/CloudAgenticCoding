@@ -1,5 +1,4 @@
 import java.io.File
-import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -13,13 +12,6 @@ apply(from = rootProject.file("../android/sideload-signing.gradle.kts"))
 
 val autoVersionCode: Int = extra["autoVersionCode"] as Int
 val useCustomSigning: Boolean = extra["useCustomSigning"] as Boolean
-
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { localProperties.load(it) }
-}
-val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY", "").ifBlank { "YOUR_MAPS_API_KEY" }
 
 android {
     namespace = "com.tepmex.ctxcalendar"
@@ -42,8 +34,6 @@ android {
         targetSdk = 36
         versionCode = autoVersionCode
         versionName = "1.0.$autoVersionCode"
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
-        resValue("string", "google_maps_api_key", mapsApiKey)
     }
 
     buildTypes {
@@ -111,8 +101,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
-    implementation("com.google.maps.android:maps-compose:6.4.1")
-    implementation("com.google.android.gms:play-services-maps:19.2.0")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

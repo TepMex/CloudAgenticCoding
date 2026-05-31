@@ -1,4 +1,3 @@
 -keepattributes SourceFile,LineNumberTable
 
--keep class com.google.android.gms.maps.** { *; }
--keep class com.google.maps.android.** { *; }
+-keep class org.osmdroid.** { *; }
