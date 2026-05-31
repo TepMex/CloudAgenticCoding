@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.ctxcalendar.data.GalleryPhoto
 import com.tepmex.ctxcalendar.data.PhotoRepository
+import com.tepmex.ctxcalendar.util.PerformanceLog
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,11 +58,15 @@ class CalendarViewModel(
     }
 
     fun previousMonth() {
-        _uiState.update { it.copy(currentMonth = it.currentMonth.minusMonths(1)) }
+        PerformanceLog.trace("calendar previousMonth") {
+            _uiState.update { it.copy(currentMonth = it.currentMonth.minusMonths(1)) }
+        }
     }
 
     fun nextMonth() {
-        _uiState.update { it.copy(currentMonth = it.currentMonth.plusMonths(1)) }
+        PerformanceLog.trace("calendar nextMonth") {
+            _uiState.update { it.copy(currentMonth = it.currentMonth.plusMonths(1)) }
+        }
     }
 
     fun photosFor(date: LocalDate): List<GalleryPhoto> =
