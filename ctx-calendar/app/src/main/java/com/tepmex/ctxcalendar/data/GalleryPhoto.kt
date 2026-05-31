@@ -7,4 +7,6 @@ data class GalleryPhoto(
     val id: Long,
     val uri: Uri,
     val date: LocalDate,
+    val source: ImageSource,
+    val dateTakenMillis: Long,
 )
