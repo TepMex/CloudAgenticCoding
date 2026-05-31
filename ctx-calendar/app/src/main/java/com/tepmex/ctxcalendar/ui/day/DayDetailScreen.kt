@@ -1,5 +1,6 @@
 package com.tepmex.ctxcalendar.ui.day
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +9,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,7 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -30,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tepmex.ctxcalendar.R
 import com.tepmex.ctxcalendar.data.GalleryPhoto
+import com.tepmex.ctxcalendar.util.PerformanceLog
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -70,10 +75,20 @@ fun DayDetailScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val title = date.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy", Locale.getDefault()))
+    val title = remember(date) {
+        date.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy", Locale.getDefault()))
+    }
     val pages = DayDetailPage.entries
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(pagerState.settledPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress) {
+            PerformanceLog.log(
+                "day pager settled: ${pages[pagerState.settledPage].name} (date=$date)",
+            )
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -115,50 +130,79 @@ fun DayDetailScreen(
 
             HorizontalPager(
                 state = pagerState,
+                beyondViewportPageCount = 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
             ) { pageIndex ->
-                when (pages[pageIndex]) {
+                val page = pages[pageIndex]
+                val isSettledOnPage =
+                    pagerState.settledPage == pageIndex && !pagerState.isScrollInProgress
+                val isVisibleDuringSwipe = pagerState.currentPage == pageIndex
+
+                when (page) {
                     DayDetailPage.Photos -> {
-                        DayPhotosTab(
-                            photos = photos,
-                            onPhotoClick = onPhotoClick,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        val keepPhotosDuringSwipe =
+                            pagerState.isScrollInProgress && pagerState.settledPage == pageIndex
+                        if (isSettledOnPage || keepPhotosDuringSwipe) {
+                            DayPhotosTab(
+                                photos = photos,
+                                onPhotoClick = onPhotoClick,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                     DayDetailPage.Chronology -> {
-                        val timeline = takeoutState.timeline
-                        ChronologyMapTab(
-                            isLoading = takeoutState.isLoading,
-                            hasDatabase = takeoutState.hasDatabase,
-                            track = timeline?.track.orEmpty(),
-                            visits = timeline?.visits.orEmpty(),
-                            activities = timeline?.activities.orEmpty(),
-                            errorMessage = takeoutState.errorMessage,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        if (isSettledOnPage) {
+                            val timeline = takeoutState.timeline
+                            ChronologyMapTab(
+                                isLoading = takeoutState.isLoading,
+                                hasDatabase = takeoutState.hasDatabase,
+                                track = timeline?.track.orEmpty(),
+                                visits = timeline?.visits.orEmpty(),
+                                activities = timeline?.activities.orEmpty(),
+                                errorMessage = takeoutState.errorMessage,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else if (isVisibleDuringSwipe) {
+                            PagerSwipePlaceholder()
+                        }
                     }
                     DayDetailPage.YoutubeSearch -> {
-                        YoutubeSearchTab(
-                            isLoading = takeoutState.isLoading,
-                            hasDatabase = takeoutState.hasDatabase,
-                            searches = takeoutState.timeline?.searches.orEmpty(),
-                            errorMessage = takeoutState.errorMessage,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        if (isSettledOnPage) {
+                            YoutubeSearchTab(
+                                isLoading = takeoutState.isLoading,
+                                hasDatabase = takeoutState.hasDatabase,
+                                searches = takeoutState.timeline?.searches.orEmpty(),
+                                errorMessage = takeoutState.errorMessage,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else if (isVisibleDuringSwipe) {
+                            PagerSwipePlaceholder()
+                        }
                     }
                     DayDetailPage.YoutubeWatch -> {
-                        YoutubeWatchTab(
-                            isLoading = takeoutState.isLoading,
-                            hasDatabase = takeoutState.hasDatabase,
-                            watches = takeoutState.timeline?.watches.orEmpty(),
-                            errorMessage = takeoutState.errorMessage,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        if (isSettledOnPage) {
+                            YoutubeWatchTab(
+                                isLoading = takeoutState.isLoading,
+                                hasDatabase = takeoutState.hasDatabase,
+                                watches = takeoutState.timeline?.watches.orEmpty(),
+                                errorMessage = takeoutState.errorMessage,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else if (isVisibleDuringSwipe) {
+                            PagerSwipePlaceholder()
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PagerSwipePlaceholder(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
     }
 }

@@ -15,8 +15,12 @@ class TakeoutRepository(private val context: Context) {
 
     private var db: SQLiteDatabase? = null
     private var openedUri: String? = null
+    private var openGeneration: Int = 0
 
     fun isOpen(): Boolean = db != null
+
+    /** Increments whenever the database is opened or closed (used to invalidate UI caches). */
+    fun openGeneration(): Int = openGeneration
 
     fun openedUriString(): String? = openedUri
 
@@ -36,6 +40,7 @@ class TakeoutRepository(private val context: Context) {
             validateSchema(database)
             db = database
             openedUri = uriString
+            openGeneration++
             readDbInfo(database)
         }.onFailure { e ->
             Log.e(TAG, "openFromUri failed", e)
@@ -50,6 +55,7 @@ class TakeoutRepository(private val context: Context) {
         }
         db = null
         openedUri = null
+        openGeneration++
     }
 
     suspend fun loadDayTimeline(date: LocalDate): TakeoutDayTimeline? = withContext(Dispatchers.IO) {

@@ -15,7 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -25,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.tepmex.ctxcalendar.data.GalleryPhoto
 import java.time.LocalDate
 import java.time.YearMonth
@@ -67,8 +70,8 @@ fun CalendarMonthGrid(
     modifier: Modifier = Modifier,
     locale: Locale = Locale.getDefault(),
 ) {
-    val days = buildMonthGrid(yearMonth, locale)
-    val headers = weekdayHeaders(locale)
+    val days = remember(yearMonth, locale) { buildMonthGrid(yearMonth, locale) }
+    val headers = remember(locale) { weekdayHeaders(locale) }
 
     Column(modifier = modifier.fillMaxHeight()) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -115,6 +118,11 @@ private fun DayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val thumbnailSizePx = remember(context) {
+        (48 * context.resources.displayMetrics.density).toInt()
+    }
+
     val borderColor = if (isToday) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -161,7 +169,11 @@ private fun DayCell(
                     ) {
                         rowPhotos.forEach { photo ->
                             AsyncImage(
-                                model = photo.uri,
+                                model = ImageRequest.Builder(context)
+                                    .data(photo.uri)
+                                    .size(thumbnailSizePx)
+                                    .crossfade(false)
+                                    .build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

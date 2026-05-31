@@ -170,9 +170,10 @@ private fun EmptyTakeoutMessage(
     }
 }
 
-private fun formatTime(epochMs: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
-    return Instant.ofEpochMilli(epochMs)
+private val timeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+
+private fun formatTime(epochMs: Long): String =
+    Instant.ofEpochMilli(epochMs)
         .atZone(ZoneId.systemDefault())
-        .format(formatter)
-}
+        .format(timeFormatter)
