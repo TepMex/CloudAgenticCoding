@@ -5,6 +5,7 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAnalysis } from "@/hooks/useAnalysis";
 import {
@@ -24,6 +25,7 @@ export function App() {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [text, setText] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [minImportancePercent, setMinImportancePercent] = useState(0);
 
   const {
     status,
@@ -137,8 +139,35 @@ export function App() {
                 Stronger highlight = greater impact on meaning when removed.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <HighlightedText text={text.trim()} tokens={tokens} scores={scores} />
+            <CardContent className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="importance-threshold">
+                    Hide words below importance
+                  </Label>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {minImportancePercent}%
+                  </span>
+                </div>
+                <Slider
+                  id="importance-threshold"
+                  value={[minImportancePercent]}
+                  onValueChange={([value]) => setMinImportancePercent(value ?? 0)}
+                  min={0}
+                  max={100}
+                  step={1}
+                />
+                <p className="text-xs text-muted-foreground">
+                  At {minImportancePercent}%, tokens with importance under this level appear as
+                  plain text.
+                </p>
+              </div>
+              <HighlightedText
+                text={text.trim()}
+                tokens={tokens}
+                scores={scores}
+                minImportance={minImportancePercent / 100}
+              />
             </CardContent>
           </Card>
         </>

@@ -1,4 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+import {
+  buildCacheKey,
+  getCachedAnalysis,
+  hashText,
+  setCachedAnalysis,
+} from "@/lib/analysis-cache";
 import { analyzeWithEmbeddings, terminateEmbeddingWorker } from "@/lib/embeddings/wasm";
 import { minMaxNormalize } from "@/lib/math";
 import { analyzeWithLlm } from "@/lib/llm/client";
@@ -39,7 +45,6 @@ export function useAnalysis(settings: AppSettings) {
   const runAnalysis = useCallback(
     async (text: string, selectedModel: string) => {
       setError(null);
-      setScores([]);
 
       const trimmed = text.trim();
       if (!trimmed) {
@@ -71,6 +76,17 @@ export function useAnalysis(settings: AppSettings) {
       }
 
       setTokens(tok);
+
+      const textHash = await hashText(trimmed);
+      const cacheKey = buildCacheKey(textHash, selectedModel);
+      const cached = getCachedAnalysis(cacheKey);
+      if (cached) {
+        setScores(cached.scores);
+        setStatus("done");
+        return;
+      }
+
+      setScores([]);
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -108,6 +124,7 @@ export function useAnalysis(settings: AppSettings) {
         if (controller.signal.aborted) return;
 
         setScores(result);
+        setCachedAnalysis(cacheKey, { scores: result });
         setStatus("done");
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {

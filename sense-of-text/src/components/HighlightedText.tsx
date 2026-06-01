@@ -6,6 +6,8 @@ type HighlightedTextProps = {
   text: string;
   tokens: Token[];
   scores: number[];
+  /** Scores below this (0–1) render without highlight. */
+  minImportance?: number;
   className?: string;
 };
 
@@ -13,7 +15,13 @@ function highlightAlpha(score: number): number {
   return 0.15 + score * 0.75;
 }
 
-export function HighlightedText({ text, tokens, scores, className }: HighlightedTextProps) {
+export function HighlightedText({
+  text,
+  tokens,
+  scores,
+  minImportance = 0,
+  className,
+}: HighlightedTextProps) {
   if (!text) return null;
 
   const segments: ReactNode[] = [];
@@ -26,17 +34,21 @@ export function HighlightedText({ text, tokens, scores, className }: Highlighted
       );
     }
     const score = scores[i] ?? 0;
-    const alpha = highlightAlpha(score);
-    segments.push(
-      <span
-        key={`tok-${token.start}`}
-        className={cn("rounded-sm px-0.5")}
-        style={{ backgroundColor: `hsl(45 93% 47% / ${alpha})` }}
-        title={`Importance: ${(score * 100).toFixed(0)}%`}
-      >
-        {token.text}
-      </span>,
-    );
+    if (score < minImportance) {
+      segments.push(<span key={`tok-${token.start}`}>{token.text}</span>);
+    } else {
+      const alpha = highlightAlpha(score);
+      segments.push(
+        <span
+          key={`tok-${token.start}`}
+          className={cn("rounded-sm px-0.5")}
+          style={{ backgroundColor: `hsl(45 93% 47% / ${alpha})` }}
+          title={`Importance: ${(score * 100).toFixed(0)}%`}
+        >
+          {token.text}
+        </span>,
+      );
+    }
     cursor = token.end;
   });
 
