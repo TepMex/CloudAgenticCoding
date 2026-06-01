@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+<project name="sense of text">
+<tech-stack>Bun, React, TS, Tailwind, shadcn</tech-stack>
+Sanbox for highlighting of the most important parts / vocab in the given text. 
+User can choose embeddings model (by WASM) or LLM by OpenAI compatible API.
+</project>
