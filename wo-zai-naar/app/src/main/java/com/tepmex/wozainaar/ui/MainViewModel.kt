@@ -69,13 +69,17 @@ class MainViewModel(
         refreshSampleCount()
     }
 
-    fun healPeriodicWorkIfNeeded() {
-        if (!LocationPermissions.hasAll(appContext)) return
-        val state = _uiState.value.periodicWorkState
-        if (state.contains("failed", ignoreCase = true) || state.contains("cancelled", ignoreCase = true)) {
-            TrackingLogger.log("Periodic work is $state — re-scheduling")
-            LocationWorkScheduler.schedule(appContext)
+    private fun healPeriodicWorkIfNeeded(stateLabel: String) {
+        if (!LocationPermissions.hasAll(appContext) || periodicHealInFlight) return
+        if (
+            !stateLabel.contains("failed", ignoreCase = true) &&
+            !stateLabel.contains("cancelled", ignoreCase = true)
+        ) {
+            return
         }
+        periodicHealInFlight = true
+        TrackingLogger.log("Periodic work is $stateLabel — re-scheduling with cancel + re-enqueue")
+        LocationWorkScheduler.schedule(appContext)
     }
 
     fun captureLocationNow() {
@@ -103,12 +107,13 @@ class MainViewModel(
                     }
                     _uiState.update { it.copy(periodicWorkState = state) }
                     if (
-                        LocationPermissions.hasAll(appContext) &&
                         infos.any {
-                            it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
+                            it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
                         }
                     ) {
-                        healPeriodicWorkIfNeeded()
+                        periodicHealInFlight = false
+                    } else {
+                        healPeriodicWorkIfNeeded(state)
                     }
                 }
         }
