@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as WoZaiNaarApp
-        val factory = MainViewModelFactory(app.repository)
+        val factory = MainViewModelFactory(app.repository, applicationContext)
         setContent {
             WoZaiNaarTheme {
                 val viewModel: MainViewModel = viewModel(factory = factory)

@@ -13,7 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,12 +52,13 @@ fun MainScreen(
 ) {
     val uiState by viewModel.screenState.collectAsStateWithLifecycle()
     val points by viewModel.pointsForSelectedDay.collectAsStateWithLifecycle()
+    val trackingLogs by viewModel.trackingLogs.collectAsStateWithLifecycle()
     val permissions = rememberLocationPermissionsState()
 
     LaunchedEffect(permissions.allGranted) {
         viewModel.setPermissionsReady(permissions.allGranted)
         if (permissions.allGranted) {
-            viewModel.refreshSampleCount()
+            viewModel.onPermissionsGranted()
         }
     }
 
@@ -90,11 +94,13 @@ fun MainScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
 
-                Text(
-                    text = stringResource(R.string.tracking_active),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                TrackingDiagnosticsSection(
+                    uiState = uiState,
+                    trackingLogs = trackingLogs,
+                    onCaptureNow = viewModel::captureLocationNow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                 )
 
                 if (points.isEmpty()) {
@@ -125,6 +131,84 @@ fun MainScreen(
                             .weight(0.45f)
                             .padding(horizontal = 12.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackingDiagnosticsSection(
+    uiState: MainUiState,
+    trackingLogs: List<String>,
+    onCaptureNow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.tracking_active),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.work_status_periodic, uiState.periodicWorkState),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.work_status_manual, uiState.manualWorkState),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.total_samples, uiState.totalSamples),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = onCaptureNow,
+            enabled = !uiState.manualCaptureInFlight,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                stringResource(
+                    if (uiState.manualCaptureInFlight) {
+                        R.string.capturing_location
+                    } else {
+                        R.string.capture_location_now
+                    },
+                ),
+            )
+        }
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.tracking_log_title),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                if (trackingLogs.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.tracking_log_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    trackingLogs.take(12).forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
