@@ -29,6 +29,8 @@ fun rememberOsmMapView(): MapView {
             clipToOutline = true
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            controller.setZoom(4.0)
+            controller.setCenter(GeoPoint(20.0, 0.0))
         }
     }
 
@@ -99,6 +101,12 @@ fun DailyMovementMap(
                         val bounds = BoundingBox.fromGeoPoints(pathPoints)
                         view.zoomToBoundingBox(bounds, true, 72)
                     }
+                    onFitBoundsApplied()
+                }
+            } else if (fitBounds && pathPoints.isEmpty()) {
+                view.post {
+                    view.controller.setZoom(4.0)
+                    view.controller.setCenter(GeoPoint(20.0, 0.0))
                     onFitBoundsApplied()
                 }
             } else if (fitBounds) {
