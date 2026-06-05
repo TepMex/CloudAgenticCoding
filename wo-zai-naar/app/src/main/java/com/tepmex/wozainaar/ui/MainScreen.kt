@@ -74,6 +74,7 @@ fun MainScreen(
             if (!permissions.allGranted) {
                 PermissionPrompt(
                     onRequest = permissions.request,
+                    needsBackgroundStep = permissions.needsBackgroundStep,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
@@ -133,6 +134,7 @@ fun MainScreen(
 @Composable
 private fun PermissionPrompt(
     onRequest: () -> Unit,
+    needsBackgroundStep: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -153,8 +155,23 @@ private fun PermissionPrompt(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (needsBackgroundStep) {
+            Text(
+                text = stringResource(R.string.permission_rationale_background_settings),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Button(onClick = onRequest) {
-            Text(stringResource(R.string.grant_permissions))
+            Text(
+                stringResource(
+                    if (needsBackgroundStep) {
+                        R.string.grant_background_permission
+                    } else {
+                        R.string.grant_permissions
+                    },
+                ),
+            )
         }
     }
 }

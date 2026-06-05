@@ -11,4 +11,6 @@
     <string name="points_count">%1$d samples</string>
     <string name="tracking_active">Background tracking scheduled (every 15 min)</string>
     <string name="grant_permissions">Grant permissions</string>
+    <string name="grant_background_permission">Allow all the time</string>
+    <string name="permission_rationale_background_settings">Location while using the app is allowed. Tap below and choose Allow all the time in system settings.</string>
 </resources>
