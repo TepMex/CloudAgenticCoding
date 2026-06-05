@@ -18,7 +18,7 @@ class WoZaiNaarApp : Application() {
         Configuration.getInstance().load(this, getSharedPreferences("osmdroid", MODE_PRIVATE))
         Configuration.getInstance().userAgentValue = packageName
         LocationNotifications.ensureChannel(this)
-        TrackingLogger.log("Application started; scheduling background location work")
-        LocationWorkScheduler.schedule(this)
+        TrackingLogger.log("Application started (periodic work waits for permissions)")
+        LocationWorkScheduler.scheduleIfReady(this)
     }
 }

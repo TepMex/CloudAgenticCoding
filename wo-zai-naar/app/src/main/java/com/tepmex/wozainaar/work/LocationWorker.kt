@@ -7,29 +7,51 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import com.tepmex.wozainaar.LocationPermissions
 import com.tepmex.wozainaar.WoZaiNaarApp
 import com.tepmex.wozainaar.notification.LocationNotifications
 import kotlinx.coroutines.tasks.await
-import kotlin.time.Duration.Companion.seconds
 
 class LocationWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
+    private val isManualRun: Boolean
+        get() = tags.contains(UNIQUE_ONE_TIME_WORK)
+
+    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo()
+
     override suspend fun doWork(): Result {
-        val runLabel = if (tags.contains(UNIQUE_ONE_TIME_WORK)) "manual" else "periodic"
+        val runLabel = if (isManualRun) "manual" else "periodic"
         TrackingLogger.log("LocationWorker started ($runLabel, attempt=$runAttemptCount)")
+
+        if (!LocationPermissions.hasAll(applicationContext)) {
+            val message = "Skipped $runLabel run — permissions not granted"
+            TrackingLogger.log(message)
+            return finish(
+                isManualRun,
+                success = !isManualRun,
+                outputKey = KEY_SKIP_REASON,
+                outputValue = "permissions_missing",
+            )
+        }
 
         val app = applicationContext as WoZaiNaarApp
         LocationNotifications.ensureChannel(applicationContext)
 
-        val foregroundInfo = buildForegroundInfo()
-        setForeground(foregroundInfo)
-        TrackingLogger.log("Foreground service notification posted")
+        if (!promoteToForeground(runLabel)) {
+            return finish(
+                isManualRun,
+                success = !isManualRun,
+                outputKey = KEY_SKIP_REASON,
+                outputValue = "foreground_unavailable",
+            )
+        }
 
         return try {
             TrackingLogger.log("Requesting current location…")
@@ -52,15 +74,37 @@ class LocationWorker(
                 Log.w(TAG, "No location available this run")
             }
             TrackingLogger.log("LocationWorker finished successfully ($runLabel)")
-            Result.success()
+            finish(isManualRun, success = true)
         } catch (e: SecurityException) {
             TrackingLogger.log("Failed: location permission missing — ${e.message}")
             Log.e(TAG, "Location permission missing", e)
-            Result.failure()
+            finish(
+                isManualRun,
+                success = false,
+                outputKey = KEY_ERROR,
+                outputValue = "permission_denied",
+            )
         } catch (e: Exception) {
             TrackingLogger.log("Failed: ${e.javaClass.simpleName} — ${e.message}")
             Log.e(TAG, "Location worker failed", e)
-            Result.retry()
+            finish(
+                isManualRun,
+                success = false,
+                outputKey = KEY_ERROR,
+                outputValue = e.message ?: e.javaClass.simpleName,
+            )
+        }
+    }
+
+    private suspend fun promoteToForeground(runLabel: String): Boolean {
+        return try {
+            setForeground(getForegroundInfo())
+            TrackingLogger.log("Foreground service notification posted")
+            true
+        } catch (e: Exception) {
+            TrackingLogger.log("setForeground failed for $runLabel (${e.message})")
+            Log.w(TAG, "setForeground failed", e)
+            false
         }
     }
 
@@ -94,9 +138,33 @@ class LocationWorker(
         }
     }
 
+    /**
+     * Periodic work must not return [Result.failure] or [Result.retry] — that cancels the
+     * schedule. Manual one-time work may fail so the UI shows an error.
+     */
+    private fun finish(
+        isManual: Boolean,
+        success: Boolean,
+        outputKey: String? = null,
+        outputValue: String? = null,
+    ): Result {
+        val output = if (outputKey != null && outputValue != null) {
+            workDataOf(outputKey to outputValue)
+        } else {
+            workDataOf()
+        }
+        return when {
+            success -> Result.success(output)
+            isManual -> Result.failure(output)
+            else -> Result.success(output)
+        }
+    }
+
     companion object {
         const val TAG = "LocationWorker"
         const val UNIQUE_PERIODIC_WORK = "location_periodic"
         const val UNIQUE_ONE_TIME_WORK = "location_one_time"
+        const val KEY_ERROR = "error"
+        const val KEY_SKIP_REASON = "skip_reason"
     }
 }

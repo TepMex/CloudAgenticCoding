@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.tepmex.wozainaar.LocationPermissions
 import com.tepmex.wozainaar.data.LocationPoint
 import com.tepmex.wozainaar.data.LocationRepository
 import com.tepmex.wozainaar.work.LocationWorkScheduler
@@ -36,6 +37,7 @@ class MainViewModel(
 ) : ViewModel() {
     private val workManager = WorkManager.getInstance(appContext)
     private val selectedDate = MutableStateFlow(LocalDate.now())
+    private var periodicHealInFlight = false
 
     private val _uiState = MutableStateFlow(MainUiState())
     val screenState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -67,6 +69,15 @@ class MainViewModel(
         refreshSampleCount()
     }
 
+    fun healPeriodicWorkIfNeeded() {
+        if (!LocationPermissions.hasAll(appContext)) return
+        val state = _uiState.value.periodicWorkState
+        if (state.contains("failed", ignoreCase = true) || state.contains("cancelled", ignoreCase = true)) {
+            TrackingLogger.log("Periodic work is $state — re-scheduling")
+            LocationWorkScheduler.schedule(appContext)
+        }
+    }
+
     fun captureLocationNow() {
         if (_uiState.value.manualCaptureInFlight) {
             TrackingLogger.log("Manual capture already in progress")
@@ -91,6 +102,14 @@ class MainViewModel(
                         TrackingLogger.log("Periodic work state: $state")
                     }
                     _uiState.update { it.copy(periodicWorkState = state) }
+                    if (
+                        LocationPermissions.hasAll(appContext) &&
+                        infos.any {
+                            it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
+                        }
+                    ) {
+                        healPeriodicWorkIfNeeded()
+                    }
                 }
         }
     }
@@ -122,7 +141,14 @@ class MainViewModel(
     private fun formatWorkStates(infos: List<WorkInfo>): String {
         if (infos.isEmpty()) return "not scheduled"
         return infos.joinToString { info ->
-            "${info.state.name.lowercase()}${info.outputData.keyValueMap.takeIf { it.isNotEmpty() }?.let { " $it" } ?: ""}"
+            val detail = listOfNotNull(
+                info.outputData.getString(LocationWorker.KEY_ERROR),
+                info.outputData.getString(LocationWorker.KEY_SKIP_REASON),
+            ).joinToString()
+            buildString {
+                append(info.state.name.lowercase())
+                if (detail.isNotEmpty()) append(" ($detail)")
+            }
         }
     }
 }
