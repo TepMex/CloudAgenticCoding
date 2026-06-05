@@ -6,10 +6,19 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.tepmex.wozainaar.LocationPermissions
 import java.util.concurrent.TimeUnit
 
 object LocationWorkScheduler {
     private val INTERVAL_MINUTES = 15L
+
+    fun scheduleIfReady(context: Context) {
+        if (!LocationPermissions.hasAll(context)) {
+            TrackingLogger.log("Skipping periodic schedule — location permissions not ready yet")
+            return
+        }
+        schedule(context)
+    }
 
     fun schedule(context: Context) {
         val request = PeriodicWorkRequestBuilder<LocationWorker>(
@@ -21,7 +30,7 @@ object LocationWorkScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             LocationWorker.UNIQUE_PERIODIC_WORK,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
             request,
         )
         TrackingLogger.log(
