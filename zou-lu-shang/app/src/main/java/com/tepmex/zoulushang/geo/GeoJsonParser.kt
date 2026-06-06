@@ -37,7 +37,7 @@ object GeoJsonParser {
             when (element["type"]?.jsonPrimitive?.content) {
                 "Polygon" -> listOf(parseRing(element["coordinates"]!!.jsonArray[0].jsonArray))
                 "MultiPolygon" -> element["coordinates"]!!.jsonArray.flatMap { polygon ->
-                    polygon.jsonArray.map { ring -> parseRing(ring.jsonArray[0].jsonArray) }
+                    polygon.jsonArray.map { ring -> parseRing(ring.jsonArray) }
                 }
                 "Feature" -> extractRings(element["geometry"]!!)
                 "FeatureCollection" -> element["features"]!!.jsonArray.flatMap { extractRings(it) }
