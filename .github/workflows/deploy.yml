@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike sense-of-text
   ANDROID_APPS: chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang
 
 jobs:
@@ -28,6 +28,7 @@ jobs:
       build_mandarin_koan: ${{ steps.plan.outputs.build_mandarin_koan }}
       build_hanzi_info: ${{ steps.plan.outputs.build_hanzi_info }}
       build_hanzi_reading_roguelike: ${{ steps.plan.outputs.build_hanzi_reading_roguelike }}
+      build_sense_of_text: ${{ steps.plan.outputs.build_sense_of_text }}
       build_chesswatch: ${{ steps.plan.outputs.build_chesswatch }}
       build_ankidroid_llm: ${{ steps.plan.outputs.build_ankidroid_llm }}
       build_local_tts: ${{ steps.plan.outputs.build_local_tts }}
@@ -60,6 +61,8 @@ jobs:
               - 'hanzi-info/**'
             hanzi-reading-roguelike:
               - 'hanzi-reading-roguelike/**'
+            sense-of-text:
+              - 'sense-of-text/**'
             chesswatch:
               - 'chesswatch/**'
             ankidroid-llm:
@@ -105,6 +108,7 @@ jobs:
           CHANGED_MANDARIN_KOAN: ${{ steps.changes.outputs.mandarin-koan }}
           CHANGED_HANZI_INFO: ${{ steps.changes.outputs.hanzi-info }}
           CHANGED_HANZI_READING_ROGUELIKE: ${{ steps.changes.outputs.hanzi-reading-roguelike }}
+          CHANGED_SENSE_OF_TEXT: ${{ steps.changes.outputs.sense-of-text }}
           CHANGED_CHESSWATCH: ${{ steps.changes.outputs.chesswatch }}
           CHANGED_ANKIDROID_LLM: ${{ steps.changes.outputs.ankidroid-llm }}
           CHANGED_LOCAL_TTS: ${{ steps.changes.outputs.local-tts }}
@@ -137,6 +141,7 @@ jobs:
           build_mandarin_koan=false
           build_hanzi_info=false
           build_hanzi_reading_roguelike=false
+          build_sense_of_text=false
           build_chesswatch=false
           build_ankidroid_llm=false
           build_local_tts=false
@@ -152,6 +157,7 @@ jobs:
             build_mandarin_koan=true
             build_hanzi_info=true
             build_hanzi_reading_roguelike=true
+            build_sense_of_text=true
             build_chesswatch=true
             build_ankidroid_llm=true
             build_local_tts=true
@@ -165,6 +171,7 @@ jobs:
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
             is_true "$CHANGED_HANZI_INFO" && build_hanzi_info=true
             is_true "$CHANGED_HANZI_READING_ROGUELIKE" && build_hanzi_reading_roguelike=true
+            is_true "$CHANGED_SENSE_OF_TEXT" && build_sense_of_text=true
             is_true "$CHANGED_CHESSWATCH" && build_chesswatch=true
             is_true "$CHANGED_ANKIDROID_LLM" && build_ankidroid_llm=true
             is_true "$CHANGED_LOCAL_TTS" && build_local_tts=true
@@ -191,7 +198,7 @@ jobs:
           fi
 
           any_web_build=false
-          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike && any_web_build=true
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_sense_of_text && any_web_build=true
 
           any_android_apk_build=false
           $build_chesswatch || $build_ankidroid_llm || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang && any_android_apk_build=true
@@ -206,6 +213,7 @@ jobs:
             echo "build_mandarin_koan=$build_mandarin_koan"
             echo "build_hanzi_info=$build_hanzi_info"
             echo "build_hanzi_reading_roguelike=$build_hanzi_reading_roguelike"
+            echo "build_sense_of_text=$build_sense_of_text"
             echo "build_chesswatch=$build_chesswatch"
             echo "build_ankidroid_llm=$build_ankidroid_llm"
             echo "build_local_tts=$build_local_tts"
@@ -275,6 +283,11 @@ jobs:
         working-directory: hanzi-reading-roguelike
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (sense-of-text)
+        if: needs.detect.outputs.build_sense_of_text == 'true'
+        working-directory: sense-of-text
+        run: bun install --frozen-lockfile
+
       - name: Set deployment timestamp
         if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
@@ -305,6 +318,13 @@ jobs:
         working-directory: hanzi-reading-roguelike
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-reading-roguelike/
+        run: bun run build
+
+      - name: Build (sense-of-text)
+        if: needs.detect.outputs.build_sense_of_text == 'true'
+        working-directory: sense-of-text
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/sense-of-text/
         run: bun run build
 
       - name: Setup Java
@@ -392,6 +412,7 @@ jobs:
           BUILD_MANDARIN_KOAN: ${{ needs.detect.outputs.build_mandarin_koan }}
           BUILD_HANZI_INFO: ${{ needs.detect.outputs.build_hanzi_info }}
           BUILD_HANZI_READING_ROGUELIKE: ${{ needs.detect.outputs.build_hanzi_reading_roguelike }}
+          BUILD_SENSE_OF_TEXT: ${{ needs.detect.outputs.build_sense_of_text }}
           BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
           BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
           BUILD_LOCAL_TTS: ${{ needs.detect.outputs.build_local_tts }}
@@ -445,6 +466,7 @@ jobs:
           if is_true "$BUILD_MANDARIN_KOAN"; then copy_web_app mandarin-koan; else require_dir mandarin-koan; fi
           if is_true "$BUILD_HANZI_INFO"; then copy_web_app hanzi-info; else require_dir hanzi-info; fi
           if is_true "$BUILD_HANZI_READING_ROGUELIKE"; then copy_web_app hanzi-reading-roguelike; else require_dir hanzi-reading-roguelike; fi
+          if is_true "$BUILD_SENSE_OF_TEXT"; then copy_web_app sense-of-text; else require_dir sense-of-text; fi
 
           android_should_build() {
             case "$1" in

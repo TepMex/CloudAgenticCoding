@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "NODE_ENV=production bun src/index.ts",
-    "build": "bun run build.ts"
+    "build": "bun run build.ts --public-path=${GH_PAGES_PUBLIC_PATH:-./}"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
