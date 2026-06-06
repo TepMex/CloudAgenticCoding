@@ -68,7 +68,9 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             }
             val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
             val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
-            val bounds = selected?.let { GeoJsonParser.parsePolygon(it.geoJson).boundingBox }
+            val bounds = selected?.let { city ->
+                runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
+            }
             _uiState.update {
                 it.copy(
                     cities = cities,
