@@ -1,0 +1,1 @@
+-keepclassmembers class * extends org.osmdroid.views.overlay.Overlay { *; }
