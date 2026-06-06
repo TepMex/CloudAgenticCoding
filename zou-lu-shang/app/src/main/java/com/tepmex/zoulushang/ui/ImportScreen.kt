@@ -73,19 +73,31 @@ fun ImportScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
 
+            if (uiState.selectedCity == null) {
+                Text(
+                    text = "Choose a city first — import maps points to tiles inside that city's boundary.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(
+                    onClick = { viewModel.setShowCityPicker(true) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Choose city")
+                }
+            }
+
             if (uiState.isImporting) {
                 ImportProgressBar(uiState)
-            } else {
+            } else if (uiState.selectedCity != null) {
                 Button(
                     onClick = { dbPicker.launch(arrayOf("application/octet-stream", "*/*")) },
-                    enabled = uiState.selectedCity != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Choose takeout.db")
                 }
                 OutlinedButton(
                     onClick = { jsonPicker.launch(arrayOf("application/json", "*/*")) },
-                    enabled = uiState.selectedCity != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Choose Records.json")

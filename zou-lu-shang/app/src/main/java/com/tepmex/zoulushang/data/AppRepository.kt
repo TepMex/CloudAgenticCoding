@@ -45,12 +45,7 @@ class AppRepository(
         nominatim.searchCities(query)
 
     suspend fun saveCityFromSearch(result: NominatimSearchResult): Long = withContext(Dispatchers.IO) {
-        val geoElement = result.geoJson ?: nominatim.lookupBoundary(result.placeId).geoJson
-            ?: error("No boundary polygon for ${result.displayName}")
-        val geoJson = json.encodeToString(
-            kotlinx.serialization.json.JsonElement.serializer(),
-            geoElement,
-        )
+        val geoJson = resolveCityGeoJson(result)
         val parsed = GeoJsonParser.parsePolygon(geoJson)
         val bbox = parsed.boundingBox
         val existing = database.cityBoundaryDao().getByOsmPlaceId(result.placeId)
@@ -115,6 +110,28 @@ class AppRepository(
         val tiles = ImportProcessor.process(rawPoints, city.geoJson, city.id, onProgress)
         database.visitedTileDao().insertAll(tiles)
         return tiles.size
+    }
+
+    private suspend fun resolveCityGeoJson(result: NominatimSearchResult): String {
+        val candidates = buildList {
+            result.geoJson?.let { add(it) }
+            runCatching { nominatim.lookupBoundary(result).geoJson }.getOrNull()?.let { add(it) }
+            runCatching { nominatim.detailsGeometry(result.placeId) }.getOrNull()?.let { add(it) }
+        }
+        for (element in candidates) {
+            val geoJson = json.encodeToString(
+                kotlinx.serialization.json.JsonElement.serializer(),
+                element,
+            )
+            if (runCatching { GeoJsonParser.parsePolygon(geoJson) }.isSuccess) {
+                return geoJson
+            }
+        }
+        val bbox = result.boundingbox
+        if (bbox != null && bbox.size >= 4) {
+            return GeoJsonParser.rectangleFromBoundingBox(bbox)
+        }
+        error("No boundary polygon for ${result.displayName}")
     }
 
     companion object {
