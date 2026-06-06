@@ -16,7 +16,7 @@ permissions:
 
 env:
   WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike
-  ANDROID_APPS: chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar
+  ANDROID_APPS: chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang
 
 jobs:
   detect:
@@ -35,6 +35,7 @@ jobs:
       build_zuo_tasks: ${{ steps.plan.outputs.build_zuo_tasks }}
       build_ctx_calendar: ${{ steps.plan.outputs.build_ctx_calendar }}
       build_wo_zai_naar: ${{ steps.plan.outputs.build_wo_zai_naar }}
+      build_zou_lu_shang: ${{ steps.plan.outputs.build_zou_lu_shang }}
       refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
       any_web_build: ${{ steps.plan.outputs.any_web_build }}
       any_android_apk_build: ${{ steps.plan.outputs.any_android_apk_build }}
@@ -73,6 +74,8 @@ jobs:
               - 'ctx-calendar/**'
             wo-zai-naar:
               - 'wo-zai-naar/**'
+            zou-lu-shang:
+              - 'zou-lu-shang/**'
             shared-android-signing:
               - 'android/sideload-signing.gradle.kts'
               - 'android/verify-apk-sideload-cert.sh'
@@ -109,6 +112,7 @@ jobs:
           CHANGED_ZUO_TASKS: ${{ steps.changes.outputs.zuo-tasks }}
           CHANGED_CTX_CALENDAR: ${{ steps.changes.outputs.ctx-calendar }}
           CHANGED_WO_ZAI_NAAR: ${{ steps.changes.outputs.wo-zai-naar }}
+          CHANGED_ZOU_LU_SHANG: ${{ steps.changes.outputs.zou-lu-shang }}
           CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
           CHANGED_ANDROID_LANDING: ${{ steps.changes.outputs.shared-android-landing }}
           CHANGED_SCRIPTS: ${{ steps.changes.outputs.shared-scripts }}
@@ -140,6 +144,7 @@ jobs:
           build_zuo_tasks=false
           build_ctx_calendar=false
           build_wo_zai_naar=false
+          build_zou_lu_shang=false
           refresh_android_landings=false
 
           if $full_deploy; then
@@ -154,6 +159,7 @@ jobs:
             build_zuo_tasks=true
             build_ctx_calendar=true
             build_wo_zai_naar=true
+            build_zou_lu_shang=true
           else
             is_true "$CHANGED_SOCRATUS" && build_socratus=true
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
@@ -166,6 +172,7 @@ jobs:
             is_true "$CHANGED_ZUO_TASKS" && build_zuo_tasks=true
             is_true "$CHANGED_CTX_CALENDAR" && build_ctx_calendar=true
             is_true "$CHANGED_WO_ZAI_NAAR" && build_wo_zai_naar=true
+            is_true "$CHANGED_ZOU_LU_SHANG" && build_zou_lu_shang=true
 
             if is_true "$CHANGED_ANDROID_SIGNING"; then
               build_chesswatch=true
@@ -175,6 +182,7 @@ jobs:
               build_zuo_tasks=true
               build_ctx_calendar=true
               build_wo_zai_naar=true
+              build_zou_lu_shang=true
             fi
 
             if is_true "$CHANGED_ANDROID_LANDING" || is_true "$CHANGED_SCRIPTS"; then
@@ -186,7 +194,7 @@ jobs:
           $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -205,6 +213,7 @@ jobs:
             echo "build_zuo_tasks=$build_zuo_tasks"
             echo "build_ctx_calendar=$build_ctx_calendar"
             echo "build_wo_zai_naar=$build_wo_zai_naar"
+            echo "build_zou_lu_shang=$build_zou_lu_shang"
             echo "refresh_android_landings=$refresh_android_landings"
             echo "any_web_build=$any_web_build"
             echo "any_android_apk_build=$any_android_apk_build"
@@ -344,6 +353,11 @@ jobs:
         working-directory: wo-zai-naar
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build zou-lu-shang APK
+        if: needs.detect.outputs.build_zou_lu_shang == 'true'
+        working-directory: zou-lu-shang
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Verify APK sideload signing
         if: needs.detect.outputs.any_android_apk_build == 'true'
         env:
@@ -354,6 +368,7 @@ jobs:
           BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
           BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
           BUILD_WO_ZAI_NAAR: ${{ needs.detect.outputs.build_wo_zai_naar }}
+          BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
         run: |
           set -euo pipefail
           chmod +x android/verify-apk-sideload-cert.sh
@@ -368,6 +383,7 @@ jobs:
           is_true "$BUILD_ZUO_TASKS" && verify zuo-tasks
           is_true "$BUILD_CTX_CALENDAR" && verify ctx-calendar
           is_true "$BUILD_WO_ZAI_NAAR" && verify wo-zai-naar
+          is_true "$BUILD_ZOU_LU_SHANG" && verify zou-lu-shang
 
       - name: Prepare GitHub Pages site
         env:
@@ -383,6 +399,7 @@ jobs:
           BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
           BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
           BUILD_WO_ZAI_NAAR: ${{ needs.detect.outputs.build_wo_zai_naar }}
+          BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -438,11 +455,12 @@ jobs:
               zuo-tasks) is_true "$BUILD_ZUO_TASKS" ;;
               ctx-calendar) is_true "$BUILD_CTX_CALENDAR" ;;
               wo-zai-naar) is_true "$BUILD_WO_ZAI_NAAR" ;;
+              zou-lu-shang) is_true "$BUILD_ZOU_LU_SHANG" ;;
               *) return 1 ;;
             esac
           }
 
-          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar; do
+          for app in chesswatch ankidroid-llm local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -473,6 +491,7 @@ jobs:
           BUILD_ZUO_TASKS: ${{ needs.detect.outputs.build_zuo_tasks }}
           BUILD_CTX_CALENDAR: ${{ needs.detect.outputs.build_ctx_calendar }}
           BUILD_WO_ZAI_NAAR: ${{ needs.detect.outputs.build_wo_zai_naar }}
+          BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -488,6 +507,7 @@ jobs:
           should_inject zuo-tasks "$BUILD_ZUO_TASKS" && pages+=(deploy/zuo-tasks/index.html)
           should_inject ctx-calendar "$BUILD_CTX_CALENDAR" && pages+=(deploy/ctx-calendar/index.html)
           should_inject wo-zai-naar "$BUILD_WO_ZAI_NAAR" && pages+=(deploy/wo-zai-naar/index.html)
+          should_inject zou-lu-shang "$BUILD_ZOU_LU_SHANG" && pages+=(deploy/zou-lu-shang/index.html)
           if [[ ${#pages[@]} -eq 0 ]]; then
             echo "No Android landing pages to update"
             exit 0
