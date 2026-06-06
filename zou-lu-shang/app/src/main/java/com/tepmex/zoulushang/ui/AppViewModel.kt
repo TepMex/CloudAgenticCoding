@@ -29,6 +29,7 @@ data class AppUiState(
     val citySearchQuery: String = "",
     val citySearchResults: List<NominatimSearchResult> = emptyList(),
     val isSearching: Boolean = false,
+    val isSavingCity: Boolean = false,
     val importProgress: ImportProgress? = null,
     val isImporting: Boolean = false,
     val errorMessage: String? = null,
@@ -122,14 +123,14 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun addCityFromSearch(result: NominatimSearchResult) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSearching = true, errorMessage = null) }
+            _uiState.update { it.copy(isSavingCity = true, errorMessage = null) }
             runCatching { repository.saveCityFromSearch(result) }
                 .onSuccess { cityId ->
                     repository.setSelectedCityId(cityId)
                     refreshCities(cityId)
                     _uiState.update {
                         it.copy(
-                            isSearching = false,
+                            isSavingCity = false,
                             showCityPicker = false,
                             citySearchQuery = "",
                             citySearchResults = emptyList(),
@@ -139,7 +140,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 .onFailure { e ->
                     _uiState.update {
                         it.copy(
-                            isSearching = false,
+                            isSavingCity = false,
                             errorMessage = e.message ?: "Failed to save city boundary",
                         )
                     }

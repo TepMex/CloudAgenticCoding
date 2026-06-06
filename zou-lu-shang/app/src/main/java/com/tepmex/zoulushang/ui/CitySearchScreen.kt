@@ -1,6 +1,5 @@
 package com.tepmex.zoulushang.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +13,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,37 +57,50 @@ fun CitySearchScreen(
                 label = { Text("Search city") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                enabled = !uiState.isSavingCity,
             )
 
             if (uiState.isSearching) {
                 CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
             }
 
-            if (uiState.cities.isNotEmpty()) {
+            if (uiState.isSavingCity) {
                 Text(
-                    text = "Saved cities",
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                    text = "Saving city boundary…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 16.dp),
                 )
-                LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                    items(uiState.cities, key = { it.id }) { city ->
+            }
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                if (uiState.cities.isNotEmpty()) {
+                    item(key = "saved-header") {
+                        Text(
+                            text = "Saved cities",
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                        )
+                    }
+                    items(uiState.cities, key = { "saved-${it.id}" }) { city ->
                         ListItem(
                             headlineContent = { Text(city.displayName) },
-                            modifier = Modifier.clickable { viewModel.selectCity(city) },
+                            onClick = { viewModel.selectCity(city) },
+                            enabled = !uiState.isSavingCity,
                         )
                     }
                 }
-            }
 
-            if (uiState.citySearchResults.isNotEmpty()) {
-                Text(
-                    text = "Search results",
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-                )
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(uiState.citySearchResults, key = { it.placeId }) { result ->
+                if (uiState.citySearchResults.isNotEmpty()) {
+                    item(key = "search-header") {
+                        Text(
+                            text = "Search results",
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                        )
+                    }
+                    items(uiState.citySearchResults, key = { "search-${it.placeId}" }) { result ->
                         ListItem(
                             headlineContent = { Text(result.displayName) },
-                            modifier = Modifier.clickable { viewModel.addCityFromSearch(result) },
+                            onClick = { viewModel.addCityFromSearch(result) },
+                            enabled = !uiState.isSavingCity,
                         )
                     }
                 }

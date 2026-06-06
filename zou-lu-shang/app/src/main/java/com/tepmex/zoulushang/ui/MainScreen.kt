@@ -47,60 +47,84 @@ fun MainScreen(
         }
     }
 
-    when {
-        uiState.showCityPicker -> CitySearchScreen(viewModel = viewModel, modifier = modifier)
-        uiState.showImport -> ImportScreen(viewModel = viewModel, modifier = modifier)
-        else -> Scaffold(
-            modifier = modifier,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text("zou-lu-shang")
-                            uiState.selectedCity?.let { city ->
-                                Text(
-                                    text = city.displayName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { scaffoldPadding ->
+        when {
+            uiState.showCityPicker -> CitySearchScreen(
+                viewModel = viewModel,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
+            uiState.showImport -> ImportScreen(
+                viewModel = viewModel,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
+            else -> MainMapScaffold(
+                viewModel = viewModel,
+                uiState = uiState,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainMapScaffold(
+    viewModel: AppViewModel,
+    uiState: AppUiState,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("zou-lu-shang")
+                        uiState.selectedCity?.let { city ->
+                            Text(
+                                text = city.displayName,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.setShowCityPicker(true) }) {
-                            Icon(Icons.Default.AddLocation, contentDescription = "Choose city")
-                        }
-                        IconButton(onClick = { viewModel.setShowImport(true) }) {
-                            Icon(Icons.Default.FileUpload, contentDescription = "Import data")
-                        }
-                    },
-                )
-            },
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            ) {
-                if (uiState.isImporting) {
-                    ImportProgressBar(uiState)
-                }
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (uiState.selectedCity == null) {
-                        EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
-                    } else {
-                        VisitedTilesMap(
-                            visitedLookup = uiState.visitedLookup,
-                            fitBounds = uiState.mapBounds,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        TileStats(
-                            tileCount = uiState.visitedTileCount,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(16.dp),
-                        )
                     }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.setShowCityPicker(true) }) {
+                        Icon(Icons.Default.AddLocation, contentDescription = "Choose city")
+                    }
+                    IconButton(onClick = { viewModel.setShowImport(true) }) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Import data")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (uiState.isImporting) {
+                ImportProgressBar(uiState)
+            }
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (uiState.selectedCity == null) {
+                    EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
+                } else {
+                    VisitedTilesMap(
+                        visitedLookup = uiState.visitedLookup,
+                        fitBounds = uiState.mapBounds,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    TileStats(
+                        tileCount = uiState.visitedTileCount,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp),
+                    )
                 }
             }
         }
