@@ -52,7 +52,6 @@ object GeoJsonParser {
                 "multipolygon" -> {
                     val coords = element["coordinates"]?.asArray() ?: return emptyList()
                     coords.mapNotNull { polygon -> polygon.asArray()?.let(::parsePolygonCoordinates) }
-                        .map { listOf(it) }
                 }
                 "feature" -> element["geometry"]?.let { extractRings(it) } ?: emptyList()
                 "featurecollection" -> {
