@@ -1,5 +1,7 @@
 package com.tepmex.zoulushang.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CitySearchScreen(
     viewModel: AppViewModel,
@@ -82,9 +84,13 @@ fun CitySearchScreen(
                     }
                     items(uiState.cities, key = { "saved-${it.id}" }) { city ->
                         ListItem(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    enabled = !uiState.isSavingCity,
+                                    onClick = { viewModel.selectCity(city) },
+                                ),
                             headlineContent = { Text(city.displayName) },
-                            onClick = { viewModel.selectCity(city) },
-                            enabled = !uiState.isSavingCity,
                         )
                     }
                 }
@@ -98,9 +104,13 @@ fun CitySearchScreen(
                     }
                     items(uiState.citySearchResults, key = { "search-${it.placeId}" }) { result ->
                         ListItem(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    enabled = !uiState.isSavingCity,
+                                    onClick = { viewModel.addCityFromSearch(result) },
+                                ),
                             headlineContent = { Text(result.displayName) },
-                            onClick = { viewModel.addCityFromSearch(result) },
-                            enabled = !uiState.isSavingCity,
                         )
                     }
                 }
