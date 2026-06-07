@@ -1,7 +1,10 @@
 package com.tepmex.zoulushang.geo
 
+import kotlin.math.atan
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.sinh
 import kotlin.math.tan
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
@@ -11,11 +14,11 @@ object TileMath {
 
     fun latLngToTile(lat: Double, lng: Double, zoom: Int = GRID_ZOOM): Pair<Int, Int> {
         val scale = 1 shl zoom
-        val x = ((lng + 180.0) / 360.0 * scale).toInt().coerceIn(0, scale - 1)
+        val x = floor((lng + 180.0) / 360.0 * scale).toInt().coerceIn(0, scale - 1)
         val latRad = Math.toRadians(lat)
-        val y = (
+        val y = floor(
             (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI) / 2.0 * scale
-            ).toInt().coerceIn(0, scale - 1)
+        ).toInt().coerceIn(0, scale - 1)
         return x to y
     }
 
@@ -34,10 +37,8 @@ object TileMath {
 
     fun tileYToLat(y: Int, zoom: Int): Double {
         val n = Math.PI - 2.0 * Math.PI * y / (1 shl zoom)
-        return Math.toDegrees(atanSinh(n))
+        return Math.toDegrees(atan(sinh(n)))
     }
-
-    private fun atanSinh(x: Double): Double = ln(x + kotlin.math.sqrt(x * x + 1.0))
 
     fun tileBounds(zoom: Int, x: Int, y: Int): BoundingBox {
         val north = tileYToLat(y, zoom)
