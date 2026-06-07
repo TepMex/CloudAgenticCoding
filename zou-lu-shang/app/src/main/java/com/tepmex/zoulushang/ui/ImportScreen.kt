@@ -1,5 +1,6 @@
 package com.tepmex.zoulushang.ui
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tepmex.zoulushang.importing.ImportProgress
 
@@ -33,11 +35,17 @@ fun ImportScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     val dbPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
-        uri?.let { viewModel.importTakeoutDb(it) }
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+        )
+        viewModel.importTakeoutDb(uri)
     }
 
     val jsonPicker = rememberLauncherForActivityResult(
@@ -68,10 +76,24 @@ fun ImportScreen(
         ) {
             Text(
                 text = "Import Google Takeout location data for ${uiState.selectedCity?.displayName ?: "the selected city"}. " +
-                    "Points are filtered (accuracy < 50 m), clustered to remove stationary duplicates, " +
-                    "mapped to zoom-15 tiles inside the city boundary, and stored locally.",
+                    "Pick takeout.db once — switching to another city will import from the same file automatically.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+
+            uiState.takeoutDbUri?.let { uri ->
+                Text(
+                    text = "Saved takeout.db:\n$uri",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { viewModel.clearTakeoutDb() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isImporting,
+                ) {
+                    Text("Clear saved takeout.db")
+                }
+            }
 
             if (uiState.selectedCity == null) {
                 Text(
@@ -93,8 +115,9 @@ fun ImportScreen(
                 Button(
                     onClick = { dbPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isImporting,
                 ) {
-                    Text("Choose takeout.db")
+                    Text(if (uiState.takeoutDbUri == null) "Choose takeout.db" else "Choose different takeout.db")
                 }
                 OutlinedButton(
                     onClick = { jsonPicker.launch(arrayOf("application/json", "*/*")) },
