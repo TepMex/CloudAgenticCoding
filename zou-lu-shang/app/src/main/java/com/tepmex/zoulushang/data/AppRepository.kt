@@ -63,9 +63,9 @@ class AppRepository(
         database.cityBoundaryDao().getByOsmPlaceId(result.placeId)!!.id
     }
 
-    suspend fun getVisitedTileLookup(cityId: Long): HashMap<Long, Boolean> = withContext(Dispatchers.IO) {
-        database.visitedTileDao().getTileKeysForCity(cityId)
-            .associateWith { true }
+    suspend fun getVisitedTileLookup(cityId: Long): HashMap<Long, Int> = withContext(Dispatchers.IO) {
+        database.visitedTileDao().getTilesForCity(cityId)
+            .associate { it.tileKey to it.pointCount }
             .let { HashMap(it) }
     }
 

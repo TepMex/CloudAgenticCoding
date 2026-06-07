@@ -7,8 +7,8 @@ import androidx.room.Query
 
 @Dao
 interface VisitedTileDao {
-    @Query("SELECT tileKey FROM visited_tiles WHERE cityId = :cityId")
-    suspend fun getTileKeysForCity(cityId: Long): List<Long>
+    @Query("SELECT * FROM visited_tiles WHERE cityId = :cityId")
+    suspend fun getTilesForCity(cityId: Long): List<VisitedTile>
 
     @Query("SELECT COUNT(*) FROM visited_tiles WHERE cityId = :cityId")
     suspend fun countForCity(cityId: Long): Int

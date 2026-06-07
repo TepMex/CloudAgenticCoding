@@ -9,4 +9,5 @@ import androidx.room.Entity
 data class VisitedTile(
     val cityId: Long,
     val tileKey: Long,
+    val pointCount: Int = 1,
 )

@@ -55,7 +55,7 @@ fun rememberOsmMapView(): MapView {
 
 @Composable
 fun VisitedTilesMap(
-    visitedLookup: HashMap<Long, Boolean>,
+    visitedLookup: HashMap<Long, Int>,
     fitBounds: BoundingBox?,
     modifier: Modifier = Modifier,
     onViewportChanged: () -> Unit = {},
@@ -91,7 +91,9 @@ fun VisitedTilesMap(
                 overlay = it
                 view.overlays.add(it)
             }
-            val lookupKey = visitedLookup.keys.fold(0L) { acc, key -> acc xor key }
+            val lookupKey = visitedLookup.entries.fold(0L) { acc, (key, count) ->
+                acc xor key xor count.toLong()
+            }
             if (lookupKey != lastLookupKey) {
                 currentOverlay.updateLookup(visitedLookup)
                 lastLookupKey = lookupKey

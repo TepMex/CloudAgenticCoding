@@ -24,7 +24,7 @@ import org.osmdroid.util.BoundingBox
 data class AppUiState(
     val cities: List<CityBoundary> = emptyList(),
     val selectedCity: CityBoundary? = null,
-    val visitedLookup: HashMap<Long, Boolean> = hashMapOf(),
+    val visitedLookup: HashMap<Long, Int> = hashMapOf(),
     val visitedTileCount: Int = 0,
     val mapBounds: BoundingBox? = null,
     val citySearchQuery: String = "",
