@@ -33,6 +33,7 @@ data class AppUiState(
     val isSavingCity: Boolean = false,
     val importProgress: ImportProgress? = null,
     val isImporting: Boolean = false,
+    val takeoutDbUri: String? = null,
     val errorMessage: String? = null,
     val showCityPicker: Boolean = false,
     val showImport: Boolean = false,
@@ -56,33 +57,45 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 refreshCities(cityId)
             }
         }
+        viewModelScope.launch {
+            repository.takeoutDbUri.collect { uri ->
+                _uiState.update { it.copy(takeoutDbUri = uri) }
+            }
+        }
     }
 
-    fun refreshCities(preferredCityId: Long? = null) {
+    fun refreshCities(preferredCityId: Long? = null, autoImportIfNeeded: Boolean = true) {
         viewModelScope.launch {
-            val cities = repository.getCities()
-            val selectedId = preferredCityId ?: selectedCityId.value
-            val selected = selectedId?.let { id -> cities.find { it.id == id } }
-                ?: cities.firstOrNull()
-            if (selected != null && selected.id != selectedCityId.value) {
-                repository.setSelectedCityId(selected.id)
-            }
-            val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
-            val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
-            val tileBounds = TileMath.boundsFromTileKeys(lookup.keys)
-            val cityBounds = selected?.let { city ->
-                runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
-            }
-            val bounds = tileBounds ?: cityBounds
-            _uiState.update {
-                it.copy(
-                    cities = cities,
-                    selectedCity = selected,
-                    visitedLookup = lookup,
-                    visitedTileCount = count,
-                    mapBounds = bounds,
-                )
-            }
+            loadCitiesState(preferredCityId, autoImportIfNeeded)
+        }
+    }
+
+    private suspend fun loadCitiesState(preferredCityId: Long? = null, autoImportIfNeeded: Boolean = true) {
+        val cities = repository.getCities()
+        val selectedId = preferredCityId ?: selectedCityId.value
+        val selected = selectedId?.let { id -> cities.find { it.id == id } }
+            ?: cities.firstOrNull()
+        if (selected != null && selected.id != selectedCityId.value) {
+            repository.setSelectedCityId(selected.id)
+        }
+        val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
+        val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
+        val tileBounds = TileMath.boundsFromTileKeys(lookup.keys)
+        val cityBounds = selected?.let { city ->
+            runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
+        }
+        val bounds = tileBounds ?: cityBounds
+        _uiState.update {
+            it.copy(
+                cities = cities,
+                selectedCity = selected,
+                visitedLookup = lookup,
+                visitedTileCount = count,
+                mapBounds = bounds,
+            )
+        }
+        if (autoImportIfNeeded && selected != null && count == 0 && !_uiState.value.isImporting) {
+            maybeAutoImportFromSavedTakeoutDb(selected.id)
         }
     }
 
@@ -156,31 +169,47 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     fun importTakeoutDb(uri: Uri) {
         val cityId = _uiState.value.selectedCity?.id ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isImporting = true, importProgress = null, errorMessage = null) }
-            runCatching { repository.importTakeoutDb(cityId, uri) { progress ->
-                _uiState.update { state -> state.copy(importProgress = progress) }
-            } }
-                .onSuccess { count ->
-                    refreshCities(cityId)
-                    _uiState.update {
-                        it.copy(
-                            isImporting = false,
-                            importProgress = ImportProgress(
-                                ImportProgress.Stage.DONE,
-                                tilesFound = count,
-                            ),
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isImporting = false,
-                            errorMessage = e.message ?: "Import failed",
-                        )
-                    }
-                }
+            repository.setTakeoutDbUri(uri.toString())
+            runImport(cityId, uri)
         }
+    }
+
+    fun clearTakeoutDb() {
+        viewModelScope.launch {
+            repository.setTakeoutDbUri(null)
+        }
+    }
+
+    private suspend fun maybeAutoImportFromSavedTakeoutDb(cityId: Long) {
+        val uriString = repository.getTakeoutDbUri() ?: return
+        runImport(cityId, Uri.parse(uriString))
+    }
+
+    private suspend fun runImport(cityId: Long, uri: Uri) {
+        _uiState.update { it.copy(isImporting = true, importProgress = null, errorMessage = null) }
+        runCatching { repository.importTakeoutDb(cityId, uri) { progress ->
+            _uiState.update { state -> state.copy(importProgress = progress) }
+        } }
+            .onSuccess { count ->
+                loadCitiesState(cityId, autoImportIfNeeded = false)
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        importProgress = ImportProgress(
+                            ImportProgress.Stage.DONE,
+                            tilesFound = count,
+                        ),
+                    )
+                }
+            }
+            .onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        errorMessage = e.message ?: "Import failed",
+                    )
+                }
+            }
     }
 
     fun importTakeoutJson(uri: Uri) {

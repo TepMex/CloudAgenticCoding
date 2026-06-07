@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.tepmex.zoulushang.geo.GeoJsonParser
 import com.tepmex.zoulushang.importing.ImportProcessor
@@ -14,6 +15,7 @@ import com.tepmex.zoulushang.nominatim.NominatimApi
 import com.tepmex.zoulushang.nominatim.NominatimSearchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -31,11 +33,25 @@ class AppRepository(
         prefs[KEY_SELECTED_CITY_ID]
     }
 
+    val takeoutDbUri: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[KEY_TAKEOUT_DB_URI]
+    }
+
     suspend fun setSelectedCityId(cityId: Long?) {
         context.dataStore.edit { prefs ->
             if (cityId == null) prefs.remove(KEY_SELECTED_CITY_ID) else prefs[KEY_SELECTED_CITY_ID] = cityId
         }
     }
+
+    suspend fun setTakeoutDbUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri == null) prefs.remove(KEY_TAKEOUT_DB_URI) else prefs[KEY_TAKEOUT_DB_URI] = uri
+        }
+    }
+
+    suspend fun getTakeoutDbUri(): String? = context.dataStore.data.map { prefs ->
+        prefs[KEY_TAKEOUT_DB_URI]
+    }.first()
 
     suspend fun getCities(): List<CityBoundary> = database.cityBoundaryDao().getAll()
 
@@ -136,5 +152,6 @@ class AppRepository(
 
     companion object {
         private val KEY_SELECTED_CITY_ID = longPreferencesKey("selected_city_id")
+        private val KEY_TAKEOUT_DB_URI = stringPreferencesKey("takeout_db_uri")
     }
 }
