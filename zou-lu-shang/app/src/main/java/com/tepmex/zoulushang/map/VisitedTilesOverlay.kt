@@ -10,20 +10,18 @@ import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
 class VisitedTilesOverlay(
-    private var visitedLookup: HashMap<Long, Boolean>,
+    private var visitedLookup: HashMap<Long, Int>,
 ) : Overlay() {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x9900C853.toInt()
         style = Paint.Style.FILL
     }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xCC00A040.toInt()
         style = Paint.Style.STROKE
         strokeWidth = 1.5f
     }
     private val rect = Rect()
 
-    fun updateLookup(lookup: HashMap<Long, Boolean>) {
+    fun updateLookup(lookup: HashMap<Long, Int>) {
         visitedLookup = lookup
     }
 
@@ -37,7 +35,7 @@ class VisitedTilesOverlay(
         for (x in xRange) {
             for (y in yRange) {
                 val key = TileMath.packTileKey(zoom, x, y)
-                if (visitedLookup[key] != true) continue
+                val pointCount = visitedLookup[key] ?: continue
                 val bounds = TileMath.tileBounds(zoom, x, y)
                 val topLeft = projection.toPixels(
                     org.osmdroid.util.GeoPoint(bounds.latNorth, bounds.lonWest),
@@ -54,6 +52,8 @@ class VisitedTilesOverlay(
                     maxOf(topLeft.y, bottomRight.y),
                 )
                 ensureMinPixelSize(rect, minPixelSize(mapView))
+                fillPaint.color = TileColorIntensity.fillColor(pointCount)
+                strokePaint.color = TileColorIntensity.strokeColor(pointCount)
                 canvas.drawRect(rect, fillPaint)
                 canvas.drawRect(rect, strokePaint)
             }

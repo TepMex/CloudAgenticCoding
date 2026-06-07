@@ -58,27 +58,30 @@ object ImportProcessor {
         )
 
         val polygon = GeoJsonParser.parsePolygon(geoJson)
-        val tileSet = LinkedHashSet<Long>()
+        val tileCounts = HashMap<Long, Int>()
 
         onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, clustered.size))
         clustered.forEachIndexed { index, point ->
             val latLng = LatLng(point.lat, point.lng)
             if (!PointInPolygon.containsInAnyRing(latLng, polygon.rings)) return@forEachIndexed
             val (x, y) = TileMath.latLngToTile(point.lat, point.lng)
-            tileSet += TileMath.packTileKey(TileMath.GRID_ZOOM, x, y)
+            val key = TileMath.packTileKey(TileMath.GRID_ZOOM, x, y)
+            tileCounts[key] = (tileCounts[key] ?: 0) + 1
             if (index % 200 == 0) {
                 onProgress(
                     ImportProgress(
                         ImportProgress.Stage.MAPPING,
                         index,
                         clustered.size,
-                        tilesFound = tileSet.size,
+                        tilesFound = tileCounts.size,
                     ),
                 )
             }
         }
 
-        val tiles = tileSet.map { VisitedTile(cityId = cityId, tileKey = it) }
+        val tiles = tileCounts.map { (tileKey, pointCount) ->
+            VisitedTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
+        }
         onProgress(
             ImportProgress(
                 ImportProgress.Stage.DONE,
