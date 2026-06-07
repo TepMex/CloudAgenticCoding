@@ -13,13 +13,13 @@ class VisitedTilesOverlay(
     private var visitedLookup: HashMap<Long, Boolean>,
 ) : Overlay() {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x6600C853.toInt()
+        color = 0x9900C853.toInt()
         style = Paint.Style.FILL
     }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x9900A040.toInt()
+        color = 0xCC00A040.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = 1f
+        strokeWidth = 1.5f
     }
     private val rect = Rect()
 
@@ -53,10 +53,29 @@ class VisitedTilesOverlay(
                     maxOf(topLeft.x, bottomRight.x),
                     maxOf(topLeft.y, bottomRight.y),
                 )
+                ensureMinPixelSize(rect, minPixelSize(mapView))
                 canvas.drawRect(rect, fillPaint)
                 canvas.drawRect(rect, strokePaint)
             }
         }
+    }
+
+    private fun minPixelSize(mapView: MapView): Int {
+        val zoomGap = TileMath.GRID_ZOOM - mapView.zoomLevelDouble
+        return when {
+            zoomGap <= 1.0 -> 0
+            zoomGap <= 3.0 -> 6
+            else -> 10
+        }
+    }
+
+    private fun ensureMinPixelSize(rect: Rect, minPx: Int) {
+        if (minPx <= 0) return
+        if (rect.width() >= minPx && rect.height() >= minPx) return
+        val centerX = (rect.left + rect.right) / 2
+        val centerY = (rect.top + rect.bottom) / 2
+        val half = minPx / 2
+        rect.set(centerX - half, centerY - half, centerX + half, centerY + half)
     }
 
     private fun visibleRanges(bbox: BoundingBox): Pair<IntRange, IntRange> {

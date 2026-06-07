@@ -55,4 +55,21 @@ object TileMath {
         )
     }
 
+    fun boundsFromTileKeys(tileKeys: Collection<Long>): BoundingBox? {
+        if (tileKeys.isEmpty()) return null
+        var north = Double.NEGATIVE_INFINITY
+        var south = Double.POSITIVE_INFINITY
+        var east = Double.NEGATIVE_INFINITY
+        var west = Double.POSITIVE_INFINITY
+        for (key in tileKeys) {
+            val (zoom, x, y) = unpackTileKey(key)
+            val bounds = tileBounds(zoom, x, y)
+            north = maxOf(north, bounds.latNorth)
+            south = minOf(south, bounds.latSouth)
+            east = maxOf(east, bounds.lonEast)
+            west = minOf(west, bounds.lonWest)
+        }
+        return BoundingBox(north, east, south, west)
+    }
+
 }

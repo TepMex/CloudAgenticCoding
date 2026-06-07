@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.tepmex.zoulushang.data.AppRepository
 import com.tepmex.zoulushang.data.CityBoundary
 import com.tepmex.zoulushang.geo.GeoJsonParser
+import com.tepmex.zoulushang.geo.TileMath
 import com.tepmex.zoulushang.importing.ImportProgress
 import com.tepmex.zoulushang.nominatim.NominatimSearchResult
 import kotlinx.coroutines.Job
@@ -68,9 +69,11 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             }
             val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
             val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
-            val bounds = selected?.let { city ->
+            val tileBounds = TileMath.boundsFromTileKeys(lookup.keys)
+            val cityBounds = selected?.let { city ->
                 runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
             }
+            val bounds = tileBounds ?: cityBounds
             _uiState.update {
                 it.copy(
                     cities = cities,

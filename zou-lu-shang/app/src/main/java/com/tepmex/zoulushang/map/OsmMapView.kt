@@ -62,7 +62,7 @@ fun VisitedTilesMap(
 ) {
     val mapView = rememberOsmMapView()
     var overlay by remember { mutableStateOf<VisitedTilesOverlay?>(null) }
-    var lastLookupSize by remember { mutableStateOf(-1) }
+    var lastLookupKey by remember { mutableStateOf<Long?>(null) }
     var lastBoundsKey by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(mapView) {
@@ -91,9 +91,10 @@ fun VisitedTilesMap(
                 overlay = it
                 view.overlays.add(it)
             }
-            if (visitedLookup.size != lastLookupSize) {
+            val lookupKey = visitedLookup.keys.fold(0L) { acc, key -> acc xor key }
+            if (lookupKey != lastLookupKey) {
                 currentOverlay.updateLookup(visitedLookup)
-                lastLookupSize = visitedLookup.size
+                lastLookupKey = lookupKey
             }
 
             val boundsKey = fitBounds?.let {
