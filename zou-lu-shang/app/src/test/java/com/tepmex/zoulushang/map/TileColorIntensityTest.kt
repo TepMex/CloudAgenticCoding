@@ -23,4 +23,17 @@ class TileColorIntensityTest {
         assertEquals(0x7200C853.toInt(), TileColorIntensity.fillColor(20))
         assertEquals(0x9900C853.toInt(), TileColorIntensity.fillColor(26))
     }
+
+    @Test
+    fun blendColors_mixesGreenAndRed() {
+        val green = TileColorIntensity.takeoutFillColor(10)
+        val red = TileColorIntensity.liveFillColor(10)
+        val mixed = TileColorIntensity.blendColors(green, red)
+        val r = (mixed shr 16) and 0xFF
+        val g = (mixed shr 8) and 0xFF
+        val b = mixed and 0xFF
+        assert(r in 1..254)
+        assert(g in 1..254)
+        assert(b in 1..254)
+    }
 }

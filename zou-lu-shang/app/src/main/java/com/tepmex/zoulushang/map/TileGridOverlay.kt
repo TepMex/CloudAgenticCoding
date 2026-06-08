@@ -5,12 +5,14 @@ import android.graphics.Paint
 import android.graphics.Rect
 import com.tepmex.zoulushang.geo.TileMath
 import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
-class VisitedTilesOverlay(
-    private var visitedLookup: HashMap<Long, Int>,
+class TileGridOverlay(
+    private var takeoutLookup: HashMap<Long, Int>,
+    private var liveLookup: HashMap<Long, Int>,
 ) : Overlay() {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -21,12 +23,13 @@ class VisitedTilesOverlay(
     }
     private val rect = Rect()
 
-    fun updateLookup(lookup: HashMap<Long, Int>) {
-        visitedLookup = lookup
+    fun updateLookups(takeout: HashMap<Long, Int>, live: HashMap<Long, Int>) {
+        takeoutLookup = takeout
+        liveLookup = live
     }
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
-        if (shadow || visitedLookup.isEmpty()) return
+        if (shadow || (takeoutLookup.isEmpty() && liveLookup.isEmpty())) return
         val projection: Projection = mapView.projection
         val bbox: BoundingBox = mapView.boundingBox
         val (xRange, yRange) = visibleRanges(bbox)
@@ -35,16 +38,13 @@ class VisitedTilesOverlay(
         for (x in xRange) {
             for (y in yRange) {
                 val key = TileMath.packTileKey(zoom, x, y)
-                val pointCount = visitedLookup[key] ?: continue
+                val takeoutCount = takeoutLookup[key]
+                val liveCount = liveLookup[key]
+                if (takeoutCount == null && liveCount == null) continue
+
                 val bounds = TileMath.tileBounds(zoom, x, y)
-                val topLeft = projection.toPixels(
-                    org.osmdroid.util.GeoPoint(bounds.latNorth, bounds.lonWest),
-                    null,
-                )
-                val bottomRight = projection.toPixels(
-                    org.osmdroid.util.GeoPoint(bounds.latSouth, bounds.lonEast),
-                    null,
-                )
+                val topLeft = projection.toPixels(GeoPoint(bounds.latNorth, bounds.lonWest), null)
+                val bottomRight = projection.toPixels(GeoPoint(bounds.latSouth, bounds.lonEast), null)
                 rect.set(
                     minOf(topLeft.x, bottomRight.x),
                     minOf(topLeft.y, bottomRight.y),
@@ -52,8 +52,20 @@ class VisitedTilesOverlay(
                     maxOf(topLeft.y, bottomRight.y),
                 )
                 ensureMinPixelSize(rect, minPixelSize(mapView))
-                fillPaint.color = TileColorIntensity.fillColor(pointCount)
-                strokePaint.color = TileColorIntensity.strokeColor(pointCount)
+
+                val (fillColor, strokeColor) = when {
+                    takeoutCount != null && liveCount != null ->
+                        TileColorIntensity.mixedFillColor(takeoutCount, liveCount) to
+                            TileColorIntensity.mixedStrokeColor(takeoutCount, liveCount)
+                    takeoutCount != null ->
+                        TileColorIntensity.takeoutFillColor(takeoutCount) to
+                            TileColorIntensity.takeoutStrokeColor(takeoutCount)
+                    else ->
+                        TileColorIntensity.liveFillColor(liveCount!!) to
+                            TileColorIntensity.liveStrokeColor(liveCount)
+                }
+                fillPaint.color = fillColor
+                strokePaint.color = strokeColor
                 canvas.drawRect(rect, fillPaint)
                 canvas.drawRect(rect, strokePaint)
             }

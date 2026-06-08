@@ -13,6 +13,9 @@ import com.tepmex.zoulushang.importing.TakeoutDbReader
 import com.tepmex.zoulushang.importing.TakeoutJsonReader
 import com.tepmex.zoulushang.nominatim.NominatimApi
 import com.tepmex.zoulushang.nominatim.NominatimSearchResult
+import com.tepmex.zoulushang.geo.LatLng
+import com.tepmex.zoulushang.geo.PointInPolygon
+import com.tepmex.zoulushang.geo.TileMath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -88,6 +91,32 @@ class AppRepository(
     suspend fun getVisitedTileCount(cityId: Long): Int =
         database.visitedTileDao().countForCity(cityId)
 
+    fun observeLiveTileLookup(cityId: Long): Flow<HashMap<Long, Int>> =
+        database.liveTileDao().observeTilesForCity(cityId).map { tiles ->
+            tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
+        }
+
+    suspend fun getLiveTileLookup(cityId: Long): HashMap<Long, Int> = withContext(Dispatchers.IO) {
+        database.liveTileDao().getTilesForCity(cityId)
+            .associate { it.tileKey to it.pointCount }
+            .let { HashMap(it) }
+    }
+
+    suspend fun getLiveTileCount(cityId: Long): Int =
+        database.liveTileDao().countForCity(cityId)
+
+    suspend fun recordLiveLocation(cityId: Long, latitude: Double, longitude: Double, accuracyMeters: Float?) {
+        if (accuracyMeters != null && accuracyMeters > MAX_LIVE_ACCURACY_METERS) return
+        val city = database.cityBoundaryDao().getById(cityId) ?: return
+        val polygon = GeoJsonParser.parsePolygon(city.geoJson)
+        if (!PointInPolygon.containsInAnyRing(LatLng(latitude, longitude), polygon.rings)) return
+        val (x, y) = TileMath.latLngToTile(latitude, longitude)
+        val tileKey = TileMath.packTileKey(TileMath.GRID_ZOOM, x, y)
+        withContext(Dispatchers.IO) {
+            database.liveTileDao().recordVisit(cityId, tileKey)
+        }
+    }
+
     suspend fun importTakeoutDb(
         cityId: Long,
         uri: Uri,
@@ -151,6 +180,7 @@ class AppRepository(
     }
 
     companion object {
+        private const val MAX_LIVE_ACCURACY_METERS = 50f
         private val KEY_SELECTED_CITY_ID = longPreferencesKey("selected_city_id")
         private val KEY_TAKEOUT_DB_URI = stringPreferencesKey("takeout_db_uri")
     }

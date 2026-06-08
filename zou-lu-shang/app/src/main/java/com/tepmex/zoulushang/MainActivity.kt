@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as ZouLuShangApp
-        val factory = AppViewModelFactory(app.repository)
+        val factory = AppViewModelFactory(app.repository, applicationContext)
         setContent {
             ZouLuShangTheme {
                 val viewModel: AppViewModel = viewModel(factory = factory)
