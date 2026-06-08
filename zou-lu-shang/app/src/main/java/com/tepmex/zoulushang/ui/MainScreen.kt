@@ -1,7 +1,6 @@
 package com.tepmex.zoulushang.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -23,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -81,6 +80,7 @@ private fun MainMapScaffold(
     modifier: Modifier = Modifier,
 ) {
     val locationPermissions = rememberLocationPermissionsState()
+    val hasCity = uiState.selectedCity != null
 
     Scaffold(
         modifier = modifier,
@@ -98,6 +98,19 @@ private fun MainMapScaffold(
                     }
                 },
                 actions = {
+                    if (hasCity) {
+                        IconButton(
+                            onClick = {
+                                if (locationPermissions.allGranted) {
+                                    viewModel.recenterOnMyLocation()
+                                } else {
+                                    locationPermissions.request()
+                                }
+                            },
+                        ) {
+                            Icon(Icons.Default.MyLocation, contentDescription = "My location")
+                        }
+                    }
                     IconButton(onClick = { viewModel.setShowCityPicker(true) }) {
                         Icon(Icons.Default.AddLocation, contentDescription = "Choose city")
                     }
@@ -106,6 +119,21 @@ private fun MainMapScaffold(
                     }
                 },
             )
+        },
+        bottomBar = {
+            if (hasCity) {
+                MapControlBottomBar(
+                    takeoutTileCount = uiState.visitedTileCount,
+                    liveTileCount = uiState.liveTileCount,
+                    isRunning = uiState.isFillMapRunning,
+                    minutesRemaining = uiState.fillMapMinutesRemaining,
+                    samplesTaken = uiState.fillMapSamplesTaken,
+                    hasPermissions = locationPermissions.allGranted,
+                    onRequestPermissions = locationPermissions.request,
+                    onStart = viewModel::startFillMap,
+                    onStop = viewModel::stopFillMap,
+                )
+            }
         },
     ) { padding ->
         Column(
@@ -116,60 +144,25 @@ private fun MainMapScaffold(
             if (uiState.isImporting) {
                 ImportProgressBar(uiState)
             }
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (uiState.selectedCity == null) {
-                    EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
-                } else {
-                    VisitedTilesMap(
-                        takeoutLookup = uiState.visitedLookup,
-                        liveLookup = uiState.liveLookup,
-                        fitBounds = uiState.mapBounds,
-                        enableMyLocation = locationPermissions.allGranted,
-                        recenterMyLocationToken = uiState.recenterMyLocationToken,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    if (!locationPermissions.allGranted) {
-                        LocationPermissionBanner(
-                            onRequest = locationPermissions.request,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(16.dp),
-                        )
-                    }
-                    FloatingActionButton(
-                        onClick = {
-                            if (locationPermissions.allGranted) {
-                                viewModel.recenterOnMyLocation()
-                            } else {
-                                locationPermissions.request()
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(16.dp),
-                    ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = "My location")
-                    }
-                    FillMapControls(
-                        isRunning = uiState.isFillMapRunning,
-                        minutesRemaining = uiState.fillMapMinutesRemaining,
-                        samplesTaken = uiState.fillMapSamplesTaken,
-                        hasPermissions = locationPermissions.allGranted,
-                        onRequestPermissions = locationPermissions.request,
-                        onStart = viewModel::startFillMap,
-                        onStop = viewModel::stopFillMap,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(16.dp),
-                    )
-                    TileStats(
-                        takeoutTileCount = uiState.visitedTileCount,
-                        liveTileCount = uiState.liveTileCount,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 72.dp),
-                    )
-                }
+            if (hasCity && !locationPermissions.allGranted) {
+                LocationPermissionBanner(
+                    onRequest = locationPermissions.request,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (!hasCity) {
+                EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
+            } else {
+                VisitedTilesMap(
+                    takeoutLookup = uiState.visitedLookup,
+                    liveLookup = uiState.liveLookup,
+                    fitBounds = uiState.mapBounds,
+                    enableMyLocation = locationPermissions.allGranted,
+                    recenterMyLocationToken = uiState.recenterMyLocationToken,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -204,23 +197,38 @@ private fun LocationPermissionBanner(
     onRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.medium,
     ) {
-        Text(
-            text = "Location access is needed to show your position and fill the map live.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        FilledTonalButton(onClick = onRequest) {
-            Text("Grant location access")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "Grant location access to show your position and fill the map live.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            FilledTonalButton(
+                onClick = onRequest,
+                modifier = Modifier.padding(start = 8.dp),
+            ) {
+                Text("Grant")
+            }
         }
     }
 }
 
 @Composable
-private fun FillMapControls(
+private fun MapControlBottomBar(
+    takeoutTileCount: Int,
+    liveTileCount: Int,
     isRunning: Boolean,
     minutesRemaining: Int,
     samplesTaken: Int,
@@ -230,50 +238,52 @@ private fun FillMapControls(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
     ) {
-        if (isRunning) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text(
-                text = "Recording · $samplesTaken samples · ${minutesRemaining}m left",
-                style = MaterialTheme.typography.labelMedium,
+                text = "$takeoutTileCount takeout · $liveTileCount live tiles (zoom ${com.tepmex.zoulushang.geo.TileMath.GRID_ZOOM})",
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            FilledTonalButton(onClick = onStop) {
-                Text("Stop")
-            }
-        } else {
-            Button(
-                onClick = {
-                    if (hasPermissions) onStart() else onRequestPermissions()
-                },
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Start")
+                Text(
+                    text = if (isRunning) {
+                        "Recording · $samplesTaken samples · ${minutesRemaining}m left"
+                    } else {
+                        "Fill the map — record your path for up to 30 minutes"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (isRunning) {
+                    FilledTonalButton(onClick = onStop) {
+                        Text("Stop")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            if (hasPermissions) onStart() else onRequestPermissions()
+                        },
+                    ) {
+                        Text("Start")
+                    }
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun TileStats(
-    takeoutTileCount: Int,
-    liveTileCount: Int,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "$takeoutTileCount takeout · $liveTileCount live tiles (zoom ${com.tepmex.zoulushang.geo.TileMath.GRID_ZOOM})",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
     }
 }
 
