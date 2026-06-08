@@ -20,9 +20,13 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @Composable
-fun rememberOsmMapView(): MapView {
+fun rememberOsmMapView(
+    enableMyLocation: Boolean,
+): MapView {
     val context = LocalContext.current
     val mapView = remember {
         MapView(context).apply {
@@ -32,6 +36,22 @@ fun rememberOsmMapView(): MapView {
             setMultiTouchControls(true)
             controller.setZoom(13.0)
             controller.setCenter(GeoPoint(39.9, 116.4))
+        }
+    }
+    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+
+    DisposableEffect(mapView, enableMyLocation) {
+        val overlay = locationOverlay ?: MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).also {
+            locationOverlay = it
+            mapView.overlays.add(it)
+        }
+        if (enableMyLocation) {
+            overlay.enableMyLocation()
+        } else {
+            overlay.disableMyLocation()
+        }
+        onDispose {
+            overlay.disableMyLocation()
         }
     }
 
@@ -53,17 +73,29 @@ fun rememberOsmMapView(): MapView {
     return mapView
 }
 
+fun MapView.centerOnMyLocation(): Boolean {
+    val overlay = overlays.filterIsInstance<MyLocationNewOverlay>().firstOrNull() ?: return false
+    val location = overlay.myLocation ?: return false
+    controller.animateTo(location)
+    return true
+}
+
 @Composable
 fun VisitedTilesMap(
-    visitedLookup: HashMap<Long, Int>,
+    takeoutLookup: HashMap<Long, Int>,
+    liveLookup: HashMap<Long, Int>,
     fitBounds: BoundingBox?,
+    enableMyLocation: Boolean,
+    recenterMyLocationToken: Int,
     modifier: Modifier = Modifier,
     onViewportChanged: () -> Unit = {},
 ) {
-    val mapView = rememberOsmMapView()
-    var overlay by remember { mutableStateOf<VisitedTilesOverlay?>(null) }
-    var lastLookupKey by remember { mutableStateOf<Long?>(null) }
+    val mapView = rememberOsmMapView(enableMyLocation = enableMyLocation)
+    var overlay by remember { mutableStateOf<TileGridOverlay?>(null) }
+    var lastTakeoutKey by remember { mutableStateOf<Long?>(null) }
+    var lastLiveKey by remember { mutableStateOf<Long?>(null) }
     var lastBoundsKey by remember { mutableStateOf<String?>(null) }
+    var lastRecenterToken by remember { mutableStateOf(recenterMyLocationToken) }
 
     DisposableEffect(mapView) {
         val listener = object : MapListener {
@@ -87,16 +119,21 @@ fun VisitedTilesMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            val currentOverlay = overlay ?: VisitedTilesOverlay(visitedLookup).also {
+            val currentOverlay = overlay ?: TileGridOverlay(takeoutLookup, liveLookup).also {
                 overlay = it
-                view.overlays.add(it)
+                view.overlays.add(0, it)
             }
-            val lookupKey = visitedLookup.entries.fold(0L) { acc, (key, count) ->
+
+            val takeoutKey = takeoutLookup.entries.fold(0L) { acc, (key, count) ->
                 acc xor key xor count.toLong()
             }
-            if (lookupKey != lastLookupKey) {
-                currentOverlay.updateLookup(visitedLookup)
-                lastLookupKey = lookupKey
+            val liveKey = liveLookup.entries.fold(0L) { acc, (key, count) ->
+                acc xor key xor count.toLong()
+            }
+            if (takeoutKey != lastTakeoutKey || liveKey != lastLiveKey) {
+                currentOverlay.updateLookups(takeoutLookup, liveLookup)
+                lastTakeoutKey = takeoutKey
+                lastLiveKey = liveKey
             }
 
             val boundsKey = fitBounds?.let {
@@ -107,6 +144,11 @@ fun VisitedTilesMap(
                     view.zoomToBoundingBox(fitBounds, true, 64)
                     lastBoundsKey = boundsKey
                 }
+            }
+
+            if (recenterMyLocationToken != lastRecenterToken) {
+                lastRecenterToken = recenterMyLocationToken
+                view.post { view.centerOnMyLocation() }
             }
 
             view.invalidate()

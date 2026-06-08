@@ -11,7 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -76,6 +80,8 @@ private fun MainMapScaffold(
     uiState: AppUiState,
     modifier: Modifier = Modifier,
 ) {
+    val locationPermissions = rememberLocationPermissionsState()
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -115,15 +121,53 @@ private fun MainMapScaffold(
                     EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
                 } else {
                     VisitedTilesMap(
-                        visitedLookup = uiState.visitedLookup,
+                        takeoutLookup = uiState.visitedLookup,
+                        liveLookup = uiState.liveLookup,
                         fitBounds = uiState.mapBounds,
+                        enableMyLocation = locationPermissions.allGranted,
+                        recenterMyLocationToken = uiState.recenterMyLocationToken,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    if (!locationPermissions.allGranted) {
+                        LocationPermissionBanner(
+                            onRequest = locationPermissions.request,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(16.dp),
+                        )
+                    }
+                    FloatingActionButton(
+                        onClick = {
+                            if (locationPermissions.allGranted) {
+                                viewModel.recenterOnMyLocation()
+                            } else {
+                                locationPermissions.request()
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = "My location")
+                    }
+                    FillMapControls(
+                        isRunning = uiState.isFillMapRunning,
+                        minutesRemaining = uiState.fillMapMinutesRemaining,
+                        samplesTaken = uiState.fillMapSamplesTaken,
+                        hasPermissions = locationPermissions.allGranted,
+                        onRequestPermissions = locationPermissions.request,
+                        onStart = viewModel::startFillMap,
+                        onStop = viewModel::stopFillMap,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp),
+                    )
                     TileStats(
-                        tileCount = uiState.visitedTileCount,
+                        takeoutTileCount = uiState.visitedTileCount,
+                        liveTileCount = uiState.liveTileCount,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(16.dp),
+                            .padding(bottom = 72.dp),
                     )
                 }
             }
@@ -156,7 +200,67 @@ private fun EmptyState(onChooseCity: () -> Unit) {
 }
 
 @Composable
-private fun TileStats(tileCount: Int, modifier: Modifier = Modifier) {
+private fun LocationPermissionBanner(
+    onRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Location access is needed to show your position and fill the map live.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        FilledTonalButton(onClick = onRequest) {
+            Text("Grant location access")
+        }
+    }
+}
+
+@Composable
+private fun FillMapControls(
+    isRunning: Boolean,
+    minutesRemaining: Int,
+    samplesTaken: Int,
+    hasPermissions: Boolean,
+    onRequestPermissions: () -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (isRunning) {
+            Text(
+                text = "Recording · $samplesTaken samples · ${minutesRemaining}m left",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            FilledTonalButton(onClick = onStop) {
+                Text("Stop")
+            }
+        } else {
+            Button(
+                onClick = {
+                    if (hasPermissions) onStart() else onRequestPermissions()
+                },
+            ) {
+                Text("Start")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TileStats(
+    takeoutTileCount: Int,
+    liveTileCount: Int,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -164,7 +268,7 @@ private fun TileStats(tileCount: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "$tileCount visited tiles (zoom ${com.tepmex.zoulushang.geo.TileMath.GRID_ZOOM})",
+            text = "$takeoutTileCount takeout · $liveTileCount live tiles (zoom ${com.tepmex.zoulushang.geo.TileMath.GRID_ZOOM})",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier

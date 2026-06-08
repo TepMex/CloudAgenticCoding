@@ -9,6 +9,8 @@ import com.tepmex.zoulushang.data.CityBoundary
 import com.tepmex.zoulushang.geo.GeoJsonParser
 import com.tepmex.zoulushang.geo.TileMath
 import com.tepmex.zoulushang.importing.ImportProgress
+import com.tepmex.zoulushang.location.FillMapForegroundService
+import com.tepmex.zoulushang.location.FillMapSession
 import com.tepmex.zoulushang.nominatim.NominatimSearchResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,8 +27,14 @@ data class AppUiState(
     val cities: List<CityBoundary> = emptyList(),
     val selectedCity: CityBoundary? = null,
     val visitedLookup: HashMap<Long, Int> = hashMapOf(),
+    val liveLookup: HashMap<Long, Int> = hashMapOf(),
     val visitedTileCount: Int = 0,
+    val liveTileCount: Int = 0,
     val mapBounds: BoundingBox? = null,
+    val isFillMapRunning: Boolean = false,
+    val fillMapMinutesRemaining: Int = 0,
+    val fillMapSamplesTaken: Int = 0,
+    val recenterMyLocationToken: Int = 0,
     val citySearchQuery: String = "",
     val citySearchResults: List<NominatimSearchResult> = emptyList(),
     val isSearching: Boolean = false,
@@ -39,7 +47,10 @@ data class AppUiState(
     val showImport: Boolean = false,
 )
 
-class AppViewModel(private val repository: AppRepository) : ViewModel() {
+class AppViewModel(
+    private val repository: AppRepository,
+    private val appContext: android.content.Context,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
@@ -62,6 +73,30 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 _uiState.update { it.copy(takeoutDbUri = uri) }
             }
         }
+        viewModelScope.launch {
+            FillMapSession.state.collect { session ->
+                updateFillMapUi(session)
+                if (session.isRunning) {
+                    while (FillMapSession.state.value.isRunning) {
+                        delay(5_000)
+                        updateFillMapUi(FillMapSession.state.value)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateFillMapUi(session: com.tepmex.zoulushang.location.FillMapSessionState) {
+        val minutesRemaining = session.endsAtMillis?.let { endsAt ->
+            ((endsAt - System.currentTimeMillis()).coerceAtLeast(0) / 60_000).toInt()
+        } ?: 0
+        _uiState.update {
+            it.copy(
+                isFillMapRunning = session.isRunning,
+                fillMapMinutesRemaining = minutesRemaining,
+                fillMapSamplesTaken = session.samplesTaken,
+            )
+        }
     }
 
     fun refreshCities(preferredCityId: Long? = null, autoImportIfNeeded: Boolean = true) {
@@ -79,8 +114,10 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             repository.setSelectedCityId(selected.id)
         }
         val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
+        val liveLookup = selected?.let { repository.getLiveTileLookup(it.id) } ?: hashMapOf()
         val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
-        val tileBounds = TileMath.boundsFromTileKeys(lookup.keys)
+        val liveCount = selected?.let { repository.getLiveTileCount(it.id) } ?: 0
+        val tileBounds = TileMath.boundsFromTileKeys((lookup.keys + liveLookup.keys).toSet())
         val cityBounds = selected?.let { city ->
             runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
         }
@@ -90,13 +127,47 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 cities = cities,
                 selectedCity = selected,
                 visitedLookup = lookup,
+                liveLookup = liveLookup,
                 visitedTileCount = count,
+                liveTileCount = liveCount,
                 mapBounds = bounds,
             )
+        }
+        selected?.let { city ->
+            observeLiveTiles(city.id)
         }
         if (autoImportIfNeeded && selected != null && count == 0 && !_uiState.value.isImporting) {
             maybeAutoImportFromSavedTakeoutDb(selected.id)
         }
+    }
+
+    private var liveTilesJob: Job? = null
+
+    private fun observeLiveTiles(cityId: Long) {
+        liveTilesJob?.cancel()
+        liveTilesJob = viewModelScope.launch {
+            repository.observeLiveTileLookup(cityId).collect { lookup ->
+                _uiState.update {
+                    it.copy(
+                        liveLookup = lookup,
+                        liveTileCount = lookup.size,
+                    )
+                }
+            }
+        }
+    }
+
+    fun startFillMap() {
+        val cityId = _uiState.value.selectedCity?.id ?: return
+        FillMapForegroundService.start(appContext, cityId)
+    }
+
+    fun stopFillMap() {
+        FillMapForegroundService.stop(appContext)
+    }
+
+    fun recenterOnMyLocation() {
+        _uiState.update { it.copy(recenterMyLocationToken = it.recenterMyLocationToken + 1) }
     }
 
     fun selectCity(city: CityBoundary) {
@@ -247,11 +318,14 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     }
 }
 
-class AppViewModelFactory(private val repository: AppRepository) : ViewModelProvider.Factory {
+class AppViewModelFactory(
+    private val repository: AppRepository,
+    private val appContext: android.content.Context,
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AppViewModel::class.java)) {
-            return AppViewModel(repository) as T
+            return AppViewModel(repository, appContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">zou-lu-shang</string>
+    <string name="notification_channel_fill_map">Fill the map</string>
+    <string name="notification_title_fill_map">Filling the map</string>
+    <string name="notification_text_fill_map">Recording your location every minute for up to 30 minutes.</string>
+    <string name="notification_text_fill_map_progress">%1$d samples · %2$d min remaining</string>
 </resources>
