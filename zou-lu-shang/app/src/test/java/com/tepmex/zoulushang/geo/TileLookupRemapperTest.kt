@@ -41,4 +41,17 @@ class TileLookupRemapperTest {
         val remapped = TileLookupRemapper.remap(hashMapOf(), 15)
         assertTrue(remapped.isEmpty())
     }
+
+    @Test
+    fun subdivide_multipleCoarseTiles_fillsEachArea() {
+        val keys = listOf(
+            TileMath.packTileKey(15, 10, 20),
+            TileMath.packTileKey(15, 11, 20),
+            TileMath.packTileKey(15, 10, 21),
+        )
+        val lookup = keys.associateWith { 2 }.let { HashMap(it) }
+        val remapped = TileLookupRemapper.remap(lookup, 16)
+        assertEquals(12, remapped.size)
+        remapped.values.forEach { assertEquals(2, it) }
+    }
 }
