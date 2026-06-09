@@ -287,15 +287,16 @@ class AppRepository(
         )
     }
 
-    private fun remapStoredLookup(tiles: List<VisitedTile>, gridZoom: Int): HashMap<Long, Int> {
-        val lookup = tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
-        return TileLookupRemapper.remap(lookup, gridZoom)
-    }
+    @JvmName("remapVisitedStoredLookup")
+    private fun remapStoredLookup(tiles: List<VisitedTile>, gridZoom: Int): HashMap<Long, Int> =
+        remapTileCounts(tiles.associate { it.tileKey to it.pointCount }, gridZoom)
 
-    private fun remapStoredLookup(tiles: List<LiveTile>, gridZoom: Int): HashMap<Long, Int> {
-        val lookup = tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
-        return TileLookupRemapper.remap(lookup, gridZoom)
-    }
+    @JvmName("remapLiveStoredLookup")
+    private fun remapStoredLookup(tiles: List<LiveTile>, gridZoom: Int): HashMap<Long, Int> =
+        remapTileCounts(tiles.associate { it.tileKey to it.pointCount }, gridZoom)
+
+    private fun remapTileCounts(lookup: Map<Long, Int>, gridZoom: Int): HashMap<Long, Int> =
+        TileLookupRemapper.remap(HashMap(lookup), gridZoom)
 
     private fun List<ImportedLocationPoint>.toLocationPoints(): List<LocationPoint> =
         map { point ->
