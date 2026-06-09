@@ -81,7 +81,7 @@ class AppViewModel(
         }
         viewModelScope.launch {
             repository.mapSettings.collect { settings ->
-                _uiState.update { it.copy(mapSettings = settings) }
+                refreshLookupsForSettings(settings)
             }
         }
         viewModelScope.launch {
@@ -124,10 +124,11 @@ class AppViewModel(
         if (selected != null && selected.id != selectedCityId.value) {
             repository.setSelectedCityId(selected.id)
         }
-        val lookup = selected?.let { repository.getVisitedTileLookup(it.id) } ?: hashMapOf()
-        val liveLookup = selected?.let { repository.getLiveTileLookup(it.id) } ?: hashMapOf()
-        val count = selected?.let { repository.getVisitedTileCount(it.id) } ?: 0
-        val liveCount = selected?.let { repository.getLiveTileCount(it.id) } ?: 0
+        val gridZoom = repository.getMapSettings().gridZoom
+        val lookup = selected?.let { repository.getVisitedTileLookup(it.id, gridZoom) } ?: hashMapOf()
+        val liveLookup = selected?.let { repository.getLiveTileLookup(it.id, gridZoom) } ?: hashMapOf()
+        val count = lookup.size
+        val liveCount = liveLookup.size
         val tileBounds = TileMath.boundsFromTileKeys((lookup.keys + liveLookup.keys).toSet())
         val cityBounds = selected?.let { city ->
             runCatching { GeoJsonParser.parsePolygon(city.geoJson).boundingBox }.getOrNull()
@@ -158,12 +159,33 @@ class AppViewModel(
         liveTilesJob?.cancel()
         liveTilesJob = viewModelScope.launch {
             repository.observeLiveTileLookup(cityId).collect { lookup ->
+                val showLive = _uiState.value.mapSettings.showLiveGrid
                 _uiState.update {
                     it.copy(
                         liveLookup = lookup,
-                        liveTileCount = lookup.size,
+                        liveTileCount = if (showLive) lookup.size else 0,
                     )
                 }
+            }
+        }
+    }
+
+    private fun refreshLookupsForSettings(settings: MapSettings) {
+        val cityId = _uiState.value.selectedCity?.id ?: run {
+            _uiState.update { it.copy(mapSettings = settings) }
+            return
+        }
+        viewModelScope.launch {
+            val visitedLookup = repository.getVisitedTileLookup(cityId, settings.gridZoom)
+            val liveLookup = repository.getLiveTileLookup(cityId, settings.gridZoom)
+            _uiState.update {
+                it.copy(
+                    mapSettings = settings,
+                    visitedLookup = visitedLookup,
+                    liveLookup = liveLookup,
+                    visitedTileCount = if (settings.showTakeoutGrid) visitedLookup.size else 0,
+                    liveTileCount = if (settings.showLiveGrid) liveLookup.size else 0,
+                )
             }
         }
     }

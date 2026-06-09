@@ -8,8 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [CityBoundary::class, VisitedTile::class, LiveTile::class, LiveLocationSample::class],
-    version = 4,
+    entities = [
+        CityBoundary::class,
+        VisitedTile::class,
+        LiveTile::class,
+        LiveLocationSample::class,
+        ImportedLocationPoint::class,
+    ],
+    version = 5,
     exportSchema = false,
 )
 abstract class ZouLuShangDatabase : RoomDatabase() {
@@ -17,6 +23,7 @@ abstract class ZouLuShangDatabase : RoomDatabase() {
     abstract fun visitedTileDao(): VisitedTileDao
     abstract fun liveTileDao(): LiveTileDao
     abstract fun liveLocationSampleDao(): LiveLocationSampleDao
+    abstract fun importedLocationPointDao(): ImportedLocationPointDao
 
     companion object {
         @Volatile
@@ -29,7 +36,7 @@ abstract class ZouLuShangDatabase : RoomDatabase() {
                     ZouLuShangDatabase::class.java,
                     "zou_lu_shang.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build().also { instance = it }
             }
 
@@ -66,6 +73,23 @@ abstract class ZouLuShangDatabase : RoomDatabase() {
                         latitude REAL NOT NULL,
                         longitude REAL NOT NULL,
                         recordedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS imported_location_points (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        cityId INTEGER NOT NULL,
+                        ts INTEGER NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        accuracyMeters REAL
                     )
                     """.trimIndent(),
                 )
