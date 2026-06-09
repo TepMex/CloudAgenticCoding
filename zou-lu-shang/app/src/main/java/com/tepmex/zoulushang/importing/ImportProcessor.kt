@@ -33,6 +33,7 @@ object ImportProcessor {
         geoJson: String,
         cityId: Long,
         onProgress: (ImportProgress) -> Unit,
+        gridZoom: Int = TileMath.DEFAULT_GRID_ZOOM,
     ): List<VisitedTile> {
         onProgress(ImportProgress(ImportProgress.Stage.FILTERING, 0, rawPoints.size))
 
@@ -64,8 +65,8 @@ object ImportProcessor {
         clustered.forEachIndexed { index, point ->
             val latLng = LatLng(point.lat, point.lng)
             if (!PointInPolygon.containsInAnyRing(latLng, polygon.rings)) return@forEachIndexed
-            val (x, y) = TileMath.latLngToTile(point.lat, point.lng)
-            val key = TileMath.packTileKey(TileMath.GRID_ZOOM, x, y)
+            val (x, y) = TileMath.latLngToTile(point.lat, point.lng, gridZoom)
+            val key = TileMath.packTileKey(gridZoom, x, y)
             tileCounts[key] = (tileCounts[key] ?: 0) + 1
             if (index % 200 == 0) {
                 onProgress(

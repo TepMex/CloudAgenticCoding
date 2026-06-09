@@ -2,7 +2,9 @@ package com.tepmex.zoulushang.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -40,6 +42,14 @@ class AppRepository(
         prefs[KEY_TAKEOUT_DB_URI]
     }
 
+    val mapSettings: Flow<MapSettings> = context.dataStore.data.map { prefs ->
+        MapSettings(
+            showTakeoutGrid = prefs[KEY_SHOW_TAKEOUT_GRID] ?: true,
+            showLiveGrid = prefs[KEY_SHOW_LIVE_GRID] ?: true,
+            gridZoom = prefs[KEY_GRID_ZOOM] ?: TileMath.DEFAULT_GRID_ZOOM,
+        )
+    }
+
     suspend fun setSelectedCityId(cityId: Long?) {
         context.dataStore.edit { prefs ->
             if (cityId == null) prefs.remove(KEY_SELECTED_CITY_ID) else prefs[KEY_SELECTED_CITY_ID] = cityId
@@ -55,6 +65,16 @@ class AppRepository(
     suspend fun getTakeoutDbUri(): String? = context.dataStore.data.map { prefs ->
         prefs[KEY_TAKEOUT_DB_URI]
     }.first()
+
+    suspend fun getMapSettings(): MapSettings = mapSettings.first()
+
+    suspend fun setMapSettings(settings: MapSettings) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_SHOW_TAKEOUT_GRID] = settings.showTakeoutGrid
+            prefs[KEY_SHOW_LIVE_GRID] = settings.showLiveGrid
+            prefs[KEY_GRID_ZOOM] = settings.gridZoom
+        }
+    }
 
     suspend fun getCities(): List<CityBoundary> = database.cityBoundaryDao().getAll()
 
@@ -110,9 +130,13 @@ class AppRepository(
         val city = database.cityBoundaryDao().getById(cityId) ?: return
         val polygon = GeoJsonParser.parsePolygon(city.geoJson)
         if (!PointInPolygon.containsInAnyRing(LatLng(latitude, longitude), polygon.rings)) return
-        val (x, y) = TileMath.latLngToTile(latitude, longitude)
-        val tileKey = TileMath.packTileKey(TileMath.GRID_ZOOM, x, y)
+        val gridZoom = getMapSettings().gridZoom
+        val (x, y) = TileMath.latLngToTile(latitude, longitude, gridZoom)
+        val tileKey = TileMath.packTileKey(gridZoom, x, y)
         withContext(Dispatchers.IO) {
+            database.liveLocationSampleDao().insert(
+                LiveLocationSample(cityId = cityId, latitude = latitude, longitude = longitude),
+            )
             database.liveTileDao().recordVisit(cityId, tileKey)
         }
     }
@@ -121,6 +145,13 @@ class AppRepository(
         cityId: Long,
         uri: Uri,
         onProgress: (ImportProgress) -> Unit,
+    ): Int = importTakeoutDb(cityId, uri, onProgress, getMapSettings().gridZoom)
+
+    suspend fun importTakeoutDb(
+        cityId: Long,
+        uri: Uri,
+        onProgress: (ImportProgress) -> Unit,
+        gridZoom: Int,
     ): Int = withContext(Dispatchers.IO) {
         val city = database.cityBoundaryDao().getById(cityId) ?: error("City not found")
         onProgress(ImportProgress(ImportProgress.Stage.READING))
@@ -128,7 +159,7 @@ class AppRepository(
         val rawPoints = reader.readPoints(uri) { count ->
             onProgress(ImportProgress(ImportProgress.Stage.READING, count, count))
         }
-        saveImportedTiles(city, rawPoints, onProgress)
+        saveImportedTiles(city, rawPoints, onProgress, gridZoom)
     }
 
     suspend fun importTakeoutJson(
@@ -137,22 +168,101 @@ class AppRepository(
         onProgress: (ImportProgress) -> Unit,
     ): Int = withContext(Dispatchers.IO) {
         val city = database.cityBoundaryDao().getById(cityId) ?: error("City not found")
+        val gridZoom = getMapSettings().gridZoom
         onProgress(ImportProgress(ImportProgress.Stage.READING))
         val reader = TakeoutJsonReader(context)
         val rawPoints = reader.readPoints(uri) { count ->
             onProgress(ImportProgress(ImportProgress.Stage.READING, count, count))
         }
-        saveImportedTiles(city, rawPoints, onProgress)
+        saveImportedTiles(city, rawPoints, onProgress, gridZoom)
+    }
+
+    suspend fun rebuildTilesForCity(
+        cityId: Long,
+        gridZoom: Int,
+        onProgress: (ImportProgress) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, 2))
+        rebuildVisitedTilesAtZoom(cityId, gridZoom, onProgress)
+        onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 1, 2))
+        rebuildLiveTilesAtZoom(cityId, gridZoom)
+        onProgress(ImportProgress(ImportProgress.Stage.DONE, 2, 2))
+    }
+
+    private suspend fun rebuildVisitedTilesAtZoom(
+        cityId: Long,
+        gridZoom: Int,
+        onProgress: (ImportProgress) -> Unit,
+    ) {
+        val uriString = getTakeoutDbUri()
+        if (uriString != null) {
+            importTakeoutDb(cityId, Uri.parse(uriString), onProgress, gridZoom)
+            return
+        }
+        val existing = database.visitedTileDao().getTilesForCity(cityId)
+        if (existing.isEmpty()) return
+        onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, existing.size))
+        val tiles = reaggregateVisitedTiles(cityId, existing, gridZoom)
+        database.visitedTileDao().deleteForCity(cityId)
+        database.visitedTileDao().insertAll(tiles)
+    }
+
+    private suspend fun rebuildLiveTilesAtZoom(cityId: Long, gridZoom: Int) {
+        val samples = database.liveLocationSampleDao().getSamplesForCity(cityId)
+        val existing = database.liveTileDao().getTilesForCity(cityId)
+        database.liveTileDao().deleteForCity(cityId)
+        val tileCounts = HashMap<Long, Int>()
+        if (samples.isNotEmpty()) {
+            for (sample in samples) {
+                val (x, y) = TileMath.latLngToTile(sample.latitude, sample.longitude, gridZoom)
+                val key = TileMath.packTileKey(gridZoom, x, y)
+                tileCounts[key] = (tileCounts[key] ?: 0) + 1
+            }
+        } else if (existing.isNotEmpty()) {
+            for (tile in existing) {
+                val (oldZoom, x, y) = TileMath.unpackTileKey(tile.tileKey)
+                val center = TileMath.tileCenter(oldZoom, x, y)
+                val (newX, newY) = TileMath.latLngToTile(center.latitude, center.longitude, gridZoom)
+                val key = TileMath.packTileKey(gridZoom, newX, newY)
+                tileCounts[key] = (tileCounts[key] ?: 0) + tile.pointCount
+            }
+        } else {
+            return
+        }
+        database.liveTileDao().insertAll(
+            tileCounts.map { (tileKey, pointCount) ->
+                LiveTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
+            },
+        )
+    }
+
+    private fun reaggregateVisitedTiles(
+        cityId: Long,
+        tiles: List<VisitedTile>,
+        newZoom: Int,
+    ): List<VisitedTile> {
+        val counts = HashMap<Long, Int>()
+        for (tile in tiles) {
+            val (oldZoom, x, y) = TileMath.unpackTileKey(tile.tileKey)
+            val center = TileMath.tileCenter(oldZoom, x, y)
+            val (newX, newY) = TileMath.latLngToTile(center.latitude, center.longitude, newZoom)
+            val key = TileMath.packTileKey(newZoom, newX, newY)
+            counts[key] = (counts[key] ?: 0) + tile.pointCount
+        }
+        return counts.map { (tileKey, pointCount) ->
+            VisitedTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
+        }
     }
 
     private suspend fun saveImportedTiles(
         city: CityBoundary,
         rawPoints: List<com.tepmex.zoulushang.importing.LocationPoint>,
         onProgress: (ImportProgress) -> Unit,
+        gridZoom: Int,
     ): Int {
         onProgress(ImportProgress(ImportProgress.Stage.SAVING, 0, 1))
         database.visitedTileDao().deleteForCity(city.id)
-        val tiles = ImportProcessor.process(rawPoints, city.geoJson, city.id, onProgress)
+        val tiles = ImportProcessor.process(rawPoints, city.geoJson, city.id, onProgress, gridZoom)
         database.visitedTileDao().insertAll(tiles)
         return tiles.size
     }
@@ -183,5 +293,8 @@ class AppRepository(
         private const val MAX_LIVE_ACCURACY_METERS = 50f
         private val KEY_SELECTED_CITY_ID = longPreferencesKey("selected_city_id")
         private val KEY_TAKEOUT_DB_URI = stringPreferencesKey("takeout_db_uri")
+        private val KEY_SHOW_TAKEOUT_GRID = booleanPreferencesKey("show_takeout_grid")
+        private val KEY_SHOW_LIVE_GRID = booleanPreferencesKey("show_live_grid")
+        private val KEY_GRID_ZOOM = intPreferencesKey("grid_zoom")
     }
 }

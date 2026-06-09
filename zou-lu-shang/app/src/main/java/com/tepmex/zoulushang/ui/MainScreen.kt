@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -64,6 +65,10 @@ fun MainScreen(
                 viewModel = viewModel,
                 modifier = Modifier.padding(scaffoldPadding),
             )
+            uiState.showSettings -> SettingsScreen(
+                viewModel = viewModel,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
             else -> MainMapScaffold(
                 viewModel = viewModel,
                 uiState = uiState,
@@ -104,6 +109,9 @@ private fun MainMapScaffold(
                     IconButton(onClick = { viewModel.setShowImport(true) }) {
                         Icon(Icons.Default.FileUpload, contentDescription = "Import data")
                     }
+                    IconButton(onClick = { viewModel.setShowSettings(true) }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                 },
             )
         },
@@ -113,7 +121,7 @@ private fun MainMapScaffold(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (uiState.isImporting) {
+            if (uiState.isImporting || uiState.isSavingSettings) {
                 ImportProgressBar(uiState)
             }
             Box(modifier = Modifier.fillMaxSize()) {
@@ -121,8 +129,17 @@ private fun MainMapScaffold(
                     EmptyState(onChooseCity = { viewModel.setShowCityPicker(true) })
                 } else {
                     VisitedTilesMap(
-                        takeoutLookup = uiState.visitedLookup,
-                        liveLookup = uiState.liveLookup,
+                        takeoutLookup = if (uiState.mapSettings.showTakeoutGrid) {
+                            uiState.visitedLookup
+                        } else {
+                            hashMapOf()
+                        },
+                        liveLookup = if (uiState.mapSettings.showLiveGrid) {
+                            uiState.liveLookup
+                        } else {
+                            hashMapOf()
+                        },
+                        gridZoom = uiState.mapSettings.gridZoom,
                         fitBounds = uiState.mapBounds,
                         enableMyLocation = locationPermissions.allGranted,
                         recenterMyLocationToken = uiState.recenterMyLocationToken,
@@ -163,8 +180,17 @@ private fun MainMapScaffold(
                             .padding(16.dp),
                     )
                     TileStats(
-                        takeoutTileCount = uiState.visitedTileCount,
-                        liveTileCount = uiState.liveTileCount,
+                        takeoutTileCount = if (uiState.mapSettings.showTakeoutGrid) {
+                            uiState.visitedTileCount
+                        } else {
+                            0
+                        },
+                        liveTileCount = if (uiState.mapSettings.showLiveGrid) {
+                            uiState.liveTileCount
+                        } else {
+                            0
+                        },
+                        gridZoom = uiState.mapSettings.gridZoom,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 72.dp),
@@ -259,6 +285,7 @@ private fun FillMapControls(
 private fun TileStats(
     takeoutTileCount: Int,
     liveTileCount: Int,
+    gridZoom: Int,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -268,7 +295,7 @@ private fun TileStats(
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "$takeoutTileCount takeout · $liveTileCount live tiles (zoom ${com.tepmex.zoulushang.geo.TileMath.GRID_ZOOM})",
+            text = "$takeoutTileCount takeout · $liveTileCount live tiles (zoom $gridZoom)",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier

@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.zoulushang.data.AppRepository
 import com.tepmex.zoulushang.data.CityBoundary
+import com.tepmex.zoulushang.data.MapSettings
+import com.tepmex.zoulushang.data.SettingsDraft
 import com.tepmex.zoulushang.geo.GeoJsonParser
 import com.tepmex.zoulushang.geo.TileMath
 import com.tepmex.zoulushang.importing.ImportProgress
@@ -45,6 +47,10 @@ data class AppUiState(
     val errorMessage: String? = null,
     val showCityPicker: Boolean = false,
     val showImport: Boolean = false,
+    val showSettings: Boolean = false,
+    val mapSettings: MapSettings = MapSettings(),
+    val settingsDraft: SettingsDraft? = null,
+    val isSavingSettings: Boolean = false,
 )
 
 class AppViewModel(
@@ -71,6 +77,11 @@ class AppViewModel(
         viewModelScope.launch {
             repository.takeoutDbUri.collect { uri ->
                 _uiState.update { it.copy(takeoutDbUri = uri) }
+            }
+        }
+        viewModelScope.launch {
+            repository.mapSettings.collect { settings ->
+                _uiState.update { it.copy(mapSettings = settings) }
             }
         }
         viewModelScope.launch {
@@ -183,6 +194,88 @@ class AppViewModel(
 
     fun setShowImport(show: Boolean) {
         _uiState.update { it.copy(showImport = show, importProgress = null, errorMessage = null) }
+    }
+
+    fun setShowSettings(show: Boolean) {
+        if (show) {
+            val settings = _uiState.value.mapSettings
+            _uiState.update {
+                it.copy(
+                    showSettings = true,
+                    settingsDraft = SettingsDraft(
+                        showTakeoutGrid = settings.showTakeoutGrid,
+                        showLiveGrid = settings.showLiveGrid,
+                        gridZoom = settings.gridZoom,
+                    ),
+                )
+            }
+        } else {
+            _uiState.update { it.copy(showSettings = false, settingsDraft = null) }
+        }
+    }
+
+    fun updateSettingsDraft(
+        showTakeoutGrid: Boolean? = null,
+        showLiveGrid: Boolean? = null,
+        gridZoom: Int? = null,
+    ) {
+        val draft = _uiState.value.settingsDraft ?: return
+        _uiState.update {
+            it.copy(
+                settingsDraft = draft.copy(
+                    showTakeoutGrid = showTakeoutGrid ?: draft.showTakeoutGrid,
+                    showLiveGrid = showLiveGrid ?: draft.showLiveGrid,
+                    gridZoom = gridZoom?.coerceIn(TileMath.MIN_GRID_ZOOM, TileMath.MAX_GRID_ZOOM)
+                        ?: draft.gridZoom,
+                ),
+            )
+        }
+    }
+
+    fun saveSettings() {
+        val draft = _uiState.value.settingsDraft ?: return
+        val cityId = _uiState.value.selectedCity?.id
+        val previousZoom = _uiState.value.mapSettings.gridZoom
+        val zoomChanged = draft.gridZoom != previousZoom
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingSettings = true, errorMessage = null) }
+            val newSettings = MapSettings(
+                showTakeoutGrid = draft.showTakeoutGrid,
+                showLiveGrid = draft.showLiveGrid,
+                gridZoom = draft.gridZoom,
+            )
+            runCatching {
+                repository.setMapSettings(newSettings)
+                if (cityId != null && zoomChanged) {
+                    _uiState.update { it.copy(isImporting = true, importProgress = null) }
+                    repository.rebuildTilesForCity(cityId, draft.gridZoom) { progress ->
+                        _uiState.update { state -> state.copy(importProgress = progress) }
+                    }
+                }
+            }.onSuccess {
+                if (cityId != null) {
+                    loadCitiesState(cityId, autoImportIfNeeded = false)
+                }
+                _uiState.update {
+                    it.copy(
+                        mapSettings = newSettings,
+                        showSettings = false,
+                        settingsDraft = null,
+                        isSavingSettings = false,
+                        isImporting = false,
+                        importProgress = null,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isSavingSettings = false,
+                        isImporting = false,
+                        errorMessage = e.message ?: "Failed to save settings",
+                    )
+                }
+            }
+        }
     }
 
     fun updateCitySearchQuery(query: String) {
