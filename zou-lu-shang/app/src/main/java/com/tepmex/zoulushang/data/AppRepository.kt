@@ -105,12 +105,13 @@ class AppRepository(
         database.cityBoundaryDao().getByOsmPlaceId(result.placeId)!!.id
     }
 
-    suspend fun getVisitedTileLookup(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): HashMap<Long, Int> =
+    suspend fun getVisitedTileLookup(cityId: Long, gridZoom: Int? = null): HashMap<Long, Int> =
         withContext(Dispatchers.IO) {
-            remapStoredLookup(database.visitedTileDao().getTilesForCity(cityId), gridZoom)
+            val zoom = gridZoom ?: getMapSettings().gridZoom
+            remapStoredLookup(database.visitedTileDao().getTilesForCity(cityId), zoom)
         }
 
-    suspend fun getVisitedTileCount(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): Int =
+    suspend fun getVisitedTileCount(cityId: Long, gridZoom: Int? = null): Int =
         getVisitedTileLookup(cityId, gridZoom).size
 
     fun observeLiveTileLookup(cityId: Long): Flow<HashMap<Long, Int>> =
@@ -121,12 +122,13 @@ class AppRepository(
             remapStoredLookup(tiles, settings.gridZoom)
         }
 
-    suspend fun getLiveTileLookup(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): HashMap<Long, Int> =
+    suspend fun getLiveTileLookup(cityId: Long, gridZoom: Int? = null): HashMap<Long, Int> =
         withContext(Dispatchers.IO) {
-            remapStoredLookup(database.liveTileDao().getTilesForCity(cityId), gridZoom)
+            val zoom = gridZoom ?: getMapSettings().gridZoom
+            remapStoredLookup(database.liveTileDao().getTilesForCity(cityId), zoom)
         }
 
-    suspend fun getLiveTileCount(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): Int =
+    suspend fun getLiveTileCount(cityId: Long, gridZoom: Int? = null): Int =
         getLiveTileLookup(cityId, gridZoom).size
 
     suspend fun recordLiveLocation(cityId: Long, latitude: Double, longitude: Double, accuracyMeters: Float?) {
