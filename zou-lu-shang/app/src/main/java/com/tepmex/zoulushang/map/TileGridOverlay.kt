@@ -13,6 +13,7 @@ import org.osmdroid.views.overlay.Overlay
 class TileGridOverlay(
     private var takeoutLookup: HashMap<Long, Int>,
     private var liveLookup: HashMap<Long, Int>,
+    private var gridZoom: Int = TileMath.DEFAULT_GRID_ZOOM,
 ) : Overlay() {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -23,9 +24,10 @@ class TileGridOverlay(
     }
     private val rect = Rect()
 
-    fun updateLookups(takeout: HashMap<Long, Int>, live: HashMap<Long, Int>) {
+    fun updateLookups(takeout: HashMap<Long, Int>, live: HashMap<Long, Int>, zoom: Int) {
         takeoutLookup = takeout
         liveLookup = live
+        gridZoom = zoom
     }
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
@@ -33,7 +35,7 @@ class TileGridOverlay(
         val projection: Projection = mapView.projection
         val bbox: BoundingBox = mapView.boundingBox
         val (xRange, yRange) = visibleRanges(bbox)
-        val zoom = TileMath.GRID_ZOOM
+        val zoom = gridZoom
 
         for (x in xRange) {
             for (y in yRange) {
@@ -73,7 +75,7 @@ class TileGridOverlay(
     }
 
     private fun minPixelSize(mapView: MapView): Int {
-        val zoomGap = TileMath.GRID_ZOOM - mapView.zoomLevelDouble
+        val zoomGap = gridZoom - mapView.zoomLevelDouble
         return when {
             zoomGap <= 1.0 -> 0
             zoomGap <= 3.0 -> 6
@@ -91,11 +93,11 @@ class TileGridOverlay(
     }
 
     private fun visibleRanges(bbox: BoundingBox): Pair<IntRange, IntRange> {
-        val scale = 1 shl TileMath.GRID_ZOOM
-        val minX = TileMath.latLngToTile(bbox.latNorth, bbox.lonWest).first
-        val maxX = TileMath.latLngToTile(bbox.latSouth, bbox.lonEast).first
-        val minY = TileMath.latLngToTile(bbox.latNorth, bbox.lonEast).second
-        val maxY = TileMath.latLngToTile(bbox.latSouth, bbox.lonWest).second
+        val scale = 1 shl gridZoom
+        val minX = TileMath.latLngToTile(bbox.latNorth, bbox.lonWest, gridZoom).first
+        val maxX = TileMath.latLngToTile(bbox.latSouth, bbox.lonEast, gridZoom).first
+        val minY = TileMath.latLngToTile(bbox.latNorth, bbox.lonEast, gridZoom).second
+        val maxY = TileMath.latLngToTile(bbox.latSouth, bbox.lonWest, gridZoom).second
         val xRange = minOf(minX, maxX).coerceAtLeast(0)..maxOf(minX, maxX).coerceAtMost(scale - 1)
         val yRange = minOf(minY, maxY).coerceAtLeast(0)..maxOf(minY, maxY).coerceAtMost(scale - 1)
         return xRange to yRange

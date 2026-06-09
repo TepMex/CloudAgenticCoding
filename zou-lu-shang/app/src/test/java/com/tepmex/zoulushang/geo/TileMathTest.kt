@@ -46,6 +46,14 @@ class TileMathTest {
     }
 
     @Test
+    fun approximateTileWidthMeters_decreasesWithHigherZoom() {
+        val lat = 41.0
+        val wider = TileMath.approximateTileWidthMeters(lat, TileMath.MIN_GRID_ZOOM)
+        val narrower = TileMath.approximateTileWidthMeters(lat, TileMath.MAX_GRID_ZOOM)
+        assertTrue(wider > narrower)
+    }
+
+    @Test
     fun tileYToLat_matchesWebMercatorFormula() {
         val zoom = TileMath.GRID_ZOOM
         val y = 12345

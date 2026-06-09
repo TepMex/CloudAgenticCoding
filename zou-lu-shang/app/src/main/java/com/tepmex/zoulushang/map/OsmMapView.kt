@@ -84,6 +84,7 @@ fun MapView.centerOnMyLocation(): Boolean {
 fun VisitedTilesMap(
     takeoutLookup: HashMap<Long, Int>,
     liveLookup: HashMap<Long, Int>,
+    gridZoom: Int,
     fitBounds: BoundingBox?,
     enableMyLocation: Boolean,
     recenterMyLocationToken: Int,
@@ -94,6 +95,7 @@ fun VisitedTilesMap(
     var overlay by remember { mutableStateOf<TileGridOverlay?>(null) }
     var lastTakeoutKey by remember { mutableStateOf<Long?>(null) }
     var lastLiveKey by remember { mutableStateOf<Long?>(null) }
+    var lastGridZoom by remember { mutableStateOf(gridZoom) }
     var lastBoundsKey by remember { mutableStateOf<String?>(null) }
     var lastRecenterToken by remember { mutableStateOf(recenterMyLocationToken) }
 
@@ -119,7 +121,7 @@ fun VisitedTilesMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            val currentOverlay = overlay ?: TileGridOverlay(takeoutLookup, liveLookup).also {
+            val currentOverlay = overlay ?: TileGridOverlay(takeoutLookup, liveLookup, gridZoom).also {
                 overlay = it
                 view.overlays.add(0, it)
             }
@@ -130,10 +132,11 @@ fun VisitedTilesMap(
             val liveKey = liveLookup.entries.fold(0L) { acc, (key, count) ->
                 acc xor key xor count.toLong()
             }
-            if (takeoutKey != lastTakeoutKey || liveKey != lastLiveKey) {
-                currentOverlay.updateLookups(takeoutLookup, liveLookup)
+            if (takeoutKey != lastTakeoutKey || liveKey != lastLiveKey || gridZoom != lastGridZoom) {
+                currentOverlay.updateLookups(takeoutLookup, liveLookup, gridZoom)
                 lastTakeoutKey = takeoutKey
                 lastLiveKey = liveKey
+                lastGridZoom = gridZoom
             }
 
             val boundsKey = fitBounds?.let {

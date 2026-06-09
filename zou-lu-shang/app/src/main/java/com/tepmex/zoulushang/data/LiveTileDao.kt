@@ -1,6 +1,8 @@
 package com.tepmex.zoulushang.data
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -23,4 +25,10 @@ interface LiveTileDao {
         """,
     )
     suspend fun recordVisit(cityId: Long, tileKey: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(tiles: List<LiveTile>)
+
+    @Query("DELETE FROM live_tiles WHERE cityId = :cityId")
+    suspend fun deleteForCity(cityId: Long)
 }

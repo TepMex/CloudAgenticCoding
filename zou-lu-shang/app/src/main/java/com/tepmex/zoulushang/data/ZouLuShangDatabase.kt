@@ -8,14 +8,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [CityBoundary::class, VisitedTile::class, LiveTile::class],
-    version = 3,
+    entities = [CityBoundary::class, VisitedTile::class, LiveTile::class, LiveLocationSample::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class ZouLuShangDatabase : RoomDatabase() {
     abstract fun cityBoundaryDao(): CityBoundaryDao
     abstract fun visitedTileDao(): VisitedTileDao
     abstract fun liveTileDao(): LiveTileDao
+    abstract fun liveLocationSampleDao(): LiveLocationSampleDao
 
     companion object {
         @Volatile
@@ -28,7 +29,7 @@ abstract class ZouLuShangDatabase : RoomDatabase() {
                     ZouLuShangDatabase::class.java,
                     "zou_lu_shang.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build().also { instance = it }
             }
 
@@ -49,6 +50,22 @@ abstract class ZouLuShangDatabase : RoomDatabase() {
                         tileKey INTEGER NOT NULL,
                         pointCount INTEGER NOT NULL DEFAULT 1,
                         PRIMARY KEY(cityId, tileKey)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS live_location_samples (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        cityId INTEGER NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        recordedAt INTEGER NOT NULL
                     )
                     """.trimIndent(),
                 )
