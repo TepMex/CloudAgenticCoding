@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -53,11 +55,42 @@ fun SettingsScreen(
                 },
             )
         },
+        bottomBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (uiState.isSavingSettings) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = if (uiState.isImporting) "Recalculating tiles…" else "Saving…",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                Button(
+                    onClick = viewModel::saveSettings,
+                    enabled = !uiState.isSavingSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Save")
+                }
+            }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
@@ -122,28 +155,6 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-
-            if (uiState.isSavingSettings) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator()
-                    Text(
-                        text = if (uiState.isImporting) "Recalculating tiles…" else "Saving…",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-
-            Button(
-                onClick = viewModel::saveSettings,
-                enabled = !uiState.isSavingSettings,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Save")
             }
         }
     }
