@@ -17,9 +17,12 @@ import com.tepmex.zoulushang.nominatim.NominatimApi
 import com.tepmex.zoulushang.nominatim.NominatimSearchResult
 import com.tepmex.zoulushang.geo.LatLng
 import com.tepmex.zoulushang.geo.PointInPolygon
+import com.tepmex.zoulushang.geo.TileLookupRemapper
 import com.tepmex.zoulushang.geo.TileMath
+import com.tepmex.zoulushang.importing.LocationPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -102,28 +105,29 @@ class AppRepository(
         database.cityBoundaryDao().getByOsmPlaceId(result.placeId)!!.id
     }
 
-    suspend fun getVisitedTileLookup(cityId: Long): HashMap<Long, Int> = withContext(Dispatchers.IO) {
-        database.visitedTileDao().getTilesForCity(cityId)
-            .associate { it.tileKey to it.pointCount }
-            .let { HashMap(it) }
-    }
-
-    suspend fun getVisitedTileCount(cityId: Long): Int =
-        database.visitedTileDao().countForCity(cityId)
-
-    fun observeLiveTileLookup(cityId: Long): Flow<HashMap<Long, Int>> =
-        database.liveTileDao().observeTilesForCity(cityId).map { tiles ->
-            tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
+    suspend fun getVisitedTileLookup(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): HashMap<Long, Int> =
+        withContext(Dispatchers.IO) {
+            remapStoredLookup(database.visitedTileDao().getTilesForCity(cityId), gridZoom)
         }
 
-    suspend fun getLiveTileLookup(cityId: Long): HashMap<Long, Int> = withContext(Dispatchers.IO) {
-        database.liveTileDao().getTilesForCity(cityId)
-            .associate { it.tileKey to it.pointCount }
-            .let { HashMap(it) }
-    }
+    suspend fun getVisitedTileCount(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): Int =
+        getVisitedTileLookup(cityId, gridZoom).size
 
-    suspend fun getLiveTileCount(cityId: Long): Int =
-        database.liveTileDao().countForCity(cityId)
+    fun observeLiveTileLookup(cityId: Long): Flow<HashMap<Long, Int>> =
+        combine(
+            database.liveTileDao().observeTilesForCity(cityId),
+            mapSettings,
+        ) { tiles, settings ->
+            remapStoredLookup(tiles, settings.gridZoom)
+        }
+
+    suspend fun getLiveTileLookup(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): HashMap<Long, Int> =
+        withContext(Dispatchers.IO) {
+            remapStoredLookup(database.liveTileDao().getTilesForCity(cityId), gridZoom)
+        }
+
+    suspend fun getLiveTileCount(cityId: Long, gridZoom: Int = getMapSettings().gridZoom): Int =
+        getLiveTileLookup(cityId, gridZoom).size
 
     suspend fun recordLiveLocation(cityId: Long, latitude: Double, longitude: Double, accuracyMeters: Float?) {
         if (accuracyMeters != null && accuracyMeters > MAX_LIVE_ACCURACY_METERS) return
@@ -194,6 +198,12 @@ class AppRepository(
         gridZoom: Int,
         onProgress: (ImportProgress) -> Unit,
     ) {
+        val cachedPoints = database.importedLocationPointDao().getForCity(cityId)
+        if (cachedPoints.isNotEmpty()) {
+            val city = database.cityBoundaryDao().getById(cityId) ?: return
+            saveImportedTiles(city, cachedPoints.toLocationPoints(), onProgress, gridZoom)
+            return
+        }
         val uriString = getTakeoutDbUri()
         if (uriString != null) {
             importTakeoutDb(cityId, Uri.parse(uriString), onProgress, gridZoom)
@@ -202,9 +212,7 @@ class AppRepository(
         val existing = database.visitedTileDao().getTilesForCity(cityId)
         if (existing.isEmpty()) return
         onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, existing.size))
-        val tiles = reaggregateVisitedTiles(cityId, existing, gridZoom)
-        database.visitedTileDao().deleteForCity(cityId)
-        database.visitedTileDao().insertAll(tiles)
+        persistRemappedVisitedTiles(cityId, existing, gridZoom)
     }
 
     private suspend fun rebuildLiveTilesAtZoom(cityId: Long, gridZoom: Int) {
@@ -219,12 +227,9 @@ class AppRepository(
                 tileCounts[key] = (tileCounts[key] ?: 0) + 1
             }
         } else if (existing.isNotEmpty()) {
-            for (tile in existing) {
-                val (oldZoom, x, y) = TileMath.unpackTileKey(tile.tileKey)
-                val center = TileMath.tileCenter(oldZoom, x, y)
-                val (newX, newY) = TileMath.latLngToTile(center.latitude, center.longitude, gridZoom)
-                val key = TileMath.packTileKey(gridZoom, newX, newY)
-                tileCounts[key] = (tileCounts[key] ?: 0) + tile.pointCount
+            val remapped = remapStoredLookup(existing, gridZoom)
+            remapped.forEach { (tileKey, pointCount) ->
+                tileCounts[tileKey] = pointCount
             }
         } else {
             return
@@ -236,36 +241,69 @@ class AppRepository(
         )
     }
 
-    private fun reaggregateVisitedTiles(
+    private suspend fun persistRemappedVisitedTiles(
         cityId: Long,
         tiles: List<VisitedTile>,
-        newZoom: Int,
-    ): List<VisitedTile> {
-        val counts = HashMap<Long, Int>()
-        for (tile in tiles) {
-            val (oldZoom, x, y) = TileMath.unpackTileKey(tile.tileKey)
-            val center = TileMath.tileCenter(oldZoom, x, y)
-            val (newX, newY) = TileMath.latLngToTile(center.latitude, center.longitude, newZoom)
-            val key = TileMath.packTileKey(newZoom, newX, newY)
-            counts[key] = (counts[key] ?: 0) + tile.pointCount
-        }
-        return counts.map { (tileKey, pointCount) ->
-            VisitedTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
-        }
+        gridZoom: Int,
+    ) {
+        val remapped = remapStoredLookup(tiles, gridZoom)
+        database.visitedTileDao().deleteForCity(cityId)
+        database.visitedTileDao().insertAll(
+            remapped.map { (tileKey, pointCount) ->
+                VisitedTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
+            },
+        )
     }
 
     private suspend fun saveImportedTiles(
         city: CityBoundary,
-        rawPoints: List<com.tepmex.zoulushang.importing.LocationPoint>,
+        rawPoints: List<LocationPoint>,
         onProgress: (ImportProgress) -> Unit,
         gridZoom: Int,
     ): Int {
         onProgress(ImportProgress(ImportProgress.Stage.SAVING, 0, 1))
+        cacheImportedPoints(city.id, rawPoints)
         database.visitedTileDao().deleteForCity(city.id)
         val tiles = ImportProcessor.process(rawPoints, city.geoJson, city.id, onProgress, gridZoom)
         database.visitedTileDao().insertAll(tiles)
         return tiles.size
     }
+
+    private suspend fun cacheImportedPoints(cityId: Long, rawPoints: List<LocationPoint>) {
+        database.importedLocationPointDao().deleteForCity(cityId)
+        if (rawPoints.isEmpty()) return
+        database.importedLocationPointDao().insertAll(
+            rawPoints.map { point ->
+                ImportedLocationPoint(
+                    cityId = cityId,
+                    ts = point.ts,
+                    latitude = point.lat,
+                    longitude = point.lng,
+                    accuracyMeters = point.accuracyMeters,
+                )
+            },
+        )
+    }
+
+    private fun remapStoredLookup(tiles: List<VisitedTile>, gridZoom: Int): HashMap<Long, Int> {
+        val lookup = tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
+        return TileLookupRemapper.remap(lookup, gridZoom)
+    }
+
+    private fun remapStoredLookup(tiles: List<LiveTile>, gridZoom: Int): HashMap<Long, Int> {
+        val lookup = tiles.associate { it.tileKey to it.pointCount }.let { HashMap(it) }
+        return TileLookupRemapper.remap(lookup, gridZoom)
+    }
+
+    private fun List<ImportedLocationPoint>.toLocationPoints(): List<LocationPoint> =
+        map { point ->
+            LocationPoint(
+                ts = point.ts,
+                lat = point.latitude,
+                lng = point.longitude,
+                accuracyMeters = point.accuracyMeters,
+            )
+        }
 
     private suspend fun resolveCityGeoJson(result: NominatimSearchResult): String {
         val candidates = buildList {
