@@ -270,7 +270,7 @@ class AppViewModel(
                 repository.setMapSettings(newSettings)
                 if (cityId != null && zoomChanged) {
                     _uiState.update { it.copy(isImporting = true, importProgress = null) }
-                    repository.rebuildTilesForCity(cityId, draft.gridZoom) { progress ->
+                    repository.rebuildTilesForCity(cityId, draft.gridZoom, previousZoom) { progress ->
                         _uiState.update { state -> state.copy(importProgress = progress) }
                     }
                 }

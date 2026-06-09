@@ -186,20 +186,30 @@ class AppRepository(
     suspend fun rebuildTilesForCity(
         cityId: Long,
         gridZoom: Int,
+        previousGridZoom: Int,
         onProgress: (ImportProgress) -> Unit,
     ) = withContext(Dispatchers.IO) {
+        val zoomingIn = gridZoom > previousGridZoom
         onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, 2))
-        rebuildVisitedTilesAtZoom(cityId, gridZoom, onProgress)
+        rebuildVisitedTilesAtZoom(cityId, gridZoom, zoomingIn, onProgress)
         onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 1, 2))
-        rebuildLiveTilesAtZoom(cityId, gridZoom)
+        rebuildLiveTilesAtZoom(cityId, gridZoom, zoomingIn)
         onProgress(ImportProgress(ImportProgress.Stage.DONE, 2, 2))
     }
 
     private suspend fun rebuildVisitedTilesAtZoom(
         cityId: Long,
         gridZoom: Int,
+        zoomingIn: Boolean,
         onProgress: (ImportProgress) -> Unit,
     ) {
+        val existing = database.visitedTileDao().getTilesForCity(cityId)
+        if (existing.isNotEmpty() && zoomingIn) {
+            onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, existing.size))
+            persistRemappedVisitedTiles(cityId, existing, gridZoom)
+            return
+        }
+
         val cachedPoints = database.importedLocationPointDao().getForCity(cityId)
         if (cachedPoints.isNotEmpty()) {
             val city = database.cityBoundaryDao().getById(cityId) ?: return
@@ -211,15 +221,19 @@ class AppRepository(
             importTakeoutDb(cityId, Uri.parse(uriString), onProgress, gridZoom)
             return
         }
-        val existing = database.visitedTileDao().getTilesForCity(cityId)
         if (existing.isEmpty()) return
         onProgress(ImportProgress(ImportProgress.Stage.MAPPING, 0, existing.size))
         persistRemappedVisitedTiles(cityId, existing, gridZoom)
     }
 
-    private suspend fun rebuildLiveTilesAtZoom(cityId: Long, gridZoom: Int) {
-        val samples = database.liveLocationSampleDao().getSamplesForCity(cityId)
+    private suspend fun rebuildLiveTilesAtZoom(cityId: Long, gridZoom: Int, zoomingIn: Boolean) {
         val existing = database.liveTileDao().getTilesForCity(cityId)
+        if (existing.isNotEmpty() && zoomingIn) {
+            persistRemappedLiveTiles(cityId, existing, gridZoom)
+            return
+        }
+
+        val samples = database.liveLocationSampleDao().getSamplesForCity(cityId)
         database.liveTileDao().deleteForCity(cityId)
         val tileCounts = HashMap<Long, Int>()
         if (samples.isNotEmpty()) {
@@ -253,6 +267,20 @@ class AppRepository(
         database.visitedTileDao().insertAll(
             remapped.map { (tileKey, pointCount) ->
                 VisitedTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
+            },
+        )
+    }
+
+    private suspend fun persistRemappedLiveTiles(
+        cityId: Long,
+        tiles: List<LiveTile>,
+        gridZoom: Int,
+    ) {
+        val remapped = remapStoredLookup(tiles, gridZoom)
+        database.liveTileDao().deleteForCity(cityId)
+        database.liveTileDao().insertAll(
+            remapped.map { (tileKey, pointCount) ->
+                LiveTile(cityId = cityId, tileKey = tileKey, pointCount = pointCount)
             },
         )
     }
