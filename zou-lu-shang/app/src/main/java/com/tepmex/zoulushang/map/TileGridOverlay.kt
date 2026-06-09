@@ -76,10 +76,11 @@ class TileGridOverlay(
 
     private fun minPixelSize(mapView: MapView): Int {
         val zoomGap = gridZoom - mapView.zoomLevelDouble
+        if (zoomGap > 1.0) return 0
         return when {
-            zoomGap <= 1.0 -> 0
-            zoomGap <= 3.0 -> 6
-            else -> 10
+            zoomGap <= 0.5 -> 0
+            zoomGap <= 1.0 -> 4
+            else -> 0
         }
     }
 
