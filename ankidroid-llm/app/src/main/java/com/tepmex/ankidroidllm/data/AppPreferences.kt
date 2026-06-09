@@ -79,6 +79,13 @@ class AppPreferences(private val context: Context) {
     }
 
     companion object {
+        /** QAT mobile-transformers weights (wNa8o8) published by Google on Hugging Face. */
+        const val DEFAULT_MODEL_HF_REPO = "google/gemma-4-E2B-it-qat-mobile-transformers"
+
+        /**
+         * LiteRT-LM runtime bundle (.litertlm) for [DEFAULT_MODEL_HF_REPO].
+         * Hosted on litert-community until Google publishes a .litertlm on the QAT repo.
+         */
         const val DEFAULT_MODEL_URL =
             "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
 

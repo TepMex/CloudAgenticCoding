@@ -3,7 +3,7 @@
 Android (Kotlin) app that reads vocabulary from your **current AnkiDroid study queue** (via the [AnkiDroid content provider](https://github.com/ankidroid/Anki-Android/wiki/Ankidroid-Api)) and asks an LLM to write a short story using those words.
 
 - **Requirements:** Android 14 or newer (min SDK 34), compile SDK 35.
-- **On-device default:** [LiteRT-LM](https://ai.google.dev/edge/lite/android) with the community [Gemma 4 E2B IT](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) `.litertlm` model (downloaded on first use; large file).
+- **On-device default:** [LiteRT-LM](https://ai.google.dev/edge/lite/android) with [Gemma 4 E2B IT QAT (mobile-transformers)](https://huggingface.co/google/gemma-4-E2B-it-qat-mobile-transformers), deployed as the community [`.litertlm` bundle](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) (downloaded on first use; ~2.6 GB). To self-host from the Google safetensors checkpoint, run `scripts/export-qat-litertlm.sh`.
 - **Remote option:** OpenAI-compatible `POST /v1/chat/completions` (configure base URL, bearer token, and model name in Settings).
 
 ## Local build

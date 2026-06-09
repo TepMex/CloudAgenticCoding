@@ -52,7 +52,7 @@ class LiteRtStoryGenerator(private val context: Context) {
     fun localModelFile(context: Context): File {
         val dir = File(context.filesDir, "litert_models")
         dir.mkdirs()
-        return File(dir, "gemma-4-e2b-it.litertlm")
+        return File(dir, "gemma-4-e2b-it-qat.litertlm")
     }
 
     private fun textDelta(message: Message): String {

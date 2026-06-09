@@ -74,7 +74,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="LiteRT model download URL (.litertlm)">
+            android:hint="LiteRT model download URL (.litertlm, Gemma 4 E2B QAT)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputModelUrl"

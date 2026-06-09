@@ -10,7 +10,7 @@
     <string name="story_hint">Your story will appear here. Tap Generate after granting AnkiDroid access if prompted.</string>
     <string name="status_idle">Ready</string>
     <string name="status_loading_vocab">Reading study queue from AnkiDroid…</string>
-    <string name="status_downloading_model">Downloading on-device model (first run only, large file)…</string>
+    <string name="status_downloading_model">Downloading Gemma 4 E2B QAT model (first run only, ~2.6 GB)…</string>
     <string name="status_generating">Generating story…</string>
     <string name="error_anki_permission">AnkiDroid database permission is required. Grant it in system settings for this app, then try again.</string>
     <string name="error_anki_missing">Install AnkiDroid and enable its API (Settings → Advanced → AnkiDroid API).</string>
