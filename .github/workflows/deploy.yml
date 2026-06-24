@@ -396,14 +396,14 @@ jobs:
           verify() {
             android/verify-apk-sideload-cert.sh "$1/app/build/outputs/apk/release/app-release.apk"
           }
-          is_true "$BUILD_CHESSWATCH" && verify chesswatch
-          is_true "$BUILD_ANKIDROID_LLM" && verify ankidroid-llm
-          is_true "$BUILD_LOCAL_TTS" && verify local-tts
-          is_true "$BUILD_ANKI_DASHBOARD_APK" && verify anki-dashboard-apk
-          is_true "$BUILD_ZUO_TASKS" && verify zuo-tasks
-          is_true "$BUILD_CTX_CALENDAR" && verify ctx-calendar
-          is_true "$BUILD_WO_ZAI_NAAR" && verify wo-zai-naar
-          is_true "$BUILD_ZOU_LU_SHANG" && verify zou-lu-shang
+          if is_true "$BUILD_CHESSWATCH"; then verify chesswatch; fi
+          if is_true "$BUILD_ANKIDROID_LLM"; then verify ankidroid-llm; fi
+          if is_true "$BUILD_LOCAL_TTS"; then verify local-tts; fi
+          if is_true "$BUILD_ANKI_DASHBOARD_APK"; then verify anki-dashboard-apk; fi
+          if is_true "$BUILD_ZUO_TASKS"; then verify zuo-tasks; fi
+          if is_true "$BUILD_CTX_CALENDAR"; then verify ctx-calendar; fi
+          if is_true "$BUILD_WO_ZAI_NAAR"; then verify wo-zai-naar; fi
+          if is_true "$BUILD_ZOU_LU_SHANG"; then verify zou-lu-shang; fi
 
       - name: Prepare GitHub Pages site
         env:
