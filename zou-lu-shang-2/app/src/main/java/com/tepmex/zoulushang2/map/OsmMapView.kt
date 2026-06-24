@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.tepmex.zoulushang2.data.PaintStroke
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -81,15 +82,15 @@ fun MapView.centerOnMyLocation(): Boolean {
 
 @Composable
 fun PaintedMap(
-    paintLookup: HashMap<Long, Int>,
+    strokes: List<PaintStroke>,
     enableMyLocation: Boolean,
     recenterMyLocationToken: Int,
     modifier: Modifier = Modifier,
     onViewportChanged: () -> Unit = {},
 ) {
     val mapView = rememberOsmMapView(enableMyLocation = enableMyLocation)
-    var overlay by remember { mutableStateOf<PaintOverlay?>(null) }
-    var lastLookupKey by remember { mutableStateOf<Long?>(null) }
+    var overlay by remember { mutableStateOf<StrokeOverlay?>(null) }
+    var lastStrokeRevision by remember { mutableStateOf(0L) }
     var lastRecenterToken by remember { mutableStateOf(recenterMyLocationToken) }
 
     DisposableEffect(mapView) {
@@ -114,17 +115,18 @@ fun PaintedMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            val currentOverlay = overlay ?: PaintOverlay(paintLookup).also {
+            val currentOverlay = overlay ?: StrokeOverlay(strokes).also {
                 overlay = it
                 view.overlays.add(0, it)
             }
 
-            val lookupKey = paintLookup.entries.fold(0L) { acc, (key, intensity) ->
-                acc xor key xor intensity.toLong()
+            val revision = strokes.fold(0L) { acc, stroke ->
+                acc xor stroke.id xor stroke.colorArgb.toLong() xor
+                    stroke.latStart.toBits() xor stroke.latEnd.toBits()
             }
-            if (lookupKey != lastLookupKey) {
-                currentOverlay.updateLookup(paintLookup)
-                lastLookupKey = lookupKey
+            if (revision != lastStrokeRevision) {
+                currentOverlay.updateStrokes(strokes)
+                lastStrokeRevision = revision
             }
 
             if (recenterMyLocationToken != lastRecenterToken) {

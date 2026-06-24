@@ -1,35 +1,20 @@
 package com.tepmex.zoulushang2.data
 
+import com.tepmex.zoulushang2.brush.BrushSettingsStore
 import com.tepmex.zoulushang2.export.DrawingExportCodec
 import com.tepmex.zoulushang2.geo.BrushEngine
-import com.tepmex.zoulushang2.geo.CellMath
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 class AppRepository(
     private val database: ZouLuShang2Database,
 ) {
-    private val dao = database.paintCellDao()
+    private val dao = database.paintStrokeDao()
 
-    fun observePaintLookup(): Flow<HashMap<Long, Int>> =
-        dao.observeAll().map { cells ->
-            HashMap<Long, Int>(cells.size).apply {
-                for (cell in cells) {
-                    put(cell.cellKey, cell.intensity)
-                }
-            }
-        }
+    fun observeStrokes(): Flow<List<PaintStroke>> = dao.observeAll()
 
-    suspend fun getPaintLookup(): HashMap<Long, Int> {
-        val cells = dao.getAll()
-        return HashMap<Long, Int>(cells.size).apply {
-            for (cell in cells) {
-                put(cell.cellKey, cell.intensity)
-            }
-        }
-    }
+    suspend fun getStrokes(): List<PaintStroke> = dao.getAll()
 
-    suspend fun getCellCount(): Int = dao.count()
+    suspend fun getStrokeCount(): Int = dao.count()
 
     suspend fun recordLocation(
         latitude: Double,
@@ -37,38 +22,34 @@ class AppRepository(
         lastLatitude: Double?,
         lastLongitude: Double?,
     ): Int {
-        val updates = mutableListOf<Pair<Long, Int>>()
+        val brush = BrushSettingsStore.settings.value
+        val strokes = mutableListOf<PaintStroke>()
         BrushEngine.applyLocation(
             latitude = latitude,
             longitude = longitude,
             lastLatitude = lastLatitude,
             lastLongitude = lastLongitude,
-        ) { cellKey, delta ->
-            updates.add(cellKey to delta)
+            colorArgb = brush.colorArgb,
+            thicknessMeters = brush.thicknessMeters,
+        ) { stroke ->
+            strokes.add(stroke)
         }
-        for ((cellKey, delta) in updates) {
-            addCellIntensity(cellKey, delta)
+        for (stroke in strokes) {
+            dao.insert(stroke)
         }
-        return updates.size
-    }
-
-    private suspend fun addCellIntensity(cellKey: Long, delta: Int) {
-        val updated = dao.addIntensity(cellKey, delta, BrushEngine.MAX_INTENSITY)
-        if (updated == 0) {
-            dao.insertIfAbsent(cellKey, delta.coerceAtMost(BrushEngine.MAX_INTENSITY))
-        }
+        return strokes.size
     }
 
     suspend fun exportDrawingText(): String {
-        val cells = dao.getAll()
-        return DrawingExportCodec.encode(cells)
+        val strokes = dao.getAll()
+        return DrawingExportCodec.encode(strokes)
     }
 
     suspend fun importDrawingText(text: String) {
-        val cells = DrawingExportCodec.decode(text)
+        val strokes = DrawingExportCodec.decode(text)
         dao.deleteAll()
-        if (cells.isNotEmpty()) {
-            dao.upsertAll(cells)
+        if (strokes.isNotEmpty()) {
+            dao.insertAll(strokes)
         }
     }
 
