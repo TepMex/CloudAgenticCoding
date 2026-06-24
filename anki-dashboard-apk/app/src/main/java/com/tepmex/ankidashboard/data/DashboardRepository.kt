@@ -95,15 +95,16 @@ class DashboardRepository(
         var reviewScore = 0.0
         var totalHoursSpent = 0.0
         var longMemory = 0
-        var debt = 0
+        var debt = collection.getReviewQueueCount(selectedDecks)
         var debtHistoryData = emptyList<Pair<String, Int>>()
         var cardReviews = emptyMap<Long, List<CardReview>>()
+        val (plotStart, plotEnd) = DashboardAnalytics.plotDateRange()
+        val crtSec = collection.getCollectionCrtSec()
 
         if (distinctCardIds.isNotEmpty()) {
             cardReviews = collection.getReviewsOfCards(distinctCardIds)
             reviewsStats = collection.getNumCardsReviewedByDay()
-            val (start, end) = DashboardAnalytics.plotDateRange()
-            plotData = DashboardAnalytics.buildWordsLearnedSeries(cardReviews, start, end)
+            plotData = DashboardAnalytics.buildWordsLearnedSeries(cardReviews, plotStart, plotEnd)
             val mistakesMap = DashboardAnalytics.mistakesByDay(cardReviews)
             mistakesData = plotData.map { (day, _) -> day to (mistakesMap[day] ?: 0) }
             val reviewsMap = reviewsStats.toMap()
@@ -112,16 +113,14 @@ class DashboardRepository(
             reviewScore = DashboardAnalytics.calculateReviewScore(cardReviews)
             totalHoursSpent = DashboardAnalytics.calculateTotalHoursSpent(cardReviews)
             longMemory = DashboardAnalytics.calculateLongMemory(cardReviews)
-            val crtSec = collection.getCollectionCrtSec()
             if (crtSec != null) {
                 debtHistoryData = DashboardAnalytics.buildDebtHistoryFromRevlog(
                     cardReviews,
                     crtSec,
-                    start,
-                    end,
+                    plotStart,
+                    plotEnd,
                 )
             }
-            debt = collection.getReviewQueueCount(selectedDecks)
         }
 
         val leeches = buildLeeches(selectedDecks, cardReviews, leechCardIds)

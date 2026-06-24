@@ -8,6 +8,8 @@
     <string name="stat_hours">total hours spent</string>
     <string name="stat_long_memory">Long memory</string>
     <string name="stat_debt">Review debt</string>
+    <string name="debt_current_summary">%1$d due now</string>
+    <string name="debt_chart_empty">No overdue review periods in history for these decks.</string>
     <string name="words_fraction">%1$d / %2$d</string>
     <string name="section_vocab_progress">Vocab Learning Progress</string>
     <string name="section_debt">Review debt</string>

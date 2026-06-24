@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             binding.mistakesHeatmap.isVisible = false
             binding.monthlyChart.isVisible = false
         }
-        bindDebtChart(data.debtHistoryData)
+        bindDebtChart(data.debtHistoryData, data.debt)
 
         leechFieldByDeck = buildLeechFieldMap(
             state.selectedDecks,
@@ -261,11 +261,14 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun bindDebtChart(history: List<Pair<String, Int>>) {
+    private fun bindDebtChart(history: List<Pair<String, Int>>, currentDebt: Int) {
+        binding.debtChartSummary.text = getString(R.string.debt_current_summary, currentDebt)
         if (history.none { it.second > 0 }) {
             binding.debtChart.isVisible = false
+            binding.debtChartEmptyHint.isVisible = true
             return
         }
+        binding.debtChartEmptyHint.isVisible = false
         val labels = history.map { it.first }
         val entries = history.mapIndexed { idx, pair ->
             Entry(idx.toFloat(), pair.second.toFloat())
