@@ -221,4 +221,10 @@ object DashboardAnalytics {
         val start = end.minus(730, ChronoUnit.DAYS)
         return start to end
     }
+
+    fun debtPlotDateRange(): Pair<LocalDate, LocalDate> {
+        val end = LocalDate.now()
+        val start = end.minusMonths(3)
+        return start to end
+    }
 }
