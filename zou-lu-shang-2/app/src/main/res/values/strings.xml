@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">zou-lu-shang-2</string>
+    <string name="notification_channel_paint">Paint the map</string>
+    <string name="notification_title_paint">Painting the map</string>
+    <string name="notification_text_paint">Your GPS position is drawing on the map.</string>
+    <string name="notification_text_paint_progress">%1$d brush strokes · painting</string>
+</resources>
