@@ -16,6 +16,7 @@ import java.io.File
 class CollectionReader(private val context: Context) {
 
     private var db: SQLiteDatabase? = null
+    private var revlogHasTypeColumn = false
     private var decksById: Map<String, DeckEntry> = emptyMap()
     private var deckNameById: Map<String, String> = emptyMap()
     private var fieldsByNotetypeId: Map<String, List<String>> = emptyMap()
@@ -77,6 +78,7 @@ class CollectionReader(private val context: Context) {
         deckNameById = emptyMap()
         fieldsByNotetypeId = emptyMap()
         modelsById = emptyMap()
+        revlogHasTypeColumn = false
     }
 
     fun deckNamesAndIds(): Map<String, Long> {
@@ -105,6 +107,36 @@ class CollectionReader(private val context: Context) {
             "SELECT c.id FROM cards c WHERE c.did IN ($idList)"
         }
         return queryLongColumn(db, sql)
+    }
+
+    /**
+     * Cards currently in the review queue for [deckNames] (learning + review due now).
+     * Mirrors Anki's due check: queue 1/3 (due day or timestamp), queue 2 (due day).
+     */
+    fun getReviewQueueCount(deckNames: List<String>): Int {
+        val db = db ?: return 0
+        val deckIds = deckNames.flatMap { resolveDeckIds(it) }.distinct()
+        if (deckIds.isEmpty()) return 0
+        val crtSec = queryLongColumn(db, "SELECT crt FROM col WHERE id = 1").firstOrNull() ?: return 0
+        val nowSec = System.currentTimeMillis() / 1000
+        val todayDays = ((nowSec - crtSec) / 86400).toInt()
+        val idList = deckIds.joinToString(",")
+        val sql = """
+            SELECT COUNT(*) FROM cards
+            WHERE did IN ($idList)
+              AND queue IN (1, 2, 3)
+              AND (
+                (queue = 2 AND due <= $todayDays)
+                OR (queue = 3 AND due <= $todayDays)
+                OR (queue = 1 AND (due <= $todayDays OR due <= $nowSec))
+              )
+        """.trimIndent()
+        return queryLongColumn(db, sql).firstOrNull()?.toInt() ?: 0
+    }
+
+    fun getCollectionCrtSec(): Long? {
+        val db = db ?: return null
+        return queryLongColumn(db, "SELECT crt FROM col WHERE id = 1").firstOrNull()
     }
 
     fun getIntervals(cardIds: List<Long>): List<Int> {
@@ -148,27 +180,45 @@ class CollectionReader(private val context: Context) {
         while (i < cardIds.size) {
             val batch = cardIds.subList(i, minOf(i + batchSize, cardIds.size))
             val idList = batch.joinToString(",")
-            val sql = """
+            val sql = if (revlogHasTypeColumn) {
+                """
+                SELECT cid, id, ease, time, ivl, type
+                FROM revlog
+                WHERE cid IN ($idList)
+                ORDER BY id
+                """.trimIndent()
+            } else {
+                """
                 SELECT cid, id, ease, time, ivl
                 FROM revlog
                 WHERE cid IN ($idList)
                 ORDER BY id
-            """.trimIndent()
+                """.trimIndent()
+            }
             db.rawQuery(sql, null).use { c ->
                 val iCid = c.getColumnIndex("cid")
                 val iId = c.getColumnIndex("id")
                 val iEase = c.getColumnIndex("ease")
                 val iTime = c.getColumnIndex("time")
                 val iIvl = c.getColumnIndex("ivl")
+                val iType = c.getColumnIndex("type")
                 while (c.moveToNext()) {
                     val cid = c.getLong(iCid)
                     val list = out.getOrPut(cid) { ArrayList() }
+                    val ease = c.getInt(iEase)
+                    val ivl = c.getInt(iIvl)
+                    val type = if (iType >= 0) {
+                        c.getInt(iType)
+                    } else {
+                        inferRevlogType(ease, ivl)
+                    }
                     list.add(
                         CardReview(
                             id = c.getLong(iId),
-                            ease = c.getInt(iEase),
+                            ease = ease,
                             time = c.getInt(iTime),
-                            ivl = c.getInt(iIvl),
+                            ivl = ivl,
+                            type = type,
                         ),
                     )
                 }
@@ -291,6 +341,7 @@ class CollectionReader(private val context: Context) {
             fieldSource = "col-json"
         }
         val cardCount = queryLongColumn(db, "SELECT COUNT(*) FROM cards").firstOrNull() ?: 0L
+        revlogHasTypeColumn = tableExists(db, "revlog") && columnExists(db, "revlog", "type")
         Log.i(
             TAG,
             "loaded metadata: deckSource=$deckSource fieldSource=$fieldSource " +
@@ -387,6 +438,15 @@ class CollectionReader(private val context: Context) {
         ).use { c -> return c.moveToFirst() }
     }
 
+    private fun columnExists(db: SQLiteDatabase, table: String, column: String): Boolean {
+        db.rawQuery("PRAGMA table_info($table)", null).use { c ->
+            while (c.moveToNext()) {
+                if (c.getString(1) == column) return true
+            }
+        }
+        return false
+    }
+
     private fun queryLongColumn(db: SQLiteDatabase, sql: String): List<Long> {
         val out = ArrayList<Long>()
         db.rawQuery(sql, null).use { c ->
@@ -411,6 +471,13 @@ class CollectionReader(private val context: Context) {
         private const val TAG = "CollectionReader"
         private const val FIELD_SEP = '\u001f'
         private val DECK_QUERY_PATTERN = Regex("""(?:"deck:|deck:")([^"]+)""")
+
+        /** Fallback when revlog has no `type` column (pre-2.1.45 collections). */
+        private fun inferRevlogType(ease: Int, ivl: Int): Int {
+            if (ease == 1) return 2
+            if (ivl >= 1 && ease >= 2) return 1
+            return 0
+        }
 
         fun defaultCollectionPaths(): List<String> {
             val base = Environment.getExternalStorageDirectory()

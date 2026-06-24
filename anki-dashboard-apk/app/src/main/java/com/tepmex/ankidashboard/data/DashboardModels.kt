@@ -16,6 +16,8 @@ data class DashboardData(
     val reviewScore: Double,
     val totalHoursSpent: Double,
     val longMemory: Int,
+    val debt: Int,
+    val debtHistoryData: List<Pair<String, Int>>,
     val plotData: List<Pair<String, Int>>,
     val mistakesData: List<Pair<String, Int>>,
     val reviewsData: List<Pair<String, Int>>,
@@ -32,4 +34,6 @@ data class CardReview(
     val ease: Int,
     val time: Int,
     val ivl: Int,
+    /** Revlog type: 0=learn, 1=review, 2=relrn, 3=cram */
+    val type: Int,
 )

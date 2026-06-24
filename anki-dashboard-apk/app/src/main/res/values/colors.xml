@@ -12,8 +12,10 @@
     <color name="plate_words">#FF2E4A3F</color>
     <color name="plate_hours">#FF4A3F2E</color>
     <color name="plate_memory">#FF3F2E4A</color>
+    <color name="plate_debt">#FF4A2E2E</color>
     <color name="progress_track">#FF3A3F4B</color>
     <color name="chart_words">#FF61DAFB</color>
+    <color name="chart_debt">#FFFF9800</color>
     <color name="chart_mistakes">#FFE57373</color>
     <color name="chart_reviews">#FF81C784</color>
     <color name="chart_axis_text">#FFC9D1D9</color>

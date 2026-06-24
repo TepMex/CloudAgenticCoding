@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         binding.leechesRecycler.adapter = leechesAdapter
 
         ChartTheme.apply(this, binding.vocabChart)
+        ChartTheme.apply(this, binding.debtChart)
         ChartTheme.apply(this, binding.monthlyChart)
 
         binding.retryButton.setOnClickListener { viewModel.reload() }
@@ -168,6 +169,7 @@ class MainActivity : AppCompatActivity() {
         binding.wordsValue.text = getString(R.string.words_fraction, memorized, data.totalCards)
         binding.hoursValue.text = String.format("%.1f", data.totalHoursSpent)
         binding.longMemoryValue.text = data.longMemory.toString()
+        binding.debtValue.text = data.debt.toString()
         val pct = if (data.totalCards > 0) memorized * 100f / data.totalCards else 0f
         binding.progressPercent.text = String.format("%.1f%%", pct)
         binding.progressTrack.post {
@@ -193,6 +195,7 @@ class MainActivity : AppCompatActivity() {
             binding.mistakesHeatmap.isVisible = false
             binding.monthlyChart.isVisible = false
         }
+        bindDebtChart(data.debtHistoryData)
 
         leechFieldByDeck = buildLeechFieldMap(
             state.selectedDecks,
@@ -256,6 +259,32 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .show()
+    }
+
+    private fun bindDebtChart(history: List<Pair<String, Int>>) {
+        if (history.none { it.second > 0 }) {
+            binding.debtChart.isVisible = false
+            return
+        }
+        val labels = history.map { it.first }
+        val entries = history.mapIndexed { idx, pair ->
+            Entry(idx.toFloat(), pair.second.toFloat())
+        }
+        val set = LineDataSet(entries, getString(R.string.chart_debt)).apply {
+            color = getColor(R.color.chart_debt)
+            setCircleColor(getColor(R.color.chart_debt))
+            lineWidth = 2.5f
+            setDrawCircles(false)
+            setDrawValues(false)
+            axisDependency = com.github.mikephil.charting.components.YAxis.AxisDependency.LEFT
+        }
+        val combined = CombinedData()
+        combined.setData(LineData(set))
+        binding.debtChart.data = combined
+        binding.debtChart.xAxis.valueFormatter = IndexAxisValueFormatter(sparseLabels(labels))
+        binding.debtChart.xAxis.labelRotationAngle = -45f
+        binding.debtChart.isVisible = true
+        binding.debtChart.invalidate()
     }
 
     private fun bindVocabChart(data: DashboardData) {

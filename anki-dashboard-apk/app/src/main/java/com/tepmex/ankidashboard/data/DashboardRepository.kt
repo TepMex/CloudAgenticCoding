@@ -56,6 +56,8 @@ class DashboardRepository(
                     reviewScore = 0.0,
                     totalHoursSpent = 0.0,
                     longMemory = 0,
+                    debt = 0,
+                    debtHistoryData = emptyList(),
                     plotData = emptyList(),
                     mistakesData = emptyList(),
                     reviewsData = emptyList(),
@@ -93,6 +95,8 @@ class DashboardRepository(
         var reviewScore = 0.0
         var totalHoursSpent = 0.0
         var longMemory = 0
+        var debt = 0
+        var debtHistoryData = emptyList<Pair<String, Int>>()
         var cardReviews = emptyMap<Long, List<CardReview>>()
 
         if (distinctCardIds.isNotEmpty()) {
@@ -108,6 +112,16 @@ class DashboardRepository(
             reviewScore = DashboardAnalytics.calculateReviewScore(cardReviews)
             totalHoursSpent = DashboardAnalytics.calculateTotalHoursSpent(cardReviews)
             longMemory = DashboardAnalytics.calculateLongMemory(cardReviews)
+            val crtSec = collection.getCollectionCrtSec()
+            if (crtSec != null) {
+                debtHistoryData = DashboardAnalytics.buildDebtHistoryFromRevlog(
+                    cardReviews,
+                    crtSec,
+                    start,
+                    end,
+                )
+            }
+            debt = collection.getReviewQueueCount(selectedDecks)
         }
 
         val leeches = buildLeeches(selectedDecks, cardReviews, leechCardIds)
@@ -126,6 +140,8 @@ class DashboardRepository(
                 reviewScore = reviewScore,
                 totalHoursSpent = totalHoursSpent,
                 longMemory = longMemory,
+                debt = debt,
+                debtHistoryData = debtHistoryData,
                 plotData = plotData,
                 mistakesData = mistakesData,
                 reviewsData = reviewsData,
