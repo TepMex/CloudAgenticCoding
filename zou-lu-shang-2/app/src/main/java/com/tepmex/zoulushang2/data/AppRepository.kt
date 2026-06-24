@@ -37,17 +37,19 @@ class AppRepository(
         lastLatitude: Double?,
         lastLongitude: Double?,
     ): Int {
-        var strokes = 0
+        val updates = mutableListOf<Pair<Long, Int>>()
         BrushEngine.applyLocation(
             latitude = latitude,
             longitude = longitude,
             lastLatitude = lastLatitude,
             lastLongitude = lastLongitude,
         ) { cellKey, delta ->
-            addCellIntensity(cellKey, delta)
-            strokes++
+            updates.add(cellKey to delta)
         }
-        return strokes
+        for ((cellKey, delta) in updates) {
+            addCellIntensity(cellKey, delta)
+        }
+        return updates.size
     }
 
     private suspend fun addCellIntensity(cellKey: Long, delta: Int) {
