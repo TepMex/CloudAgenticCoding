@@ -99,6 +99,7 @@ class DashboardRepository(
         var debtHistoryData = emptyList<Pair<String, Int>>()
         var cardReviews = emptyMap<Long, List<CardReview>>()
         val (plotStart, plotEnd) = DashboardAnalytics.plotDateRange()
+        val (debtStart, debtEnd) = DashboardAnalytics.debtPlotDateRange()
         val crtSec = collection.getCollectionCrtSec()
 
         if (distinctCardIds.isNotEmpty()) {
@@ -117,8 +118,8 @@ class DashboardRepository(
                 debtHistoryData = DashboardAnalytics.buildDebtHistoryFromRevlog(
                     cardReviews,
                     crtSec,
-                    plotStart,
-                    plotEnd,
+                    debtStart,
+                    debtEnd,
                 )
             }
         }
