@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 class DashboardRepository(
     private val context: Context,
     private val collection: CollectionReader,
+    private val preferences: AppPreferences = AppPreferences(context),
 ) {
 
     suspend fun hasDataSource(collectionUri: String?): Boolean = withContext(Dispatchers.IO) {
@@ -56,6 +57,8 @@ class DashboardRepository(
                     reviewScore = 0.0,
                     totalHoursSpent = 0.0,
                     longMemory = 0,
+                    debt = 0,
+                    debtHistoryData = emptyList(),
                     plotData = emptyList(),
                     mistakesData = emptyList(),
                     reviewsData = emptyList(),
@@ -112,6 +115,11 @@ class DashboardRepository(
 
         val leeches = buildLeeches(selectedDecks, cardReviews, leechCardIds)
 
+        val debt = collection.getReviewQueueCount(selectedDecks)
+        val deckKey = AppPreferences.debtDeckKey(selectedDecks)
+        preferences.recordDebtSnapshot(deckKey, debt)
+        val debtHistoryData = preferences.getDebtHistory(deckKey)
+
         val statusMessage = if (distinctCardIds.isEmpty()) {
             STATUS_NO_CARDS_IN_DECKS
         } else {
@@ -126,6 +134,8 @@ class DashboardRepository(
                 reviewScore = reviewScore,
                 totalHoursSpent = totalHoursSpent,
                 longMemory = longMemory,
+                debt = debt,
+                debtHistoryData = debtHistoryData,
                 plotData = plotData,
                 mistakesData = mistakesData,
                 reviewsData = reviewsData,

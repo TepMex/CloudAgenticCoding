@@ -7,13 +7,16 @@
     <string name="stat_words">Memorised words</string>
     <string name="stat_hours">total hours spent</string>
     <string name="stat_long_memory">Long memory</string>
+    <string name="stat_debt">Review debt</string>
     <string name="words_fraction">%1$d / %2$d</string>
     <string name="section_vocab_progress">Vocab Learning Progress</string>
+    <string name="section_debt">Review debt</string>
     <string name="section_review_hardness">Anki Review Hardness</string>
     <string name="section_review_intensity">Anki Reviews Intensity</string>
     <string name="section_new_vocab">New vocab per month</string>
     <string name="section_leeches">Leeches</string>
     <string name="chart_words_learned">Words Learned</string>
+    <string name="chart_debt">Review debt</string>
     <string name="chart_mistakes">Mistakes</string>
     <string name="chart_reviews">Cards Reviewed</string>
     <string name="chart_new_vocab">New vocab</string>

@@ -107,6 +107,31 @@ class CollectionReader(private val context: Context) {
         return queryLongColumn(db, sql)
     }
 
+    /**
+     * Cards currently in the review queue for [deckNames] (learning + review due now).
+     * Mirrors Anki's due check: queue 1/3 (due day or timestamp), queue 2 (due day).
+     */
+    fun getReviewQueueCount(deckNames: List<String>): Int {
+        val db = db ?: return 0
+        val deckIds = deckNames.flatMap { resolveDeckIds(it) }.distinct()
+        if (deckIds.isEmpty()) return 0
+        val crtSec = queryLongColumn(db, "SELECT crt FROM col WHERE id = 1").firstOrNull() ?: return 0
+        val nowSec = System.currentTimeMillis() / 1000
+        val todayDays = ((nowSec - crtSec) / 86400).toInt()
+        val idList = deckIds.joinToString(",")
+        val sql = """
+            SELECT COUNT(*) FROM cards
+            WHERE did IN ($idList)
+              AND queue IN (1, 2, 3)
+              AND (
+                (queue = 2 AND due <= $todayDays)
+                OR (queue = 3 AND due <= $todayDays)
+                OR (queue = 1 AND (due <= $todayDays OR due <= $nowSec))
+              )
+        """.trimIndent()
+        return queryLongColumn(db, sql).firstOrNull()?.toInt() ?: 0
+    }
+
     fun getIntervals(cardIds: List<Long>): List<Int> {
         if (cardIds.isEmpty()) return emptyList()
         val db = db ?: return List(cardIds.size) { 0 }
