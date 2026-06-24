@@ -11,6 +11,11 @@ private val MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM")
 
 object DashboardAnalytics {
 
+    private const val REVLOG_LEARN = 0
+    private const val REVLOG_REVIEW = 1
+    private const val REVLOG_RELRN = 2
+    private const val REVLOG_CRAM = 3
+
     fun extractFirstReviewDays(cardReviews: Map<Long, List<CardReview>>): Map<String, Int> {
         val dailyNew = linkedMapOf<String, Int>()
         for (reviews in cardReviews.values) {
@@ -120,6 +125,93 @@ object DashboardAnalytics {
         }
         return mistakes
     }
+
+    /**
+     * Reconstruct daily review debt from revlog: after each review at P with interval I,
+     * the card is due at P+I until the next review at L (when L > P+I).
+     */
+    fun buildDebtHistoryFromRevlog(
+        cardReviews: Map<Long, List<CardReview>>,
+        crtSec: Long,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ): List<Pair<String, Int>> {
+        val dailyDebt = HashMap<String, Int>()
+        val nowMs = System.currentTimeMillis()
+
+        for (reviews in cardReviews.values) {
+            if (reviews.isEmpty()) continue
+            val sorted = reviews.sortedBy { it.id }
+            for (i in sorted.indices) {
+                val review = sorted[i]
+                if (review.type == REVLOG_CRAM) continue
+                val dueMs = dueMsAfterReview(review, crtSec)
+                val endMs = sorted.getOrNull(i + 1)?.id ?: nowMs
+                if (dueMs < endMs) {
+                    addDebtPeriod(dailyDebt, dueMs, endMs, startDate, endDate)
+                }
+            }
+        }
+
+        val result = ArrayList<Pair<String, Int>>()
+        var current = startDate
+        while (!current.isAfter(endDate)) {
+            val dayStr = current.toString()
+            result.add(dayStr to (dailyDebt[dayStr] ?: 0))
+            current = current.plusDays(1)
+        }
+        return result
+    }
+
+    private fun dueMsAfterReview(review: CardReview, crtSec: Long): Long {
+        when (review.type) {
+            REVLOG_REVIEW -> {
+                val reviewColDay = collectionDayAt(review.id, crtSec)
+                return collectionDayStartMs(reviewColDay + review.ivl, crtSec)
+            }
+            REVLOG_LEARN, REVLOG_RELRN -> {
+                val minutes = review.ivl.coerceAtLeast(1)
+                return review.id + minutes.toLong() * 60_000
+            }
+            else -> return inferDueMs(review, crtSec)
+        }
+    }
+
+    private fun inferDueMs(review: CardReview, crtSec: Long): Long {
+        if (review.ivl <= 0) return review.id
+        if (review.ease == 1 || review.ivl < 1440) {
+            return review.id + review.ivl.toLong() * 60_000
+        }
+        val reviewColDay = collectionDayAt(review.id, crtSec)
+        return collectionDayStartMs(reviewColDay + review.ivl, crtSec)
+    }
+
+    private fun addDebtPeriod(
+        dailyDebt: MutableMap<String, Int>,
+        dueMs: Long,
+        endMs: Long,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ) {
+        if (dueMs >= endMs) return
+        var day = millisToLocalDate(dueMs)
+        if (day.isBefore(startDate)) day = startDate
+        val lastDay = minOf(millisToLocalDate(endMs), endDate)
+        while (!day.isAfter(lastDay)) {
+            val key = day.format(DAY_FMT)
+            dailyDebt[key] = (dailyDebt[key] ?: 0) + 1
+            day = day.plusDays(1)
+        }
+    }
+
+    private fun collectionDayAt(ms: Long, crtSec: Long): Int =
+        ((ms / 1000 - crtSec) / 86400).toInt()
+
+    private fun collectionDayStartMs(collectionDay: Int, crtSec: Long): Long =
+        (crtSec + collectionDay.toLong() * 86400) * 1000
+
+    private fun millisToLocalDate(ms: Long): LocalDate =
+        Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate()
 
     private fun millisToDay(ms: Long): String =
         Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate().format(DAY_FMT)

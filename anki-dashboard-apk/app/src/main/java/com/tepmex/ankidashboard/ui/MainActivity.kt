@@ -262,7 +262,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindDebtChart(history: List<Pair<String, Int>>) {
-        if (history.size < 2) {
+        if (history.none { it.second > 0 }) {
             binding.debtChart.isVisible = false
             return
         }

@@ -34,4 +34,6 @@ data class CardReview(
     val ease: Int,
     val time: Int,
     val ivl: Int,
+    /** Revlog type: 0=learn, 1=review, 2=relrn, 3=cram */
+    val type: Int,
 )

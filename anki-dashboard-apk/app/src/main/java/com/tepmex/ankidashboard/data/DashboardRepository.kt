@@ -9,7 +9,6 @@ import kotlinx.coroutines.withContext
 class DashboardRepository(
     private val context: Context,
     private val collection: CollectionReader,
-    private val preferences: AppPreferences = AppPreferences(context),
 ) {
 
     suspend fun hasDataSource(collectionUri: String?): Boolean = withContext(Dispatchers.IO) {
@@ -96,6 +95,8 @@ class DashboardRepository(
         var reviewScore = 0.0
         var totalHoursSpent = 0.0
         var longMemory = 0
+        var debt = 0
+        var debtHistoryData = emptyList<Pair<String, Int>>()
         var cardReviews = emptyMap<Long, List<CardReview>>()
 
         if (distinctCardIds.isNotEmpty()) {
@@ -111,14 +112,19 @@ class DashboardRepository(
             reviewScore = DashboardAnalytics.calculateReviewScore(cardReviews)
             totalHoursSpent = DashboardAnalytics.calculateTotalHoursSpent(cardReviews)
             longMemory = DashboardAnalytics.calculateLongMemory(cardReviews)
+            val crtSec = collection.getCollectionCrtSec()
+            if (crtSec != null) {
+                debtHistoryData = DashboardAnalytics.buildDebtHistoryFromRevlog(
+                    cardReviews,
+                    crtSec,
+                    start,
+                    end,
+                )
+            }
+            debt = collection.getReviewQueueCount(selectedDecks)
         }
 
         val leeches = buildLeeches(selectedDecks, cardReviews, leechCardIds)
-
-        val debt = collection.getReviewQueueCount(selectedDecks)
-        val deckKey = AppPreferences.debtDeckKey(selectedDecks)
-        preferences.recordDebtSnapshot(deckKey, debt)
-        val debtHistoryData = preferences.getDebtHistory(deckKey)
 
         val statusMessage = if (distinctCardIds.isEmpty()) {
             STATUS_NO_CARDS_IN_DECKS
