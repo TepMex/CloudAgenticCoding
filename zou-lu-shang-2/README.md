@@ -1,13 +1,14 @@
 # zou-lu-shang-2
 
-Android app: paint OpenStreetMap by walking. Your GPS position acts like a brush — movement draws lines, staying increases color intensity.
+Android app: paint OpenStreetMap by walking. Your GPS position acts like a real brush — movement draws strokes, staying adds dots.
 
 ## Features
 
 - OpenStreetMap map with live GPS location marker
+- **Brush toolbar** on the main screen — color palette and thickness slider (like Paint/Corel)
 - **Start** / **Stop** painting session (foreground GPS sampling every 3 seconds)
-- Efficient cell-based storage (Room SQLite, zoom-16 grid with intensity values)
-- Export / import drawing as compact JSON from Settings
+- Stroke-based storage (Room SQLite) with color and thickness per stroke
+- Export / import drawing as JSON from Settings
 - Clear drawing from Settings
 
 ## Build
@@ -27,4 +28,4 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 ## Export format
 
-JSON with packed cell keys and intensity values (`DrawingExportCodec`).
+JSON v2 with stroke segments: start/end lat/lng, color (ARGB), thickness in meters (`DrawingExportCodec`).

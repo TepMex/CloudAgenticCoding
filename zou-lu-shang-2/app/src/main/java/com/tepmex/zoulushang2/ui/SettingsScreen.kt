@@ -105,7 +105,7 @@ fun SettingsScreen(
             )
             Button(
                 onClick = viewModel::onExportClicked,
-                enabled = !uiState.isBusy && uiState.paintedCellCount > 0,
+                enabled = !uiState.isBusy && uiState.strokeCount > 0,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Export drawing")
@@ -119,7 +119,7 @@ fun SettingsScreen(
             }
             OutlinedButton(
                 onClick = viewModel::clearDrawing,
-                enabled = !uiState.isBusy && uiState.paintedCellCount > 0,
+                enabled = !uiState.isBusy && uiState.strokeCount > 0,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Clear drawing")

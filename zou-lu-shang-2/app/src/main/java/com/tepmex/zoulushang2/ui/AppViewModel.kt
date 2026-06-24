@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tepmex.zoulushang2.brush.BrushSettings
+import com.tepmex.zoulushang2.brush.BrushSettingsStore
 import com.tepmex.zoulushang2.data.AppRepository
+import com.tepmex.zoulushang2.data.PaintStroke
 import com.tepmex.zoulushang2.location.PaintForegroundService
 import com.tepmex.zoulushang2.location.PaintSession
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,8 +20,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AppUiState(
-    val paintLookup: HashMap<Long, Int> = hashMapOf(),
-    val paintedCellCount: Int = 0,
+    val strokes: List<PaintStroke> = emptyList(),
+    val strokeCount: Int = 0,
+    val brushColorArgb: Int = BrushSettings.DEFAULT_COLOR,
+    val brushThicknessMeters: Float = BrushSettings.DEFAULT_THICKNESS_METERS,
     val isPainting: Boolean = false,
     val paintStrokesApplied: Int = 0,
     val recenterMyLocationToken: Int = 0,
@@ -45,11 +50,11 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
-            repository.observePaintLookup().collect { lookup ->
+            repository.observeStrokes().collect { strokes ->
                 _uiState.update {
                     it.copy(
-                        paintLookup = lookup,
-                        paintedCellCount = lookup.size,
+                        strokes = strokes,
+                        strokeCount = strokes.size,
                     )
                 }
             }
@@ -64,6 +69,16 @@ class AppViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            BrushSettingsStore.settings.collect { brush ->
+                _uiState.update {
+                    it.copy(
+                        brushColorArgb = brush.colorArgb,
+                        brushThicknessMeters = brush.thicknessMeters,
+                    )
+                }
+            }
+        }
     }
 
     fun startPainting() {
@@ -72,6 +87,14 @@ class AppViewModel(
 
     fun stopPainting() {
         PaintForegroundService.stop(appContext)
+    }
+
+    fun setBrushColor(colorArgb: Int) {
+        BrushSettingsStore.setColor(colorArgb)
+    }
+
+    fun setBrushThickness(thicknessMeters: Float) {
+        BrushSettingsStore.setThickness(thicknessMeters)
     }
 
     fun recenterOnMyLocation() {

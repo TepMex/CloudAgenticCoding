@@ -6,12 +6,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [PaintCell::class],
-    version = 1,
+    entities = [PaintStroke::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class ZouLuShang2Database : RoomDatabase() {
-    abstract fun paintCellDao(): PaintCellDao
+    abstract fun paintStrokeDao(): PaintStrokeDao
 
     companion object {
         @Volatile
@@ -23,7 +23,10 @@ abstract class ZouLuShang2Database : RoomDatabase() {
                     context.applicationContext,
                     ZouLuShang2Database::class.java,
                     "zou_lu_shang_2.db",
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { instance = it }
             }
     }
 }

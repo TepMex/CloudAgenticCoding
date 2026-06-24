@@ -1,7 +1,5 @@
 package com.tepmex.zoulushang2.ui
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,7 +94,7 @@ private fun MainMapScaffold(
                 .padding(padding),
         ) {
             PaintedMap(
-                paintLookup = uiState.paintLookup,
+                strokes = uiState.strokes,
                 enableMyLocation = locationPermissions.allGranted,
                 recenterMyLocationToken = uiState.recenterMyLocationToken,
                 modifier = Modifier.fillMaxSize(),
@@ -126,18 +124,29 @@ private fun MainMapScaffold(
                 Icon(Icons.Default.MyLocation, contentDescription = "My location")
             }
 
-            PaintControls(
-                isPainting = uiState.isPainting,
-                strokesApplied = uiState.paintStrokesApplied,
-                paintedCellCount = uiState.paintedCellCount,
-                hasPermissions = locationPermissions.allGranted,
-                onRequestPermissions = locationPermissions.request,
-                onStart = viewModel::startPainting,
-                onStop = viewModel::stopPainting,
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp),
-            )
+                    .padding(16.dp)
+                    .fillMaxWidth(0.85f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                BrushToolbar(
+                    colorArgb = uiState.brushColorArgb,
+                    thicknessMeters = uiState.brushThicknessMeters,
+                    onColorChange = viewModel::setBrushColor,
+                    onThicknessChange = viewModel::setBrushThickness,
+                )
+                PaintControls(
+                    isPainting = uiState.isPainting,
+                    strokesApplied = uiState.paintStrokesApplied,
+                    strokeCount = uiState.strokeCount,
+                    hasPermissions = locationPermissions.allGranted,
+                    onRequestPermissions = locationPermissions.request,
+                    onStart = viewModel::startPainting,
+                    onStop = viewModel::stopPainting,
+                )
+            }
         }
     }
 }
@@ -166,7 +175,7 @@ private fun LocationPermissionBanner(
 private fun PaintControls(
     isPainting: Boolean,
     strokesApplied: Int,
-    paintedCellCount: Int,
+    strokeCount: Int,
     hasPermissions: Boolean,
     onRequestPermissions: () -> Unit,
     onStart: () -> Unit,
@@ -179,9 +188,9 @@ private fun PaintControls(
     ) {
         Text(
             text = if (isPainting) {
-                "Painting · $strokesApplied strokes · $paintedCellCount cells"
+                "Painting · $strokesApplied samples · $strokeCount strokes"
             } else {
-                "$paintedCellCount painted cells"
+                "$strokeCount strokes on map"
             },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
