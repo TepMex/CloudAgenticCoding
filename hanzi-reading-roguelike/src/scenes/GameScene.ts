@@ -1,4 +1,8 @@
 import Phaser from "phaser";
+import {
+  CHARACTER_TEXTURE_URLS,
+  pickRandomCharacter,
+} from "../characters";
 import { HANZI_DATA } from "../hanziData";
 import {
   bumpEncounter,
@@ -8,6 +12,7 @@ import {
 } from "../encounters";
 import { HanziEnemy } from "../game/HanziEnemy";
 import { normalizePinyin, promptPinyin } from "../pinyinModal";
+import { THEME } from "../theme";
 import { SCENE_GAME, SCENE_MENU } from "./sceneKeys";
 
 /** Movement update cadence — balances smooth motion and CPU on mobile. */
@@ -38,6 +43,12 @@ export default class GameScene extends Phaser.Scene {
     super(SCENE_GAME);
   }
 
+  preload(): void {
+    for (const [key, url] of Object.entries(CHARACTER_TEXTURE_URLS)) {
+      this.load.image(key, url);
+    }
+  }
+
   create(): void {
     this.encounterMap = loadEncounters();
     this.enemies = [];
@@ -52,7 +63,7 @@ export default class GameScene extends Phaser.Scene {
       .text(16, 16, "", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "15px",
-        color: "#ccddee",
+        color: THEME.hud,
       })
       .setScrollFactor(0)
       .setDepth(10);
@@ -127,7 +138,7 @@ export default class GameScene extends Phaser.Scene {
     const cy = this.cameras.main.centerY;
     const g = this.add.graphics();
     const len = 16;
-    g.lineStyle(2, 0xe94560, 1);
+    g.lineStyle(2, 0xb91c1c, 1);
     g.lineBetween(cx - len, cy, cx + len, cy);
     g.lineBetween(cx, cy - len, cx, cy + len);
     this.coreGraphics = g;
@@ -171,7 +182,16 @@ export default class GameScene extends Phaser.Scene {
     const showHint = seen < 5;
     this.encounterMap = bumpEncounter(this.encounterMap, entry.hanzi);
 
-    const enemy = new HanziEnemy(this, x, y, entry.hanzi, entry.pinyin, showHint);
+    const character = pickRandomCharacter();
+    const enemy = new HanziEnemy(
+      this,
+      x,
+      y,
+      entry.hanzi,
+      entry.pinyin,
+      showHint,
+      character,
+    );
     this.add.existing(enemy);
     this.enemies.push(enemy);
   }
@@ -284,14 +304,14 @@ export default class GameScene extends Phaser.Scene {
     layer.setDepth(100);
 
     const dim = this.add.graphics();
-    dim.fillStyle(0x000011, 0.78);
+    dim.fillStyle(0x3d2914, 0.55);
     dim.fillRect(0, 0, w, h);
 
     const msg = this.add
       .text(cx, cy - 56, "A hanzi reached the center", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "24px",
-        color: "#ffffff",
+        color: THEME.text,
         align: "center",
       })
       .setOrigin(0.5);
@@ -300,7 +320,7 @@ export default class GameScene extends Phaser.Scene {
       .text(cx, cy - 8, `Cleared: ${this.kills}`, {
         fontFamily: "system-ui, sans-serif",
         fontSize: "16px",
-        color: "#aabbcc",
+        color: THEME.textMuted,
       })
       .setOrigin(0.5);
 
@@ -309,14 +329,14 @@ export default class GameScene extends Phaser.Scene {
         .text(cx, y, label, {
           fontFamily: "system-ui, sans-serif",
           fontSize: "20px",
-          color: "#1a1a2e",
-          backgroundColor: "#e94560",
+          color: THEME.panel,
+          backgroundColor: THEME.accent,
           padding: { x: 22, y: 12 },
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
-      t.on("pointerover", () => t.setStyle({ backgroundColor: "#ff6b81" }));
-      t.on("pointerout", () => t.setStyle({ backgroundColor: "#e94560" }));
+      t.on("pointerover", () => t.setStyle({ backgroundColor: THEME.accentHover }));
+      t.on("pointerout", () => t.setStyle({ backgroundColor: THEME.accent }));
       t.on("pointerup", onClick);
       return t;
     };
