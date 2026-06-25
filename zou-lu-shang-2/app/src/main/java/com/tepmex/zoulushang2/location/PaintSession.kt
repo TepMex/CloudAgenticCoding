@@ -9,6 +9,7 @@ data class PaintSessionState(
     val strokesApplied: Int = 0,
     val lastLatitude: Double? = null,
     val lastLongitude: Double? = null,
+    val lastTimestampMillis: Long? = null,
 )
 
 object PaintSession {
@@ -23,15 +24,17 @@ object PaintSession {
         _state.value = PaintSessionState(isRunning = false)
     }
 
-    fun recordStroke(
+    fun recordAcceptedLocation(
         latitude: Double,
         longitude: Double,
+        timestampMillis: Long,
         strokesApplied: Int,
     ) {
         _state.value = _state.value.copy(
             strokesApplied = _state.value.strokesApplied + strokesApplied,
             lastLatitude = latitude,
             lastLongitude = longitude,
+            lastTimestampMillis = timestampMillis,
         )
     }
 }

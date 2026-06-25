@@ -10,6 +10,8 @@ import com.tepmex.zoulushang2.data.AppRepository
 import com.tepmex.zoulushang2.data.PaintStroke
 import com.tepmex.zoulushang2.location.PaintForegroundService
 import com.tepmex.zoulushang2.location.PaintSession
+import com.tepmex.zoulushang2.paint.PaintSettings
+import com.tepmex.zoulushang2.paint.PaintSettingsStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,6 +26,7 @@ data class AppUiState(
     val strokeCount: Int = 0,
     val brushColorArgb: Int = BrushSettings.DEFAULT_COLOR,
     val brushThicknessMeters: Float = BrushSettings.DEFAULT_THICKNESS_METERS,
+    val maxSpeedKmh: Float = PaintSettings.DEFAULT_MAX_SPEED_KMH,
     val isPainting: Boolean = false,
     val paintStrokesApplied: Int = 0,
     val recenterMyLocationToken: Int = 0,
@@ -79,6 +82,13 @@ class AppViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            PaintSettingsStore.settings.collect { paint ->
+                _uiState.update {
+                    it.copy(maxSpeedKmh = paint.maxSpeedKmh)
+                }
+            }
+        }
     }
 
     fun startPainting() {
@@ -95,6 +105,10 @@ class AppViewModel(
 
     fun setBrushThickness(thicknessMeters: Float) {
         BrushSettingsStore.setThickness(thicknessMeters)
+    }
+
+    fun setMaxSpeedKmh(maxSpeedKmh: Float) {
+        PaintSettingsStore.setMaxSpeedKmh(maxSpeedKmh)
     }
 
     fun recenterOnMyLocation() {

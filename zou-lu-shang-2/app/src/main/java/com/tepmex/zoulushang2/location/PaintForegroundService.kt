@@ -75,17 +75,22 @@ class PaintForegroundService : Service() {
     private suspend fun captureAndPaint(app: ZouLuShang2App) {
         val location = fetchCurrentLocation() ?: return
         val session = PaintSession.state.value
-        val strokes = app.repository.recordLocation(
+        val result = app.repository.recordLocation(
             latitude = location.latitude,
             longitude = location.longitude,
             lastLatitude = session.lastLatitude,
             lastLongitude = session.lastLongitude,
+            lastTimestampMillis = session.lastTimestampMillis,
+            timestampMillis = location.time,
         )
-        PaintSession.recordStroke(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            strokesApplied = strokes,
-        )
+        if (result.accepted) {
+            PaintSession.recordAcceptedLocation(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                timestampMillis = location.time,
+                strokesApplied = result.strokesAdded,
+            )
+        }
     }
 
     private suspend fun fetchCurrentLocation(): android.location.Location? {
