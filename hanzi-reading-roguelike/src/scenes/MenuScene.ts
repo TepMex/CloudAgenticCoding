@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { THEME } from "../theme";
 import { SCENE_MENU, SCENE_GAME } from "./sceneKeys";
 
 export default class MenuScene extends Phaser.Scene {
@@ -31,7 +32,7 @@ export default class MenuScene extends Phaser.Scene {
         .text(0, 0, "Hanzi Roguelike", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "28px",
-          color: "#ffffff",
+          color: THEME.text,
           fontStyle: "bold",
         })
         .setOrigin(0.5);
@@ -40,10 +41,10 @@ export default class MenuScene extends Phaser.Scene {
 
     if (!this.subtitle) {
       this.subtitle = this.add
-        .text(0, 0, "Circles drift to the center — type pinyin to clear them.", {
+        .text(0, 0, "Mythic heroes drift to the center — type pinyin to clear them.", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "14px",
-          color: "#aabbcc",
+          color: THEME.textMuted,
           wordWrap: { width: Math.min(w - 32, 360) },
           align: "center",
         })
@@ -57,15 +58,15 @@ export default class MenuScene extends Phaser.Scene {
         .text(0, 0, "New Game", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "22px",
-          color: "#1a1a2e",
-          backgroundColor: "#e94560",
+          color: THEME.panel,
+          backgroundColor: THEME.accent,
           padding: { x: 28, y: 14 },
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
 
-      this.btnNew.on("pointerover", () => this.btnNew?.setStyle({ backgroundColor: "#ff6b81" }));
-      this.btnNew.on("pointerout", () => this.btnNew?.setStyle({ backgroundColor: "#e94560" }));
+      this.btnNew.on("pointerover", () => this.btnNew?.setStyle({ backgroundColor: THEME.accentHover }));
+      this.btnNew.on("pointerout", () => this.btnNew?.setStyle({ backgroundColor: THEME.accent }));
       this.btnNew.on("pointerup", () => {
         this.scene.start(SCENE_GAME);
       });
@@ -77,15 +78,15 @@ export default class MenuScene extends Phaser.Scene {
         .text(0, 0, "Exit", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "22px",
-          color: "#1a1a2e",
-          backgroundColor: "#e94560",
+          color: THEME.panel,
+          backgroundColor: THEME.accent,
           padding: { x: 28, y: 14 },
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
 
-      this.btnExit.on("pointerover", () => this.btnExit?.setStyle({ backgroundColor: "#ff6b81" }));
-      this.btnExit.on("pointerout", () => this.btnExit?.setStyle({ backgroundColor: "#e94560" }));
+      this.btnExit.on("pointerover", () => this.btnExit?.setStyle({ backgroundColor: THEME.accentHover }));
+      this.btnExit.on("pointerout", () => this.btnExit?.setStyle({ backgroundColor: THEME.accent }));
       this.btnExit.on("pointerup", () => {
         window.close();
         if (!this.hint) {
@@ -93,7 +94,7 @@ export default class MenuScene extends Phaser.Scene {
             .text(0, 0, "You can close this tab.", {
               fontFamily: "system-ui, sans-serif",
               fontSize: "14px",
-              color: "#8899aa",
+              color: THEME.textMuted,
             })
             .setOrigin(0.5);
         }

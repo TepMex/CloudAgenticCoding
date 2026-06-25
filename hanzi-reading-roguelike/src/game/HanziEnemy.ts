@@ -1,10 +1,17 @@
 import Phaser from "phaser";
+import {
+  CHARACTER_CELL_HEIGHT,
+  type CharacterDef,
+} from "../characters";
+import { THEME } from "../theme";
 
 export class HanziEnemy extends Phaser.GameObjects.Container {
-  static readonly RADIUS = 36;
+  static readonly DISPLAY_HEIGHT = 104;
+  static readonly RADIUS = 52;
 
   readonly hanzi: string;
   readonly expectedPinyin: string;
+  readonly character: CharacterDef;
 
   frozen = false;
 
@@ -15,31 +22,36 @@ export class HanziEnemy extends Phaser.GameObjects.Container {
     hanzi: string,
     expectedPinyin: string,
     showPinyinHint: boolean,
+    character: CharacterDef,
   ) {
     super(scene, x, y);
 
     this.hanzi = hanzi;
     this.expectedPinyin = expectedPinyin;
+    this.character = character;
 
-    const g = scene.add.graphics();
-    g.fillStyle(0x16213e, 1);
-    g.lineStyle(3, 0xffffff, 0.95);
-    g.fillCircle(0, 0, HanziEnemy.RADIUS);
-    g.strokeCircle(0, 0, HanziEnemy.RADIUS);
+    const scale = HanziEnemy.DISPLAY_HEIGHT / CHARACTER_CELL_HEIGHT;
+    const sprite = scene.add.image(0, 0, character.textureKey);
+    sprite.setScale(scale);
 
-    const hanziText = scene.add.text(0, 0, hanzi, {
+    const hanziX = character.hanziOffsetX * scale;
+    const hanziY = character.hanziOffsetY * scale;
+    const hanziText = scene.add.text(hanziX, hanziY, hanzi, {
       fontFamily: '"Noto Sans SC", sans-serif',
-      fontSize: "32px",
-      color: "#ffffff",
+      fontSize: "22px",
+      color: THEME.hanziOnSprite,
+      fontStyle: "bold",
     });
     hanziText.setOrigin(0.5);
 
-    const parts: Phaser.GameObjects.GameObject[] = [g];
+    const parts: Phaser.GameObjects.GameObject[] = [sprite];
     if (showPinyinHint) {
-      const hint = scene.add.text(0, -HanziEnemy.RADIUS - 18, expectedPinyin, {
+      const hint = scene.add.text(0, -HanziEnemy.DISPLAY_HEIGHT / 2 - 14, expectedPinyin, {
         fontFamily: "system-ui, sans-serif",
         fontSize: "15px",
-        color: "#aabbcc",
+        color: THEME.textMuted,
+        backgroundColor: "rgba(250, 243, 230, 0.85)",
+        padding: { x: 6, y: 2 },
       });
       hint.setOrigin(0.5);
       parts.push(hint);

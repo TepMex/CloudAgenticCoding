@@ -1,13 +1,14 @@
 import Phaser from "phaser";
 import MenuScene from "./scenes/MenuScene";
 import GameScene from "./scenes/GameScene";
+import { THEME } from "./theme";
 
 import "./style.css";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "game-container",
-  backgroundColor: "#1a1a2e",
+  backgroundColor: THEME.background,
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
