@@ -5,6 +5,14 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.Projection
 
 object GeoMath {
+    fun speedKmh(distanceMeters: Double, elapsedMillis: Long): Double {
+        if (elapsedMillis <= 0L) {
+            return Double.POSITIVE_INFINITY
+        }
+        val metersPerSecond = distanceMeters / (elapsedMillis / 1000.0)
+        return metersPerSecond * 3.6
+    }
+
     fun distanceMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
         val earthRadius = 6_371_000.0
         val dLat = Math.toRadians(lat2 - lat1)

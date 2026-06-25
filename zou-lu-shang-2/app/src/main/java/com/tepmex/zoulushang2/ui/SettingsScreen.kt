@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -26,9 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.tepmex.zoulushang2.paint.PaintSettings
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,6 +107,31 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                text = "Maximum Speed",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "GPS points faster than this are ignored as unrealistic.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Slider(
+                    value = uiState.maxSpeedKmh,
+                    onValueChange = viewModel::setMaxSpeedKmh,
+                    valueRange = PaintSettings.MIN_MAX_SPEED_KMH..PaintSettings.MAX_MAX_SPEED_KMH,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${uiState.maxSpeedKmh.toInt()} km/h",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
             Button(
                 onClick = viewModel::onExportClicked,
                 enabled = !uiState.isBusy && uiState.strokeCount > 0,
