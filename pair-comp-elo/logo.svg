@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pair Comp Elo">
+  <rect width="64" height="64" rx="14" fill="#1B4D3E"/>
+  <path d="M14 32 L28 18 L28 26 L50 26 L50 38 L28 38 L28 46 Z" fill="#E8F5E9"/>
+  <path d="M50 32 L36 46 L36 38 L14 38 L14 26 L36 26 L36 18 Z" fill="#A5D6A7" opacity="0.85"/>
+</svg>
