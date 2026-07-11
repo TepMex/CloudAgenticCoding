@@ -61,3 +61,8 @@ android-sdk/
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Android (pair-comp-elo)
+pair-comp-elo/.gradle/
+pair-comp-elo/**/build/
+pair-comp-elo/local.properties
