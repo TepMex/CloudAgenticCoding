@@ -1,86 +1,99 @@
 package com.tepmex.paircompelo.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-private val ForestGreen = Color(0xFF1B4D3E)
-private val SoftSage = Color(0xFFA8C5B0)
-private val WarmSand = Color(0xFFF3EDE3)
-private val DeepInk = Color(0xFF14201B)
-private val Mist = Color(0xFFE7F0EA)
+private val PrimaryBlue = Color(0xFF0061A4)
+private val OnPrimary = Color.White
+private val BackgroundGrey = Color(0xFFF2F2F2)
+private val SurfaceWhite = Color.White
+private val OnSurface = Color(0xFF1C1B1F)
+private val OnSurfaceVariant = Color(0xFF49454F)
+private val OutlineVariant = Color(0xFFCAC4D0)
+private val StarGold = Color(0xFFE6A800)
+
+val StarHighlight = StarGold
 
 private val LightColors = lightColorScheme(
-    primary = ForestGreen,
-    onPrimary = Color.White,
-    primaryContainer = SoftSage,
-    onPrimaryContainer = DeepInk,
-    secondary = Color(0xFF5B6B4F),
+    primary = PrimaryBlue,
+    onPrimary = OnPrimary,
+    primaryContainer = Color(0xFFD1E4FF),
+    onPrimaryContainer = Color(0xFF001D36),
+    secondary = Color(0xFF535F70),
     onSecondary = Color.White,
-    background = WarmSand,
-    onBackground = DeepInk,
-    surface = Color(0xFFFAF7F2),
-    onSurface = DeepInk,
-    surfaceVariant = Mist,
-    onSurfaceVariant = Color(0xFF3D4A42),
+    background = BackgroundGrey,
+    onBackground = OnSurface,
+    surface = SurfaceWhite,
+    onSurface = OnSurface,
+    surfaceVariant = Color(0xFFE7E0EC),
+    onSurfaceVariant = OnSurfaceVariant,
+    outline = Color(0xFF79747E),
+    outlineVariant = OutlineVariant,
     error = Color(0xFFB3261E),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = SoftSage,
-    onPrimary = DeepInk,
-    primaryContainer = ForestGreen,
-    onPrimaryContainer = Mist,
-    secondary = Color(0xFFB7C4A8),
-    onSecondary = DeepInk,
-    background = Color(0xFF101612),
-    onBackground = Mist,
-    surface = Color(0xFF171E1A),
-    onSurface = Mist,
-    surfaceVariant = Color(0xFF2A342E),
-    onSurfaceVariant = SoftSage,
+    primary = Color(0xFF9ECAFF),
+    onPrimary = Color(0xFF003258),
+    primaryContainer = Color(0xFF00497D),
+    onPrimaryContainer = Color(0xFFD1E4FF),
+    secondary = Color(0xFFB8C8DA),
+    onSecondary = Color(0xFF233240),
+    background = Color(0xFF1A1C1E),
+    onBackground = Color(0xFFE2E2E6),
+    surface = Color(0xFF1A1C1E),
+    onSurface = Color(0xFFE2E2E6),
+    surfaceVariant = Color(0xFF49454F),
+    onSurfaceVariant = Color(0xFFCAC4D0),
+    outline = Color(0xFF938F99),
+    outlineVariant = Color(0xFF49454F),
     error = Color(0xFFF2B8B5),
 )
 
 private val AppTypography = androidx.compose.material3.Typography(
     displayLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Bold,
-        fontSize = 40.sp,
-        lineHeight = 44.sp,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 57.sp,
+        lineHeight = 64.sp,
     ),
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 34.sp,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 20.sp,
+        lineHeight = 28.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
+        lineHeight = 24.sp,
+    ),
+    titleSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -98,23 +111,28 @@ private val AppTypography = androidx.compose.material3.Typography(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    labelMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
     ),
 )
 
 @Composable
 fun PairCompEloTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
+    val colorScheme = if (darkTheme) DarkColors else LightColors
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AppTypography,
