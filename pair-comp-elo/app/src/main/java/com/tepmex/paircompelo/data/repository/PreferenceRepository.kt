@@ -38,6 +38,7 @@ data class ListSummary(
     val activeItemCount: Int,
     val itemComparisonCount: Int,
     val topItemName: String?,
+    val topItemRating: Double?,
 )
 
 @Singleton
@@ -556,8 +557,14 @@ class PreferenceRepository @Inject constructor(
         return lists.map { list ->
             val activeCount = itemDao.getActiveByList(list.id.toString()).size
             val comparisonCount = itemComparisonDao.getActiveByListChronological(list.id.toString()).size
-            val top = itemDao.getTopRated(list.id.toString())?.name
-            ListSummary(list, activeCount, comparisonCount, top)
+            val topItem = itemDao.getTopRated(list.id.toString())
+            ListSummary(
+                list = list,
+                activeItemCount = activeCount,
+                itemComparisonCount = comparisonCount,
+                topItemName = topItem?.name,
+                topItemRating = topItem?.rating,
+            )
         }
     }
 }

@@ -27,6 +27,7 @@ fun PairCompEloNavHost() {
                 onOpenList = { navController.navigate(Routes.ListDetail.create(it)) },
                 onCreateList = { navController.navigate(Routes.ListEdit.create()) },
                 onCompareItems = { navController.navigate(Routes.ItemCompare.create(it)) },
+                onItemRanking = { navController.navigate(Routes.ItemRanking.create(it)) },
                 onListRanking = { navController.navigate(Routes.ListRanking.route) },
                 onCompareLists = { navController.navigate(Routes.ListCompare.route) },
                 onSettings = { navController.navigate(Routes.Settings.route) },

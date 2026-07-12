@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pair Comp Elo</string>
+    <string name="home_title">pair-comp-elo</string>
+    <string name="active_lists">Active lists</string>
+    <string name="empty_list_title">Create your first list</string>
+    <string name="empty_list_message">Compare items in pairs and find out what you like more. Start with books, movies, restaurants — anything.</string>
+    <string name="new_list">New list</string>
+    <string name="compare">Compare</string>
+    <string name="rating">Rating</string>
+    <string name="elo_label">Elo</string>
+    <string name="search">Search</string>
+    <string name="more_options">More options</string>
+    <string name="settings">Settings</string>
+    <string name="comparison_history">Comparison history</string>
+    <string name="archived_lists">Archived lists</string>
+    <string name="list_rankings">List rankings</string>
+    <string name="compare_lists">Compare lists</string>
+    <string name="items_count">%1$d items</string>
+    <string name="comparisons_count">%1$d comparisons</string>
+    <string name="items_and_comparisons">%1$d items · %2$d comparisons</string>
 </resources>
