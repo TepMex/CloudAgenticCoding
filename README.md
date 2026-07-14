@@ -15,6 +15,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `sense-of-text` | [sense-of-text](https://tepmex.github.io/CloudAgenticCoding/sense-of-text/) | Sense of Text · highlight important words (WASM embeddings or LLM) |
 | `chesswatch` | [chesswatch](https://tepmex.github.io/CloudAgenticCoding/chesswatch/) | ChessWatch · Android time tracker (APK) |
 | `ankidroid-llm` | [ankidroid-llm](https://tepmex.github.io/CloudAgenticCoding/ankidroid-llm/) | AnkiDroid LLM · Android story from study queue (APK) |
+| `anki-entertainer` | [anki-entertainer](https://tepmex.github.io/CloudAgenticCoding/anki-entertainer/) | Anki Entertainer · LLM text chunks from AnkiDroid deep link (APK) |
 | `local-tts` | [local-tts](https://tepmex.github.io/CloudAgenticCoding/local-tts/) | Local TTS · on-device Vosk ONNX text-to-speech (APK) |
 | `anki-dashboard-apk` | [anki-dashboard-apk](https://tepmex.github.io/CloudAgenticCoding/anki-dashboard-apk/) | Anki Dashboard · Android stats from synced collection.anki2 (APK) |
 | `zuo-tasks` | [zuo-tasks](https://tepmex.github.io/CloudAgenticCoding/zuo-tasks/) | ZuoTasks · nested projects and regular tasks (APK) |
@@ -26,4 +27,4 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
-Android APKs (`chesswatch`, `ankidroid-llm`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
+Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
