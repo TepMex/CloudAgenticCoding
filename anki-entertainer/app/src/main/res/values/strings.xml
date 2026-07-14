@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Anki Entertainer</string>
+    <string name="settings_title">Settings</string>
+    <string name="action_settings">Settings</string>
+    <string name="save">Save</string>
+    <string name="status_idle">Ready</string>
+    <string name="status_generating">Generating chunks…</string>
+    <string name="status_stopped">Generation stopped.</string>
+    <string name="regenerate_chunks">Regenerate</string>
+    <string name="stop_generation">Stop</string>
+    <string name="launch_hint">Open from AnkiDroid with a link like:\nankientapi://x-callback-url?q=your_vocab</string>
+    <string name="vocab_label">Vocabulary</string>
+    <string name="error_remote_config">Set API base URL and at least one model in Settings.</string>
+    <string name="like_chunk">Like</string>
+    <string name="unlike_chunk">Unlike</string>
+    <string name="liked_badge">Saved</string>
+    <string name="hint_base_url">API base URL (OpenAI-compatible)</string>
+    <string name="hint_token">Access token (Bearer)</string>
+    <string name="hint_models">Model names (one per line)</string>
+    <string name="hint_chunk_prompt">Chunk prompt ({QUERY} = vocabulary)</string>
+    <string name="hint_chunk_count">Number of chunks to show</string>
+    <string name="settings_api_section">LLM API (BYOK)</string>
+    <string name="settings_generation_section">Generation</string>
+</resources>
