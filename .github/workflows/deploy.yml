@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike sense-of-text
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike sense-of-text map-of-chinese
   ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo
 
 jobs:
@@ -29,6 +29,7 @@ jobs:
       build_hanzi_info: ${{ steps.plan.outputs.build_hanzi_info }}
       build_hanzi_reading_roguelike: ${{ steps.plan.outputs.build_hanzi_reading_roguelike }}
       build_sense_of_text: ${{ steps.plan.outputs.build_sense_of_text }}
+      build_map_of_chinese: ${{ steps.plan.outputs.build_map_of_chinese }}
       build_chesswatch: ${{ steps.plan.outputs.build_chesswatch }}
       build_ankidroid_llm: ${{ steps.plan.outputs.build_ankidroid_llm }}
       build_anki_entertainer: ${{ steps.plan.outputs.build_anki_entertainer }}
@@ -66,6 +67,8 @@ jobs:
               - 'hanzi-reading-roguelike/**'
             sense-of-text:
               - 'sense-of-text/**'
+            map-of-chinese:
+              - 'map-of-chinese/**'
             chesswatch:
               - 'chesswatch/**'
             ankidroid-llm:
@@ -118,6 +121,7 @@ jobs:
           CHANGED_HANZI_INFO: ${{ steps.changes.outputs.hanzi-info }}
           CHANGED_HANZI_READING_ROGUELIKE: ${{ steps.changes.outputs.hanzi-reading-roguelike }}
           CHANGED_SENSE_OF_TEXT: ${{ steps.changes.outputs.sense-of-text }}
+          CHANGED_MAP_OF_CHINESE: ${{ steps.changes.outputs.map-of-chinese }}
           CHANGED_CHESSWATCH: ${{ steps.changes.outputs.chesswatch }}
           CHANGED_ANKIDROID_LLM: ${{ steps.changes.outputs.ankidroid-llm }}
           CHANGED_ANKI_ENTERTAINER: ${{ steps.changes.outputs.anki-entertainer }}
@@ -154,6 +158,7 @@ jobs:
           build_hanzi_info=false
           build_hanzi_reading_roguelike=false
           build_sense_of_text=false
+          build_map_of_chinese=false
           build_chesswatch=false
           build_ankidroid_llm=false
           build_anki_entertainer=false
@@ -173,6 +178,7 @@ jobs:
             build_hanzi_info=true
             build_hanzi_reading_roguelike=true
             build_sense_of_text=true
+            build_map_of_chinese=true
             build_chesswatch=true
             build_ankidroid_llm=true
             build_anki_entertainer=true
@@ -190,6 +196,7 @@ jobs:
             is_true "$CHANGED_HANZI_INFO" && build_hanzi_info=true
             is_true "$CHANGED_HANZI_READING_ROGUELIKE" && build_hanzi_reading_roguelike=true
             is_true "$CHANGED_SENSE_OF_TEXT" && build_sense_of_text=true
+            is_true "$CHANGED_MAP_OF_CHINESE" && build_map_of_chinese=true
             is_true "$CHANGED_CHESSWATCH" && build_chesswatch=true
             is_true "$CHANGED_ANKIDROID_LLM" && build_ankidroid_llm=true
             is_true "$CHANGED_ANKI_ENTERTAINER" && build_anki_entertainer=true
@@ -222,7 +229,7 @@ jobs:
           fi
 
           any_web_build=false
-          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_sense_of_text && any_web_build=true
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_sense_of_text || $build_map_of_chinese && any_web_build=true
 
           any_android_apk_build=false
           $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo && any_android_apk_build=true
@@ -238,6 +245,7 @@ jobs:
             echo "build_hanzi_info=$build_hanzi_info"
             echo "build_hanzi_reading_roguelike=$build_hanzi_reading_roguelike"
             echo "build_sense_of_text=$build_sense_of_text"
+            echo "build_map_of_chinese=$build_map_of_chinese"
             echo "build_chesswatch=$build_chesswatch"
             echo "build_ankidroid_llm=$build_ankidroid_llm"
             echo "build_anki_entertainer=$build_anki_entertainer"
@@ -315,6 +323,11 @@ jobs:
         working-directory: sense-of-text
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (map-of-chinese)
+        if: needs.detect.outputs.build_map_of_chinese == 'true'
+        working-directory: map-of-chinese
+        run: bun install --frozen-lockfile
+
       - name: Set deployment timestamp
         if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
@@ -353,6 +366,13 @@ jobs:
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/sense-of-text/
         run: bun run build
+
+      - name: Build (map-of-chinese)
+        if: needs.detect.outputs.build_map_of_chinese == 'true'
+        working-directory: map-of-chinese
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/map-of-chinese/
+        run: bun run data:build && bun run build
 
       - name: Setup Java
         if: needs.detect.outputs.any_android_apk_build == 'true'
@@ -461,6 +481,7 @@ jobs:
           BUILD_HANZI_INFO: ${{ needs.detect.outputs.build_hanzi_info }}
           BUILD_HANZI_READING_ROGUELIKE: ${{ needs.detect.outputs.build_hanzi_reading_roguelike }}
           BUILD_SENSE_OF_TEXT: ${{ needs.detect.outputs.build_sense_of_text }}
+          BUILD_MAP_OF_CHINESE: ${{ needs.detect.outputs.build_map_of_chinese }}
           BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
           BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
           BUILD_ANKI_ENTERTAINER: ${{ needs.detect.outputs.build_anki_entertainer }}
@@ -518,6 +539,7 @@ jobs:
           if is_true "$BUILD_HANZI_INFO"; then copy_web_app hanzi-info; else require_dir hanzi-info; fi
           if is_true "$BUILD_HANZI_READING_ROGUELIKE"; then copy_web_app hanzi-reading-roguelike; else require_dir hanzi-reading-roguelike; fi
           if is_true "$BUILD_SENSE_OF_TEXT"; then copy_web_app sense-of-text; else require_dir sense-of-text; fi
+          if is_true "$BUILD_MAP_OF_CHINESE"; then copy_web_app map-of-chinese; else require_dir map-of-chinese; fi
 
           android_should_build() {
             case "$1" in

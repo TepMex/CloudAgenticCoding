@@ -111,11 +111,25 @@ See [data/sources/README.md](data/sources/README.md) and [NOTICE.md](NOTICE.md) 
 4. Unihan dictionary readings are intentionally broad; uncommon, literary, and dialectal readings may be visible.
 5. The matrix is not a phonological claim that every geometrically possible cell is valid. Impossible combinations are retained as muted educational negative space.
 
-## Static deployment
+## Build
 
 ```bash
 bun run data:build
 bun run build
 ```
 
-Publish `dist/` to any static host (GitHub Pages, Cloudflare Pages, Netlify, S3, or similar). Vite uses a relative base path, so the build works under a subdirectory. No server rewrite or runtime API is required.
+Static output is in `dist/` — serve with any static host.
+
+For the same asset paths as **GitHub Pages** on a **project site** (repo `my-repo` → `/my-repo/map-of-chinese/`):
+
+```bash
+GH_PAGES_PUBLIC_PATH=/my-repo/map-of-chinese/ bun run build
+```
+
+## GitHub Pages (this monorepo)
+
+The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) runs `data:build`, builds this app, and copies `dist/` to `deploy/map-of-chinese/` on the `gh-pages` branch. After a push to `master`, the app is available at:
+
+`https://<user-or-org>.github.io/<repository>/map-of-chinese/`
+
+CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefix. No server rewrite or runtime API is required.

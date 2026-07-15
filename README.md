@@ -13,6 +13,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `hanzi-info` | [hanzi-info](https://tepmex.github.io/CloudAgenticCoding/hanzi-info/) | Hanzi Info · phonetic DB (EN/RU UI, Russian glosses) |
 | `hanzi-reading-roguelike` | [hanzi-reading-roguelike](https://tepmex.github.io/CloudAgenticCoding/hanzi-reading-roguelike/) | Hanzi Reading Roguelike · creature sprites & game scaffold |
 | `sense-of-text` | [sense-of-text](https://tepmex.github.io/CloudAgenticCoding/sense-of-text/) | Sense of Text · highlight important words (WASM embeddings or LLM) |
+| `map-of-chinese` | [map-of-chinese](https://tepmex.github.io/CloudAgenticCoding/map-of-chinese/) | Map of Chinese · Mandarin characters on an initial × final matrix |
 | `chesswatch` | [chesswatch](https://tepmex.github.io/CloudAgenticCoding/chesswatch/) | ChessWatch · Android time tracker (APK) |
 | `ankidroid-llm` | [ankidroid-llm](https://tepmex.github.io/CloudAgenticCoding/ankidroid-llm/) | AnkiDroid LLM · Android story from study queue (APK) |
 | `anki-entertainer` | [anki-entertainer](https://tepmex.github.io/CloudAgenticCoding/anki-entertainer/) | Anki Entertainer · LLM text chunks from AnkiDroid deep link (APK) |
