@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "1.0.0",
+  "sources": {
+    "unihan": {
+      "name": "Unicode Unihan Database",
+      "version": "16.0.0",
+      "url": "https://www.unicode.org/Public/16.0.0/ucd/Unihan.zip",
+      "sha256": "b8f000df69de7828d21326a2ffea462b04bc7560022989f7cc704f10521ef3e0",
+      "license": "Unicode License v3",
+      "licenseUrl": "https://www.unicode.org/license.txt",
+      "usedFor": ["OPPOSITE", "SIMPL_HISTORY variant pairs"]
+    },
+    "opencc_st": {
+      "name": "OpenCC STCharacters",
+      "version": "ver.1.1.9",
+      "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/ver.1.1.9/data/dictionary/STCharacters.txt",
+      "sha256": "ed1d268e0ad028511dcf5b0089faed0a980ad332449ec11d481ceefde6879f41",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/BYVoid/OpenCC/blob/ver.1.1.9/LICENSE",
+      "usedFor": ["OPPOSITE supplemental mappings"]
+    },
+    "opencc_ts": {
+      "name": "OpenCC TSCharacters",
+      "version": "ver.1.1.9",
+      "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/ver.1.1.9/data/dictionary/TSCharacters.txt",
+      "sha256": "6b5a0a799bea2bb22c001f635eaa3fc2904310f0c08addbff275477a80ecf09a",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://github.com/BYVoid/OpenCC/blob/ver.1.1.9/LICENSE",
+      "usedFor": ["OPPOSITE supplemental mappings"]
+    },
+    "makemeahanzi_dictionary": {
+      "name": "Make Me a Hanzi dictionary.txt",
+      "version": "bddc96d41bef78427ed0e034e9f7e31d71fd1b92",
+      "url": "https://raw.githubusercontent.com/skishore/makemeahanzi/bddc96d41bef78427ed0e034e9f7e31d71fd1b92/dictionary.txt",
+      "sha256": "744bb05d5b0742e9ee35c37791f94d56a173349b3367569e7ca11e510364d203",
+      "license": "LGPL-3.0-or-later",
+      "licenseUrl": "https://github.com/skishore/makemeahanzi/blob/bddc96d41bef78427ed0e034e9f7e31d71fd1b92/COPYING",
+      "usedFor": ["SEMANTIC", "PHONETIC", "SIMPL_HISTORY IDS decomposition"]
+    },
+    "project_seed_mnemonics": {
+      "name": "anki-entertainer seed mnemonics",
+      "version": "1.0.0",
+      "path": "hanzi_data/seed/mnemonics.json",
+      "license": "CC0-1.0",
+      "usedFor": ["MNEMO_EXAMPLES"],
+      "note": "Small project-authored seed set. Not a large community mnemonic corpus."
+    },
+    "project_curated_simplifications": {
+      "name": "anki-entertainer curated simplifications",
+      "version": "1.0.0",
+      "path": "hanzi_data/seed/curated_simplifications.json",
+      "license": "CC0-1.0",
+      "usedFor": ["SIMPL_HISTORY curated explanations"]
+    }
+  }
+}

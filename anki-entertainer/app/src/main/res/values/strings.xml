@@ -18,8 +18,15 @@
     <string name="hint_base_url">API base URL (OpenAI-compatible)</string>
     <string name="hint_token">Access token (Bearer)</string>
     <string name="hint_models">Model names (one per line)</string>
-    <string name="hint_chunk_prompt">Chunk prompt ({QUERY} = vocabulary)</string>
+    <string name="hint_chunk_prompt">Chunk prompt (placeholders below)</string>
     <string name="hint_chunk_count">Number of chunks to show</string>
     <string name="settings_api_section">LLM API (BYOK)</string>
     <string name="settings_generation_section">Generation</string>
+    <string name="settings_prompt_preview_section">Prompt preview</string>
+    <string name="settings_dataset_section">Hanzi dataset</string>
+    <string name="hint_preview_query">Sample vocabulary query</string>
+    <string name="preview_prompt">Preview expanded prompt</string>
+    <string name="placeholder_help">Supported placeholders (case-sensitive):\n{QUERY} — exact vocabulary from the deep link\n{OPPOSITE} — simplified/traditional variants per unique Han character\n{SIMPL_HISTORY} — simplification notes (source-backed vs derived)\n{MNEMO_EXAMPLES} — up to five mnemonic stories per Han character\n{SEMANTIC} — semantic component for pictophonetic characters\n{PHONETIC} — phonetic component for pictophonetic characters\n\nMulti-character queries: metadata placeholders list each distinct Han character in first-occurrence order (max 20). Non-Han characters are ignored for metadata but kept in {QUERY}. Unknown {PLACEHOLDERS} are left unchanged and warned about; saving is still allowed.</string>
+    <string name="unknown_placeholders_warning">Unknown placeholders (will be left as-is): %1$s</string>
+    <string name="preview_warnings">Warnings:\n%1$s</string>
 </resources>

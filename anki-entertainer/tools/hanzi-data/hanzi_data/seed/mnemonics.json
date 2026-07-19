@@ -1,0 +1,202 @@
+[
+  {
+    "character": "休",
+    "story": "A person rests beside a tree.",
+    "language": "en",
+    "raw_score": 10,
+    "normalized_score": 100,
+    "source_record_id": "seed:休:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "休",
+    "story": "Someone leans on a tree to take a break from walking.",
+    "language": "en",
+    "raw_score": 8,
+    "normalized_score": 80,
+    "source_record_id": "seed:休:2",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "休",
+    "story": "Person + tree: pause in the shade.",
+    "language": "en",
+    "raw_score": 6,
+    "normalized_score": 60,
+    "source_record_id": "seed:休:3",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "明",
+    "story": "Sun and moon together make things bright and clear.",
+    "language": "en",
+    "raw_score": 10,
+    "normalized_score": 100,
+    "source_record_id": "seed:明:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "明",
+    "story": "Daylight and moonlight: understanding becomes bright.",
+    "language": "en",
+    "raw_score": 7,
+    "normalized_score": 70,
+    "source_record_id": "seed:明:2",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "好",
+    "story": "A woman with a child — something valued as good.",
+    "language": "en",
+    "raw_score": 9,
+    "normalized_score": 90,
+    "source_record_id": "seed:好:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "清",
+    "story": "Water beside the blue-green phonetic — clear, pure water.",
+    "language": "en",
+    "raw_score": 9,
+    "normalized_score": 90,
+    "source_record_id": "seed:清:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "清",
+    "story": "The water radical shows meaning; 青 hints at the sound of qing.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:清:2",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "说",
+    "story": "Speech radical on the left: to speak or explain.",
+    "language": "en",
+    "raw_score": 8,
+    "normalized_score": 80,
+    "source_record_id": "seed:说:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "说",
+    "story": "Words flow when you talk — 说 marks speaking.",
+    "language": "en",
+    "raw_score": 4,
+    "normalized_score": 40,
+    "source_record_id": "seed:说:2",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "发",
+    "story": "A short seed mnemonic for 发 (context-dependent traditional forms).",
+    "language": "en",
+    "raw_score": 3,
+    "normalized_score": 30,
+    "source_record_id": "seed:发:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "木",
+    "story": "A simple tree: one trunk with branches.",
+    "language": "en",
+    "raw_score": 6,
+    "normalized_score": 60,
+    "source_record_id": "seed:木:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "人",
+    "story": "A person walking, shown in two strokes.",
+    "language": "en",
+    "raw_score": 6,
+    "normalized_score": 60,
+    "source_record_id": "seed:人:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "日",
+    "story": "The sun as a rectangle with a line through the middle.",
+    "language": "en",
+    "raw_score": 6,
+    "normalized_score": 60,
+    "source_record_id": "seed:日:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "月",
+    "story": "The moon, drawn like a crescent window.",
+    "language": "en",
+    "raw_score": 6,
+    "normalized_score": 60,
+    "source_record_id": "seed:月:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "水",
+    "story": "Water flowing with a central stream and drops.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:水:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "火",
+    "story": "Flames rising from a central spark.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:火:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "山",
+    "story": "Three peaks of a mountain range.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:山:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "口",
+    "story": "An open mouth drawn as a square.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:口:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "手",
+    "story": "A hand with fingers suggested by the top strokes.",
+    "language": "en",
+    "raw_score": 5,
+    "normalized_score": 50,
+    "source_record_id": "seed:手:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  }
+]

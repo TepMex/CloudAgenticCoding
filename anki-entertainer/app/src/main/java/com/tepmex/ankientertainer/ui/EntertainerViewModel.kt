@@ -4,10 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tepmex.ankientertainer.AnkiEntertainerApp
-import com.tepmex.ankientertainer.data.AppSettings
 import com.tepmex.ankientertainer.data.LikedChunksRepository
 import com.tepmex.ankientertainer.data.RemoteLlmClient
 import com.tepmex.ankientertainer.data.StoredChunk
+import com.tepmex.ankientertainer.data.hanzi.PromptExpansionResult
+import com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine
 import com.tepmex.ankientertainer.data.isLlmConfigured
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -36,12 +37,21 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     private val app = application as AnkiEntertainerApp
     private val prefs = app.preferences
     private val likedRepo = app.likedChunks
+    private val promptEngine: PromptTemplateEngine = app.promptTemplateEngine
     private val llmClient = RemoteLlmClient()
 
     private val _uiState = MutableStateFlow(EntertainerUiState(statusMessage = ""))
     val uiState: StateFlow<EntertainerUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+
+    /** Test seam: number of prompt expansions performed in this VM instance. */
+    var promptExpansionCount: Int = 0
+        private set
+
+    /** Last expanded prompt reused across chunk requests in a generation session. */
+    var lastExpandedPrompt: String? = null
+        private set
 
     fun openVocab(vocab: String) {
         val trimmed = vocab.trim()
@@ -122,15 +132,26 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
 
         if (needed == 0) return
 
+        // Expand the prompt once per vocabulary generation session; reuse for every chunk.
+        val expansion: PromptExpansionResult = promptEngine.expand(settings.chunkPrompt, vocab)
+        promptExpansionCount += 1
+        lastExpandedPrompt = expansion.prompt
+        val systemPrompt = expansion.prompt
+        val warningSuffix = if (expansion.warnings.isNotEmpty()) {
+            " (" + expansion.warnings.first() + ")"
+        } else {
+            ""
+        }
+
         generationJob = viewModelScope.launch {
             val generated = mutableListOf<TextChunk>()
             try {
                 repeat(needed) { index ->
                     val model = llmClient.pickRandomModel(settings.modelNames)
                     _uiState.value = _uiState.value.copy(
-                        statusMessage = "Generating chunk ${index + 1} of $needed…",
+                        statusMessage = "Generating chunk ${index + 1} of $needed…$warningSuffix",
                     )
-                    val text = llmClient.generateChunk(settings, vocab, model)
+                    val text = llmClient.generateChunk(settings, systemPrompt, model)
                     val chunk = TextChunk(
                         id = LikedChunksRepository.newId(),
                         text = text,
@@ -144,7 +165,11 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 _uiState.value = _uiState.value.copy(
                     loading = false,
-                    statusMessage = "Ready",
+                    statusMessage = if (expansion.warnings.isNotEmpty()) {
+                        "Ready — " + expansion.warnings.first()
+                    } else {
+                        "Ready"
+                    },
                 )
             } catch (_: CancellationException) {
                 _uiState.value = _uiState.value.copy(
