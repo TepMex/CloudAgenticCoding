@@ -61,8 +61,15 @@ Or with path form:
 ### 1. Adjustable generation prompt
 
 - Settings screen exposes a **chunk prompt** template.
-- Placeholder **`{QUERY}`** is replaced with the vocabulary from the deep link before each LLM call.
+- Supported case-sensitive placeholders (expanded **once** per vocabulary generation session, then reused for every chunk request):
+  - `{QUERY}` — exact vocabulary from the deep link
+  - `{OPPOSITE}` — simplified/traditional character variants (offline)
+  - `{SIMPL_HISTORY}` — simplification notes; curated vs derived structural comparison (offline)
+  - `{MNEMO_EXAMPLES}` — up to five mnemonic stories per unique Han character (offline seed dataset)
+  - `{SEMANTIC}` / `{PHONETIC}` — pictophonetic components when explicitly recorded (offline)
+- Expansion is performed by `PromptTemplateEngine` using `HanziMetadataRepository` + `HanziMetadataFormatter`. Preferences DataStore must **not** perform metadata placeholder substitution.
 - Default prompt instructs the model to produce one short, self-contained text chunk related to the vocabulary.
+- See [docs/HANZI_DATA.md](./docs/HANZI_DATA.md) for dataset provenance and rebuild instructions.
 
 ### 2. Model list and BYOK settings
 
@@ -155,8 +162,9 @@ data class TextChunk(
 - API base URL
 - Access token (password field)
 - Model names (multi-line: one model per line)
-- Chunk prompt (`{QUERY}` hint)
+- Chunk prompt with documented placeholders, unknown-placeholder warning (save still allowed), and offline prompt preview
 - Chunk count (number)
+- Hanzi dataset version/status
 - Save
 
 ### Empty / launch states
@@ -168,27 +176,39 @@ data class TextChunk(
 
 - OpenAI-compatible `POST {baseUrl}/v1/chat/completions`
 - Per chunk: one request, `temperature ≈ 0.8`
-- System message: expanded chunk prompt (`{QUERY}` → vocab)
+- System message: **already-expanded** prompt from `PromptTemplateEngine` (client does not query Hanzi metadata)
 - User message: brief instruction to output a single short chunk (no markdown wrapper)
+
+## Offline Hanzi metadata
+
+- Prepackaged Room/SQLite DB under `app/src/main/assets/databases/hanzi_metadata.db`
+- Built by `python tools/hanzi-data/build.py` from pinned sources in `tools/hanzi-data/sources.lock.json`
+- Ordinary Gradle builds do not download Hanzi source data
 
 ## Project layout
 
 ```
 anki-entertainer/
 ├── SPEC.md
+├── docs/HANZI_DATA.md
+├── THIRD_PARTY_NOTICES.md
+├── tools/hanzi-data/        # Reproducible offline DB build pipeline
 ├── app/
-│   └── src/main/java/com/tepmex/ankientertainer/
-│       ├── AnkiEntertainerApp.kt
-│       ├── data/
-│       │   ├── AppPreferences.kt
-│       │   ├── LikedChunksRepository.kt
-│       │   ├── RemoteLlmClient.kt
-│       │   └── DeepLinkParser.kt
-│       └── ui/
-│           ├── MainActivity.kt
-│           ├── SettingsActivity.kt
-│           ├── EntertainerViewModel.kt
-│           └── ChunkAdapter.kt
+│   └── src/main/
+│       ├── assets/databases/hanzi_metadata.db
+│       └── java/com/tepmex/ankientertainer/
+│           ├── AnkiEntertainerApp.kt
+│           ├── data/
+│           │   ├── AppPreferences.kt
+│           │   ├── LikedChunksRepository.kt
+│           │   ├── RemoteLlmClient.kt
+│           │   ├── DeepLinkParser.kt
+│           │   └── hanzi/   # Room DB, repository, formatter, template engine
+│           └── ui/
+│               ├── MainActivity.kt
+│               ├── SettingsActivity.kt
+│               ├── EntertainerViewModel.kt
+│               └── ChunkAdapter.kt
 └── site/                    # GitHub Pages APK landing
 ```
 

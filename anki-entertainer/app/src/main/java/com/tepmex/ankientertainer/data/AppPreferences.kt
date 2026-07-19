@@ -81,5 +81,9 @@ fun encodeModelLines(models: List<String>): String =
 fun AppSettings.isLlmConfigured(): Boolean =
     llmBaseUrl.isNotBlank() && modelNames.isNotEmpty()
 
+/**
+ * Legacy QUERY-only helper. Generation uses [com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine]
+ * for full placeholder expansion; do not add metadata placeholders here.
+ */
 fun AppSettings.expandPrompt(vocab: String): String =
     chunkPrompt.replace("{QUERY}", vocab)

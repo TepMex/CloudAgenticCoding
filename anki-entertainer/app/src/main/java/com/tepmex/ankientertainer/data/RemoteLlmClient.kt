@@ -16,6 +16,10 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.random.Random
 
+/**
+ * OpenAI-compatible chat client.
+ * Receives an already-expanded system prompt and never queries Hanzi metadata.
+ */
 class RemoteLlmClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -26,12 +30,11 @@ class RemoteLlmClient(
 
     suspend fun generateChunk(
         settings: AppSettings,
-        vocab: String,
+        systemPrompt: String,
         modelName: String,
     ): String = withContext(Dispatchers.IO) {
         val root = settings.llmBaseUrl.trimEnd('/')
         val url = "$root/v1/chat/completions"
-        val systemPrompt = settings.expandPrompt(vocab)
         val messages = JSONArray()
             .put(JSONObject().put("role", "system").put("content", systemPrompt))
             .put(

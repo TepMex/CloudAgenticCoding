@@ -5,3 +5,7 @@
 /.idea/
 *.iml
 .DS_Store
+/tools/hanzi-data/cache/
+/tools/hanzi-data/out/
+__pycache__/
+*.pyc

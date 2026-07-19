@@ -29,5 +29,15 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 - OpenAI-compatible API base URL and bearer token (BYOK)
 - Model names (one per line; each new chunk uses a random model)
-- Chunk generation prompt with `{QUERY}` placeholder
+- Chunk generation prompt with offline placeholders (`{QUERY}`, `{OPPOSITE}`, `{SIMPL_HISTORY}`, `{MNEMO_EXAMPLES}`, `{SEMANTIC}`, `{PHONETIC}`) and prompt preview
 - Target chunk count (liked saved chunks do not reduce how many new chunks are generated)
+
+## Offline Hanzi metadata
+
+Prompt placeholders (except `{QUERY}`) are filled from a prepackaged SQLite database. Ordinary Gradle builds do not download source data.
+
+```bash
+python3 tools/hanzi-data/build.py
+```
+
+Details: [docs/HANZI_DATA.md](./docs/HANZI_DATA.md), notices: [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).

@@ -1,0 +1,182 @@
+"""Mnemonic ranking, deduplication, and multi-provider import model."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import unicodedata
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Protocol
+
+
+MNEMONIC_MAX_CODE_POINTS = 500
+MAX_PER_CHARACTER = 5
+WHITESPACE_RE = re.compile(r"\s+")
+
+
+@dataclass
+class MnemonicRecord:
+    character: str
+    story: str
+    language: str
+    raw_score: float | None
+    normalized_score: float
+    source_priority: int
+    source: str
+    source_record_id: str
+    attribution: str
+    license: str
+    content_hash: str
+
+
+class MnemonicProvider(Protocol):
+    name: str
+    source_priority: int
+
+    def load(self) -> list[dict[str, Any]]:
+        ...
+
+
+@dataclass
+class JsonMnemonicProvider:
+    """Loads a JSON list of mnemonic objects from a local seed file."""
+
+    path: Path
+    name: str = "project_seed"
+    source_priority: int = 100
+    default_license: str = "CC0-1.0"
+    default_attribution: str = "anki-entertainer project seed"
+
+    def load(self) -> list[dict[str, Any]]:
+        data = json.loads(self.path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            raise ValueError(f"Mnemonic seed must be a JSON list: {self.path}")
+        return data
+
+
+def normalize_story(story: str) -> str:
+    text = unicodedata.normalize("NFC", story or "")
+    text = text.replace("\xa0", " ")
+    text = WHITESPACE_RE.sub(" ", text).strip()
+    return text
+
+
+def truncate_code_points(text: str, limit: int = MNEMONIC_MAX_CODE_POINTS) -> str:
+    chars = list(text)
+    if len(chars) <= limit:
+        return text
+    return "".join(chars[:limit])
+
+
+def nearly_identical(a: str, b: str) -> bool:
+    na = normalize_story(a).casefold()
+    nb = normalize_story(b).casefold()
+    if na == nb:
+        return True
+    # Near-identical: differ only by trailing punctuation
+    return na.rstrip(".;!？。！") == nb.rstrip(".;!？。！")
+
+
+def content_hash(character: str, story: str, source: str) -> str:
+    payload = f"{character}\0{story}\0{source}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def normalize_provider_rows(
+    rows: list[dict[str, Any]],
+    *,
+    source: str,
+    source_priority: int,
+    default_license: str,
+    default_attribution: str,
+) -> list[MnemonicRecord]:
+    out: list[MnemonicRecord] = []
+    for i, row in enumerate(rows):
+        ch = row.get("character") or row.get("hanzi")
+        story = normalize_story(str(row.get("story") or row.get("text") or ""))
+        if not ch or not story:
+            continue
+        # Single code point
+        if len(ch) != 1:
+            continue
+        story = truncate_code_points(story)
+        raw = row.get("raw_score", row.get("score", row.get("votes")))
+        raw_score: float | None
+        try:
+            raw_score = float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            raw_score = None
+        # Normalized score: prefer explicit normalized_score; else map raw; else 0.
+        if row.get("normalized_score") is not None:
+            try:
+                normalized = float(row["normalized_score"])
+            except (TypeError, ValueError):
+                normalized = 0.0
+        elif raw_score is not None:
+            # Assume higher is better; clamp into 0..1000 style if needed.
+            normalized = float(raw_score)
+        else:
+            normalized = 0.0
+        prio = int(row.get("source_priority", source_priority))
+        out.append(
+            MnemonicRecord(
+                character=ch,
+                story=story,
+                language=str(row.get("language") or "en"),
+                raw_score=raw_score,
+                normalized_score=normalized,
+                source_priority=prio,
+                source=str(row.get("source") or source),
+                source_record_id=str(row.get("source_record_id") or f"{source}:{i}"),
+                attribution=str(row.get("attribution") or default_attribution),
+                license=str(row.get("license") or default_license),
+                content_hash=content_hash(ch, story, str(row.get("source") or source)),
+            )
+        )
+    return out
+
+
+def rank_and_dedupe(records: list[MnemonicRecord]) -> list[MnemonicRecord]:
+    """Sort by normalized_score desc, source_priority desc, source, id; keep top 5 per char."""
+    by_char: dict[str, list[MnemonicRecord]] = {}
+    for r in records:
+        by_char.setdefault(r.character, []).append(r)
+
+    selected: list[MnemonicRecord] = []
+    for ch in sorted(by_char.keys()):
+        group = by_char[ch]
+        group.sort(
+            key=lambda r: (
+                -r.normalized_score,
+                -r.source_priority,
+                r.source,
+                r.source_record_id,
+            )
+        )
+        kept: list[MnemonicRecord] = []
+        for r in group:
+            if any(nearly_identical(r.story, k.story) for k in kept):
+                continue
+            kept.append(r)
+            if len(kept) >= MAX_PER_CHARACTER:
+                break
+        selected.extend(kept)
+    return selected
+
+
+def import_mnemonics(providers: list[JsonMnemonicProvider]) -> list[MnemonicRecord]:
+    all_rows: list[MnemonicRecord] = []
+    for p in providers:
+        rows = p.load()
+        all_rows.extend(
+            normalize_provider_rows(
+                rows,
+                source=p.name,
+                source_priority=p.source_priority,
+                default_license=p.default_license,
+                default_attribution=p.default_attribution,
+            )
+        )
+    return rank_and_dedupe(all_rows)

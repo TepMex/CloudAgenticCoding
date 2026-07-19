@@ -1,0 +1,14 @@
+[
+  {
+    "inputCharacter": "貓",
+    "simplifiedCharacter": "猫",
+    "traditionalCharacter": "貓",
+    "classification": "SINGLE_COMPONENT_REPLACEMENT",
+    "explanation": "貓 → 猫\nClassification: single component replacement.\nCurated note: the semantic component 豸 was replaced by 犭 while the phonetic 苗 was retained.\nEvidence: curated project note; variant pair is also attested in Unihan.",
+    "changedComponentsJson": "[{\"traditionalComponent\":\"豸\",\"simplifiedComponent\":\"犭\",\"path\":[0],\"changeType\":\"replacement\"}]",
+    "evidenceType": "curated",
+    "confidence": 0.95,
+    "source": "project_curated",
+    "sourceRecordId": "curated:貓"
+  }
+]
