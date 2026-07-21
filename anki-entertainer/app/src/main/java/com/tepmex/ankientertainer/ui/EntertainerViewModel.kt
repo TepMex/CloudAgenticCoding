@@ -7,6 +7,7 @@ import com.tepmex.ankientertainer.AnkiEntertainerApp
 import com.tepmex.ankientertainer.data.LikedChunksRepository
 import com.tepmex.ankientertainer.data.RemoteLlmClient
 import com.tepmex.ankientertainer.data.StoredChunk
+import com.tepmex.ankientertainer.data.hanzi.OfflineMnemonicFallback
 import com.tepmex.ankientertainer.data.hanzi.PromptExpansionResult
 import com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine
 import com.tepmex.ankientertainer.data.isLlmConfigured
@@ -38,6 +39,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     private val prefs = app.preferences
     private val likedRepo = app.likedChunks
     private val promptEngine: PromptTemplateEngine = app.promptTemplateEngine
+    private val mnemonicFallback = OfflineMnemonicFallback(app.hanziMetadataRepository)
     private val llmClient = RemoteLlmClient()
 
     private val _uiState = MutableStateFlow(EntertainerUiState(statusMessage = ""))
@@ -107,17 +109,17 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
 
     private suspend fun loadAndGenerate(vocab: String, regenerateOnly: Boolean) {
         val settings = prefs.settings.first()
-        if (!settings.isLlmConfigured()) {
-            _uiState.value = _uiState.value.copy(
-                vocab = vocab,
-                loading = false,
-                statusMessage = "Set API base URL and at least one model in Settings.",
-            )
-            return
-        }
-
         val liked = likedRepo.getLiked(vocab).map {
             TextChunk(id = it.id, text = it.text, isLiked = true, modelName = it.modelName)
+        }
+
+        if (!settings.isLlmConfigured()) {
+            showMnemonicFallback(
+                vocab = vocab,
+                liked = liked,
+                reason = "LLM not configured — showing local mnemonic stories.",
+            )
+            return
         }
 
         val targetCount = settings.chunkCount.coerceAtLeast(liked.size)
@@ -178,12 +180,48 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                     statusMessage = "Generation stopped.",
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    chunks = liked + generated,
-                    loading = false,
-                    statusMessage = e.message ?: "Generation failed.",
-                )
+                if (generated.isEmpty()) {
+                    showMnemonicFallback(
+                        vocab = vocab,
+                        liked = liked,
+                        reason = "LLM unavailable — showing local mnemonic stories. " +
+                            (e.message ?: "Generation failed."),
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        chunks = liked + generated,
+                        loading = false,
+                        statusMessage = e.message ?: "Generation failed.",
+                    )
+                }
             }
         }
+    }
+
+    private suspend fun showMnemonicFallback(
+        vocab: String,
+        liked: List<TextChunk>,
+        reason: String,
+    ) {
+        val stories = mnemonicFallback.loadStories(vocab)
+        val offlineChunks = stories.map { story ->
+            TextChunk(
+                id = LikedChunksRepository.newId(),
+                text = story.text,
+                isLiked = false,
+                modelName = OfflineMnemonicFallback.MODEL_LABEL,
+            )
+        }
+        val status = when {
+            offlineChunks.isNotEmpty() -> reason
+            liked.isNotEmpty() -> "$reason No mnemonic stories found for this vocabulary."
+            else -> "$reason No mnemonic stories found — add Han characters or configure an LLM in Settings."
+        }
+        _uiState.value = _uiState.value.copy(
+            vocab = vocab,
+            chunks = liked + offlineChunks,
+            loading = false,
+            statusMessage = status,
+        )
     }
 }
