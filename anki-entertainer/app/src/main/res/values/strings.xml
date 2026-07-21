@@ -11,7 +11,8 @@
     <string name="stop_generation">Stop</string>
     <string name="launch_hint">Open from AnkiDroid with a link like:\nankientapi://x-callback-url?q=your_vocab</string>
     <string name="vocab_label">Vocabulary</string>
-    <string name="error_remote_config">Set API base URL and at least one model in Settings.</string>
+    <string name="error_remote_config">LLM not configured — showing local mnemonic stories when available.</string>
+    <string name="status_offline_mnemonics">LLM unavailable — showing local mnemonic stories.</string>
     <string name="like_chunk">Like</string>
     <string name="unlike_chunk">Unlike</string>
     <string name="liked_badge">Saved</string>

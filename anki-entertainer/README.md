@@ -36,6 +36,8 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 Prompt placeholders (except `{QUERY}`) are filled from a prepackaged SQLite database. Ordinary Gradle builds do not download source data.
 
+When the LLM is not configured or unreachable (no chunks generated yet), the main screen falls back to **up to 5 local mnemonic stories** for Han characters in the vocabulary.
+
 ```bash
 python3 tools/hanzi-data/build.py
 ```

@@ -108,9 +108,17 @@ Settings store:
 - **Regenerate** button replaces **only non-liked (session-generated) chunks** with fresh LLM output.
 - Liked chunks are kept unchanged and remain visible.
 
+### 8. Offline mnemonic fallback when LLM is unavailable
+
+- If the LLM is **not configured** (missing base URL or model list), or a generation attempt **fails before any chunk is returned**, the app falls back to the local Hanzi metadata database.
+- Fallback shows **up to 5 mnemonic stories** for Han characters in the vocabulary (first-occurrence character order, then ranked score within each character).
+- Each story is shown as a normal chunk (`character — story`), labeled with model `local mnemonic`.
+- Liked chunks still appear first; mnemonic stories follow.
+- If no mnemonic stories are found, show a clear status message (and still keep any liked chunks).
+
 ## Non-functional requirements
 
-- **Offline**: app requires network for LLM calls; show clear error if API is unreachable or misconfigured.
+- **Offline**: LLM generation requires network. When the LLM is missing or unreachable, fall back to up to 5 local mnemonic stories (requirement 8) instead of leaving the session empty.
 - **Privacy**: API keys stored locally in DataStore on device only.
 - **Cancellation**: in-flight generation can be stopped; partial results remain until regenerate.
 
@@ -170,7 +178,7 @@ data class TextChunk(
 ### Empty / launch states
 
 - Launcher open without URI: hint explaining AnkiDroid deep link format.
-- Missing API config: prompt to open Settings.
+- Missing API config: load offline mnemonic fallback (requirement 8); status explains LLM is not configured.
 
 ## LLM integration
 
@@ -203,7 +211,7 @@ anki-entertainer/
 │           │   ├── LikedChunksRepository.kt
 │           │   ├── RemoteLlmClient.kt
 │           │   ├── DeepLinkParser.kt
-│           │   └── hanzi/   # Room DB, repository, formatter, template engine
+│           │   └── hanzi/   # Room DB, repository, formatter, template engine, offline mnemonic fallback
 │           └── ui/
 │               ├── MainActivity.kt
 │               ├── SettingsActivity.kt
@@ -226,3 +234,4 @@ anki-entertainer/
 3. Liked chunks reappear for the same vocab on next launch; new chunks fill up to configured count.
 4. Regenerate updates only non-liked chunks.
 5. Unlike removes chunk from saved set for that vocab.
+6. With LLM unset or unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han characters in the vocabulary when the offline DB has them.
