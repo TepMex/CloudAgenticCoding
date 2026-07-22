@@ -25,7 +25,19 @@ class RoomHanziMetadataRepository(
     private val cacheSize: Int = 128,
 ) : HanziMetadataRepository {
 
-    private val cache = LruCache<String, HanziCharacterMetadata>(cacheSize)
+    /**
+     * Cache entries remember which optional slices were loaded so a later request
+     * for mnemonics (or variants, etc.) is not served from a partial row.
+     */
+    private data class CacheEntry(
+        val meta: HanziCharacterMetadata,
+        val loadedHanzi: Boolean,
+        val loadedVariants: Boolean,
+        val loadedSimplifications: Boolean,
+        val loadedMnemonics: Boolean,
+    )
+
+    private val cache = LruCache<String, CacheEntry>(cacheSize)
     private var openFailed = false
     private var failureMessage: String? = null
 
@@ -104,7 +116,16 @@ class RoomHanziMetadataRepository(
         val missing = mutableListOf<String>()
         for (ch in characters) {
             val hit = cache.get(ch)
-            if (hit != null) cached[ch] = hit else missing.add(ch)
+            val usable = hit != null &&
+                (!needsHanzi || hit.loadedHanzi) &&
+                (!needsVariants || hit.loadedVariants) &&
+                (!needsSimplifications || hit.loadedSimplifications) &&
+                (!needsMnemonics || hit.loadedMnemonics)
+            if (hit != null && usable) {
+                cached[ch] = hit.meta
+            } else {
+                missing.add(ch)
+            }
         }
 
         val db = dbOrNull()
@@ -122,7 +143,8 @@ class RoomHanziMetadataRepository(
             val dao = db.hanziDao()
             val meta = dao.getDatasetMetadata()
             if (missing.isNotEmpty()) {
-                val hanziRows = if (needsHanzi || needsMnemonics || needsSimplifications) {
+                val loadHanzi = needsHanzi || needsMnemonics || needsSimplifications
+                val hanziRows = if (loadHanzi) {
                     dao.getHanzi(missing).associateBy { it.character }
                 } else {
                     emptyMap()
@@ -144,53 +166,74 @@ class RoomHanziMetadataRepository(
                 }
 
                 for (ch in missing) {
-                    val h = hanziRows[ch]
-                    val opposites = (variantRows[ch].orEmpty())
-                        .sortedWith(
-                            compareByDescending<VariantEntity> { it.isPreferred }
-                                .thenBy { it.source }
-                                .thenBy { it.sourceRecordId }
-                                .thenBy { it.targetCharacter },
-                        )
-                        .map {
-                            OppositeTarget(
-                                character = it.targetCharacter,
-                                direction = it.direction,
-                                isAmbiguous = it.isAmbiguous,
-                                source = it.source,
-                                isPreferred = it.isPreferred,
+                    val previous = cache.get(ch)
+                    val h = if (loadHanzi) hanziRows[ch] else null
+                    val opposites = if (needsVariants) {
+                        (variantRows[ch].orEmpty())
+                            .sortedWith(
+                                compareByDescending<VariantEntity> { it.isPreferred }
+                                    .thenBy { it.source }
+                                    .thenBy { it.sourceRecordId }
+                                    .thenBy { it.targetCharacter },
+                            )
+                            .map {
+                                OppositeTarget(
+                                    character = it.targetCharacter,
+                                    direction = it.direction,
+                                    isAmbiguous = it.isAmbiguous,
+                                    source = it.source,
+                                    isPreferred = it.isPreferred,
+                                )
+                            }
+                    } else {
+                        previous?.meta?.oppositeTargets.orEmpty()
+                    }
+                    val simpl = if (needsSimplifications) {
+                        simplRows[ch]?.let {
+                            SimplificationInfo(
+                                simplifiedCharacter = it.simplifiedCharacter,
+                                traditionalCharacter = it.traditionalCharacter,
+                                classification = it.classification,
+                                explanation = it.explanation,
+                                evidenceType = it.evidenceType,
+                                confidence = it.confidence,
                             )
                         }
-                    val simpl = simplRows[ch]?.let {
-                        SimplificationInfo(
-                            simplifiedCharacter = it.simplifiedCharacter,
-                            traditionalCharacter = it.traditionalCharacter,
-                            classification = it.classification,
-                            explanation = it.explanation,
-                            evidenceType = it.evidenceType,
-                            confidence = it.confidence,
-                        )
+                    } else {
+                        previous?.meta?.simplification
                     }
-                    val mnemos = mnemoRows[ch].orEmpty().map {
-                        MnemonicInfo(
-                            story = it.story,
-                            normalizedScore = it.normalizedScore,
-                            sourcePriority = it.sourcePriority,
-                            source = it.source,
-                            sourceRecordId = it.sourceRecordId,
-                        )
+                    val mnemos = if (needsMnemonics) {
+                        mnemoRows[ch].orEmpty().map {
+                            MnemonicInfo(
+                                story = it.story,
+                                normalizedScore = it.normalizedScore,
+                                sourcePriority = it.sourcePriority,
+                                source = it.source,
+                                sourceRecordId = it.sourceRecordId,
+                            )
+                        }
+                    } else {
+                        previous?.meta?.mnemonics.orEmpty()
                     }
                     val assembled = HanziCharacterMetadata(
                         character = ch,
-                        decomposition = h?.decomposition,
-                        etymologyType = h?.etymologyType,
-                        semanticComponent = h?.semanticComponent,
-                        phoneticComponent = h?.phoneticComponent,
+                        decomposition = h?.decomposition ?: previous?.meta?.decomposition,
+                        etymologyType = h?.etymologyType ?: previous?.meta?.etymologyType,
+                        semanticComponent = h?.semanticComponent ?: previous?.meta?.semanticComponent,
+                        phoneticComponent = h?.phoneticComponent ?: previous?.meta?.phoneticComponent,
                         oppositeTargets = opposites,
                         simplification = simpl,
                         mnemonics = mnemos,
                     )
-                    cache.put(ch, assembled)
+                    val entry = CacheEntry(
+                        meta = assembled,
+                        loadedHanzi = (previous?.loadedHanzi == true) || loadHanzi,
+                        loadedVariants = (previous?.loadedVariants == true) || needsVariants,
+                        loadedSimplifications = (previous?.loadedSimplifications == true) ||
+                            needsSimplifications,
+                        loadedMnemonics = (previous?.loadedMnemonics == true) || needsMnemonics,
+                    )
+                    cache.put(ch, entry)
                     cached[ch] = assembled
                 }
             }

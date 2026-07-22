@@ -13,7 +13,32 @@ from typing import Any, Protocol
 
 MNEMONIC_MAX_CODE_POINTS = 500
 MAX_PER_CHARACTER = 5
+# Matches Android HanziQuery.MAX_MNEMONIC_KEY_CODE_POINTS — single Han or compounds.
+MAX_MNEMONIC_KEY_CODE_POINTS = 20
 WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _is_cjk_ideograph(cp: int) -> bool:
+    return (
+        0x3400 <= cp <= 0x4DBF
+        or 0x4E00 <= cp <= 0x9FFF
+        or 0xF900 <= cp <= 0xFAFF
+        or 0x20000 <= cp <= 0x2A6DF
+        or 0x2A700 <= cp <= 0x2B73F
+        or 0x2B740 <= cp <= 0x2B81F
+        or 0x2B820 <= cp <= 0x2CEAF
+        or 0x30000 <= cp <= 0x3134F
+    )
+
+
+def is_valid_mnemonic_key(key: str) -> bool:
+    """Accept a single Han character or a contiguous compound of Han ideographs."""
+    if not key or not isinstance(key, str):
+        return False
+    chars = list(key)
+    if len(chars) < 1 or len(chars) > MAX_MNEMONIC_KEY_CODE_POINTS:
+        return False
+    return all(_is_cjk_ideograph(ord(c)) for c in chars)
 
 
 @dataclass
@@ -98,8 +123,9 @@ def normalize_provider_rows(
         story = normalize_story(str(row.get("story") or row.get("text") or ""))
         if not ch or not story:
             continue
-        # Single code point
-        if len(ch) != 1:
+        ch = unicodedata.normalize("NFC", str(ch)).strip()
+        # Single Han character or contiguous compound (2+ Han).
+        if not is_valid_mnemonic_key(ch):
             continue
         story = truncate_code_points(story)
         raw = row.get("raw_score", row.get("score", row.get("votes")))

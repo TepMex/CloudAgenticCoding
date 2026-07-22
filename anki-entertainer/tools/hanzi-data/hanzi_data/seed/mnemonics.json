@@ -198,5 +198,35 @@
     "source_record_id": "seed:手:1",
     "attribution": "anki-entertainer project seed",
     "license": "CC0-1.0"
+  },
+  {
+    "character": "休息",
+    "story": "Person rests by a tree (休), then the heart settles (息) — take a break.",
+    "language": "en",
+    "raw_score": 10,
+    "normalized_score": 100,
+    "source_record_id": "seed:休息:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "休息",
+    "story": "休 + 息: pause work so your breath can catch up.",
+    "language": "en",
+    "raw_score": 7,
+    "normalized_score": 70,
+    "source_record_id": "seed:休息:2",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
+  },
+  {
+    "character": "明白",
+    "story": "Bright (明) and white (白): suddenly everything is clear.",
+    "language": "en",
+    "raw_score": 9,
+    "normalized_score": 90,
+    "source_record_id": "seed:明白:1",
+    "attribution": "anki-entertainer project seed",
+    "license": "CC0-1.0"
   }
 ]

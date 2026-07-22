@@ -34,4 +34,26 @@ class HanziQueryTest {
         assertEquals(20, result.characters.size)
         assertTrue(result.truncated)
     }
+
+    @Test
+    fun mnemonicLookupKeysPreferCompoundsThenCharacters() {
+        val result = HanziQuery.extractMnemonicLookupKeys("休息 OK 你好")
+        assertEquals(
+            listOf("休息", "你好", "休", "息", "你", "好"),
+            result.characters,
+        )
+        assertFalse(result.truncated)
+    }
+
+    @Test
+    fun mnemonicLookupKeysSingleCharacterIsOnlyOnce() {
+        val result = HanziQuery.extractMnemonicLookupKeys("休")
+        assertEquals(listOf("休"), result.characters)
+    }
+
+    @Test
+    fun mnemonicLookupKeysWholeCompoundRun() {
+        val result = HanziQuery.extractMnemonicLookupKeys("休息")
+        assertEquals(listOf("休息", "休", "息"), result.characters)
+    }
 }

@@ -65,7 +65,7 @@ Or with path form:
   - `{QUERY}` — exact vocabulary from the deep link
   - `{OPPOSITE}` — simplified/traditional character variants (offline)
   - `{SIMPL_HISTORY}` — simplification notes; curated vs derived structural comparison (offline)
-  - `{MNEMO_EXAMPLES}` — up to five mnemonic stories per unique Han character (offline seed dataset)
+  - `{MNEMO_EXAMPLES}` — up to five mnemonic stories per lookup key: contiguous Han compounds in the query first, then each unique Han character (offline seed dataset)
   - `{SEMANTIC}` / `{PHONETIC}` — pictophonetic components when explicitly recorded (offline)
 - Expansion is performed by `PromptTemplateEngine` using `HanziMetadataRepository` + `HanziMetadataFormatter`. Preferences DataStore must **not** perform metadata placeholder substitution.
 - Default prompt instructs the model to produce one short, self-contained text chunk related to the vocabulary.
@@ -111,8 +111,9 @@ Settings store:
 ### 8. Offline mnemonic fallback when LLM is unavailable
 
 - If the LLM is **not configured** (missing base URL or model list), or a generation attempt **fails before any chunk is returned**, the app falls back to the local Hanzi metadata database.
-- Fallback shows **up to 5 mnemonic stories** for Han characters in the vocabulary (first-occurrence character order, then ranked score within each character).
-- Each story is shown as a normal chunk (`character — story`), labeled with model `local mnemonic`.
+- Fallback shows **up to 5 mnemonic stories** for the vocabulary: contiguous multi-character Han runs (compound words) first, then individual Han characters (first-occurrence order, then ranked score within each key).
+- Each story is shown as a normal chunk (`key — story`), labeled with model `local mnemonic`.
+- Seed / local mnemonic rows may be keyed by a **single Han character or a compound** (2+ contiguous Han); compounds are preferred when the query matches.
 - Liked chunks still appear first; mnemonic stories follow.
 - If no mnemonic stories are found, show a clear status message (and still keep any liked chunks).
 
@@ -234,4 +235,4 @@ anki-entertainer/
 3. Liked chunks reappear for the same vocab on next launch; new chunks fill up to configured count.
 4. Regenerate updates only non-liked chunks.
 5. Unlike removes chunk from saved set for that vocab.
-6. With LLM unset or unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han characters in the vocabulary when the offline DB has them.
+6. With LLM unset or unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han compounds and characters in the vocabulary when the offline DB has them.

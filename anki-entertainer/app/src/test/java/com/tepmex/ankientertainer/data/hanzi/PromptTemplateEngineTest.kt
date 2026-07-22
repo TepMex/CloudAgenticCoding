@@ -153,4 +153,28 @@ class PromptTemplateEngineTest {
         engine(repo).expand("only {QUERY}", "好")
         assertEquals(0, repo.loadCount)
     }
+
+    @Test
+    fun mnemoExamplesPreferCompoundThenCharacters() = runBlocking {
+        val repo = FakeHanziMetadataRepository(
+            mapOf(
+                "休息" to meta(
+                    "休息",
+                    mnemonics = listOf(MnemonicInfo("compound story", 100.0, 1, "seed", "c1")),
+                ),
+                "休" to meta(
+                    "休",
+                    mnemonics = listOf(MnemonicInfo("char story", 50.0, 1, "seed", "s1")),
+                ),
+            ),
+        )
+        val result = engine(repo).expand("{MNEMO_EXAMPLES}", "休息")
+        val compoundIdx = result.prompt.indexOf("休息:")
+        val charIdx = result.prompt.indexOf("休:")
+        assertTrue(compoundIdx >= 0)
+        assertTrue(charIdx > compoundIdx)
+        assertTrue(result.prompt.contains("1. compound story"))
+        assertTrue(result.prompt.contains("1. char story"))
+        assertEquals(listOf("休息", "休", "息"), repo.lastLoadedCharacters)
+    }
 }

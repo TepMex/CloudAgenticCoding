@@ -50,7 +50,7 @@ SQLite database shipped with the anki-entertainer APK.
 - Path: `hanzi_data/seed/mnemonics.json`
 - License: CC0-1.0
 - Used for: MNEMO_EXAMPLES
-- Note: Small project-authored seed set. Not a large community mnemonic corpus.
+- Note: Small project-authored seed set (single Han and compound keys). Not a large community mnemonic corpus.
 
 ## anki-entertainer curated simplifications
 
