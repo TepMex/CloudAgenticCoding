@@ -3,7 +3,10 @@ package com.tepmex.ankientertainer.data.hanzi
 /**
  * Offline fallback content when a remote LLM is unavailable or misconfigured.
  * Loads up to [limit] mnemonic stories from the local Hanzi metadata database
- * for Han characters in the vocabulary query.
+ * for Han compounds and characters in the vocabulary query.
+ *
+ * Lookup order: contiguous multi-character Han runs (compound words) first,
+ * then individual Han characters (first-occurrence order, ranked score within each key).
  */
 data class OfflineMnemonicStory(
     val character: String,
@@ -15,7 +18,7 @@ class OfflineMnemonicFallback(
     private val limit: Int = DEFAULT_LIMIT,
 ) {
     suspend fun loadStories(vocab: String): List<OfflineMnemonicStory> {
-        val extraction = HanziQuery.extractUniqueHan(vocab)
+        val extraction = HanziQuery.extractMnemonicLookupKeys(vocab)
         if (extraction.characters.isEmpty()) return emptyList()
 
         val status = repository.datasetStatus()
@@ -31,14 +34,14 @@ class OfflineMnemonicFallback(
         )
 
         val out = ArrayList<OfflineMnemonicStory>(limit)
-        for (ch in batch.orderedCharacters) {
-            val mnemonics = batch.byCharacter[ch]?.mnemonics.orEmpty()
+        for (key in batch.orderedCharacters) {
+            val mnemonics = batch.byCharacter[key]?.mnemonics.orEmpty()
             for (m in mnemonics) {
                 if (out.size >= limit) return out
                 out.add(
                     OfflineMnemonicStory(
-                        character = ch,
-                        text = "$ch — ${m.story}",
+                        character = key,
+                        text = "$key — ${m.story}",
                     ),
                 )
             }

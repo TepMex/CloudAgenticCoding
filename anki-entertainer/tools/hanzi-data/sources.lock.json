@@ -44,7 +44,7 @@
       "path": "hanzi_data/seed/mnemonics.json",
       "license": "CC0-1.0",
       "usedFor": ["MNEMO_EXAMPLES"],
-      "note": "Small project-authored seed set. Not a large community mnemonic corpus."
+      "note": "Small project-authored seed set (single Han and compound keys). Not a large community mnemonic corpus."
     },
     "project_curated_simplifications": {
       "name": "anki-entertainer curated simplifications",

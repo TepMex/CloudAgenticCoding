@@ -10,7 +10,7 @@ This document describes the bundled Hanzi metadata database used by prompt place
 | `{OPPOSITE}` | Unihan `kSimplifiedVariant` / `kTraditionalVariant`; OpenCC ST/TS character dicts as supplemental | Character-level only; one-to-many kept visible |
 | `{SEMANTIC}` | Make Me a Hanzi `etymology.type=pictophonetic` + `semantic` | Omitted unless type is pictophonetic **and** semantic is non-null |
 | `{PHONETIC}` | Make Me a Hanzi `etymology.type=pictophonetic` + `phonetic` | Same filtering as `{SEMANTIC}` |
-| `{MNEMO_EXAMPLES}` | Project seed mnemonics (`CC0-1.0`) | Small seed only — **not** a large community corpus |
+| `{MNEMO_EXAMPLES}` | Project seed mnemonics (`CC0-1.0`) | Small seed only — **not** a large community corpus; keys may be single Han or compounds |
 | `{SIMPL_HISTORY}` | Unihan/OpenCC variant pairs + MMAH IDS; optional curated seed rows | Distinguishes **curated** vs **derived** structural comparison |
 
 ## Source-backed vs derived
@@ -45,8 +45,10 @@ This document describes the bundled Hanzi metadata database used by prompt place
 1. Prefer an explicit source-provided score/rank when present (`raw_score` / `normalized_score`).
 2. Otherwise use a documented normalized score (seed files set both when available).
 3. Tie-break: higher `source_priority`, then `source`, then `source_record_id`.
-4. Keep at most five stories per character after whitespace normalization, near-duplicate removal, and a 500 code-point story cap.
+4. Keep at most five stories per mnemonic key (single Han character **or** contiguous compound word) after whitespace normalization, near-duplicate removal, and a 500 code-point story cap.
 5. Attribution and license remain in the database even when omitted from prompt text.
+
+**Compound words:** seed rows may use a multi-character Han key (e.g. `休息`). Prompt `{MNEMO_EXAMPLES}` and offline fallback look up contiguous Han runs in the query first, then each unique character.
 
 **Coverage limitation:** only a small project-authored CC0 seed set is bundled. Do not treat rankings as community popularity.
 

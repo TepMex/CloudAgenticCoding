@@ -9,6 +9,9 @@ class FakeHanziMetadataRepository(
     var loadCount: Int = 0
         private set
 
+    var lastLoadedCharacters: List<String> = emptyList()
+        private set
+
     override suspend fun loadForCharacters(
         characters: List<String>,
         truncated: Boolean,
@@ -18,6 +21,7 @@ class FakeHanziMetadataRepository(
         needsMnemonics: Boolean,
     ): BatchedHanziMetadata {
         loadCount++
+        lastLoadedCharacters = characters
         return BatchedHanziMetadata(
             byCharacter = characters.mapNotNull { ch -> data[ch]?.let { ch to it } }.toMap(),
             orderedCharacters = characters,

@@ -36,6 +36,7 @@ class OfflineMnemonicFallbackTest {
         assertEquals(5, stories.size)
         assertEquals(
             listOf(
+                // Contiguous compound run "休明" has no stories; then per-char.
                 "休 — 休 high",
                 "休 — 休 mid",
                 "休 — 休 low",
@@ -45,6 +46,50 @@ class OfflineMnemonicFallbackTest {
             stories.map { it.text },
         )
         assertEquals(listOf("休", "休", "休", "明", "明"), stories.map { it.character })
+    }
+
+    @Test
+    fun prefersCompoundWordMnemonicsBeforePerCharacter() = runBlocking {
+        val repo = FakeHanziMetadataRepository(
+            data = mapOf(
+                "休息" to meta(
+                    "休息",
+                    mnemonics = listOf(
+                        mnemo("compound high", 100.0),
+                        mnemo("compound mid", 70.0),
+                    ),
+                ),
+                "休" to meta(
+                    "休",
+                    mnemonics = listOf(
+                        mnemo("char high", 90.0),
+                        mnemo("char mid", 50.0),
+                    ),
+                ),
+                "息" to meta("息", mnemonics = emptyList()),
+            ),
+        )
+        val stories = OfflineMnemonicFallback(repo).loadStories("休息")
+        assertEquals(
+            listOf(
+                "休息 — compound high",
+                "休息 — compound mid",
+                "休 — char high",
+                "休 — char mid",
+            ),
+            stories.map { it.text },
+        )
+    }
+
+    @Test
+    fun compoundQueryUsesPerCharacterWhenNoCompoundEntry() = runBlocking {
+        val repo = FakeHanziMetadataRepository(
+            data = mapOf(
+                "休" to meta("休", mnemonics = listOf(mnemo("rest", 100.0))),
+            ),
+        )
+        val stories = OfflineMnemonicFallback(repo).loadStories("休息")
+        assertEquals(listOf("休 — rest"), stories.map { it.text })
     }
 
     @Test

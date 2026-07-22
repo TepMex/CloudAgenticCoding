@@ -143,6 +143,50 @@ class MnemonicTests(unittest.TestCase):
             )
             self.assertEqual(out[0].story, "sun from b")
 
+    def test_compound_word_keys_accepted(self):
+        from hanzi_data.mnemonics import is_valid_mnemonic_key
+
+        self.assertTrue(is_valid_mnemonic_key("休"))
+        self.assertTrue(is_valid_mnemonic_key("休息"))
+        self.assertTrue(is_valid_mnemonic_key("明白"))
+        self.assertFalse(is_valid_mnemonic_key(""))
+        self.assertFalse(is_valid_mnemonic_key("休 rest"))
+        self.assertFalse(is_valid_mnemonic_key("hello"))
+        self.assertFalse(is_valid_mnemonic_key("汉" * 21))
+
+        rows = [
+            {
+                "character": "休息",
+                "story": "Compound rest story",
+                "normalized_score": 100,
+                "source_record_id": "c:1",
+            },
+            {
+                "character": "休",
+                "story": "Single char story",
+                "normalized_score": 50,
+                "source_record_id": "c:2",
+            },
+            {
+                "character": "not-hanzi",
+                "story": "rejected",
+                "normalized_score": 1,
+            },
+        ]
+        records = normalize_provider_rows(
+            rows,
+            source="t",
+            source_priority=1,
+            default_license="CC0-1.0",
+            default_attribution="t",
+        )
+        keys = {r.character for r in records}
+        self.assertEqual(keys, {"休息", "休"})
+        ranked = rank_and_dedupe(records)
+        by_key = {r.character: r.story for r in ranked}
+        self.assertEqual(by_key["休息"], "Compound rest story")
+        self.assertEqual(by_key["休"], "Single char story")
+
 
 if __name__ == "__main__":
     unittest.main()

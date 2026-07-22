@@ -55,7 +55,19 @@ class DefaultPromptTemplateEngine(
         resolved[PromptPlaceholders.QUERY] = query
 
         if (needsMetadata) {
-            val extraction = HanziQuery.extractUniqueHan(query, maxUniqueHan)
+            val charExtraction = HanziQuery.extractUniqueHan(query, maxUniqueHan)
+            val mnemonicExtraction = if (PromptPlaceholders.MNEMO_EXAMPLES in needed) {
+                HanziQuery.extractMnemonicLookupKeys(query, maxUniqueHan)
+            } else {
+                null
+            }
+            // Prefer mnemonic key order (compounds first) when loading the batch.
+            val loadKeys = LinkedHashSet<String>().apply {
+                mnemonicExtraction?.characters?.let { addAll(it) }
+                addAll(charExtraction.characters)
+            }.toList()
+            val truncated = charExtraction.truncated || (mnemonicExtraction?.truncated == true)
+
             val status = repository.datasetStatus()
             if (!status.available) {
                 warnings.add(status.message)
@@ -67,8 +79,8 @@ class DefaultPromptTemplateEngine(
             } else {
                 val batch = try {
                     repository.loadForCharacters(
-                        characters = extraction.characters,
-                        truncated = extraction.truncated,
+                        characters = loadKeys,
+                        truncated = truncated,
                         needsHanzi = PromptPlaceholders.SEMANTIC in needed ||
                             PromptPlaceholders.PHONETIC in needed,
                         needsVariants = PromptPlaceholders.OPPOSITE in needed,
@@ -91,28 +103,48 @@ class DefaultPromptTemplateEngine(
                     }
                 } else {
                     val meta = batch.byCharacter
-                    val ordered = batch.orderedCharacters
-                    val truncated = batch.truncated
+                    val orderedChars = charExtraction.characters
+                    val orderedMnemo = mnemonicExtraction?.characters.orEmpty()
 
                     if (PromptPlaceholders.OPPOSITE in needed) {
                         resolved[PromptPlaceholders.OPPOSITE] =
-                            HanziMetadataFormatter.formatOpposite(ordered, meta, truncated)
+                            HanziMetadataFormatter.formatOpposite(
+                                orderedChars,
+                                meta,
+                                charExtraction.truncated,
+                            )
                     }
                     if (PromptPlaceholders.SIMPL_HISTORY in needed) {
                         resolved[PromptPlaceholders.SIMPL_HISTORY] =
-                            HanziMetadataFormatter.formatSimplHistory(ordered, meta, truncated)
+                            HanziMetadataFormatter.formatSimplHistory(
+                                orderedChars,
+                                meta,
+                                charExtraction.truncated,
+                            )
                     }
                     if (PromptPlaceholders.MNEMO_EXAMPLES in needed) {
                         resolved[PromptPlaceholders.MNEMO_EXAMPLES] =
-                            HanziMetadataFormatter.formatMnemonics(ordered, meta, truncated)
+                            HanziMetadataFormatter.formatMnemonics(
+                                orderedMnemo,
+                                meta,
+                                mnemonicExtraction!!.truncated,
+                            )
                     }
                     if (PromptPlaceholders.SEMANTIC in needed) {
                         resolved[PromptPlaceholders.SEMANTIC] =
-                            HanziMetadataFormatter.formatSemantic(ordered, meta, truncated)
+                            HanziMetadataFormatter.formatSemantic(
+                                orderedChars,
+                                meta,
+                                charExtraction.truncated,
+                            )
                     }
                     if (PromptPlaceholders.PHONETIC in needed) {
                         resolved[PromptPlaceholders.PHONETIC] =
-                            HanziMetadataFormatter.formatPhonetic(ordered, meta, truncated)
+                            HanziMetadataFormatter.formatPhonetic(
+                                orderedChars,
+                                meta,
+                                charExtraction.truncated,
+                            )
                     }
                 }
             }
