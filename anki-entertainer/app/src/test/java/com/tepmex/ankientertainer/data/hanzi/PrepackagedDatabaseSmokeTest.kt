@@ -23,6 +23,10 @@ class PrepackagedDatabaseSmokeTest {
 
         val assetExists = context.assets.open(HanziMetadataDatabase.ASSET_PATH).use { true }
         assertTrue(assetExists)
+        val noticesArePackaged = context.assets.open("licenses/HANZI_DATA_NOTICES.md").use { input ->
+            input.bufferedReader().readText().contains("Make Me a Hanzi")
+        }
+        assertTrue(noticesArePackaged)
 
         val db = try {
             HanziMetadataDatabase.open(context)
@@ -54,9 +58,16 @@ class PrepackagedDatabaseSmokeTest {
             val meta = db.hanziDao().getDatasetMetadata()
             assertNotNull(meta)
             assertEquals(1, meta!!.schemaVersion)
-            assertTrue(meta.datasetVersion.isNotBlank())
+            assertEquals("1.1.0", meta.datasetVersion)
             val sample = db.hanziDao().getHanzi(listOf("清", "好"))
             assertTrue(sample.isNotEmpty())
+            val broadCoverageSample = db.hanziDao().getMnemonics(listOf("你"))
+            assertTrue(
+                broadCoverageSample.any {
+                    it.source == "makemeahanzi_derived_cue" &&
+                        it.license == "LGPL-3.0-or-later"
+                },
+            )
         } finally {
             db.close()
         }

@@ -65,7 +65,7 @@ Or with path form:
   - `{QUERY}` — exact vocabulary from the deep link
   - `{OPPOSITE}` — simplified/traditional character variants (offline)
   - `{SIMPL_HISTORY}` — simplification notes; curated vs derived structural comparison (offline)
-  - `{MNEMO_EXAMPLES}` — up to five mnemonic stories per lookup key: contiguous Han compounds in the query first, then each unique Han character (offline seed dataset)
+  - `{MNEMO_EXAMPLES}` — up to five mnemonic stories or source-backed structure cues per lookup key: contiguous Han compounds in the query first, then each unique Han character (offline dataset)
   - `{SEMANTIC}` / `{PHONETIC}` — pictophonetic components when explicitly recorded (offline)
 - Expansion is performed by `PromptTemplateEngine` using `HanziMetadataRepository` + `HanziMetadataFormatter`. Preferences DataStore must **not** perform metadata placeholder substitution.
 - Default prompt instructs the model to produce one short, self-contained text chunk related to the vocabulary.
@@ -115,9 +115,9 @@ A provider is configured when its base URL is non-blank and its model list is no
 ### 8. Offline mnemonic fallback when LLM is unavailable
 
 - If no LLM provider is **configured** (no provider with base URL and model list), or a generation attempt **fails before any chunk is returned**, the app falls back to the local Hanzi metadata database.
-- Fallback shows **up to 5 mnemonic stories** for the vocabulary: contiguous multi-character Han runs (compound words) first, then individual Han characters (first-occurrence order, then ranked score within each key).
+- Fallback shows **up to 5 mnemonic stories or source-backed structure cues** for the vocabulary: contiguous multi-character Han runs (compound words) first, then individual Han characters (first-occurrence order, then ranked score within each key).
 - Each story is shown as a normal chunk (`key — story`), labeled with model `local mnemonic`.
-- Seed / local mnemonic rows may be keyed by a **single Han character or a compound** (2+ contiguous Han); compounds are preferred when the query matches.
+- Local mnemonic rows may be keyed by a **single Han character or a compound** (2+ contiguous Han); compounds are preferred when the query matches. Project-authored CC0 stories rank before deterministic cues derived from Make Me a Hanzi fields.
 - Liked chunks still appear first; mnemonic stories follow.
 - If no mnemonic stories are found, show a clear status message (and still keep any liked chunks).
 

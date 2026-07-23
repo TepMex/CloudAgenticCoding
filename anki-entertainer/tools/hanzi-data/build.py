@@ -21,7 +21,11 @@ if str(ROOT) not in sys.path:
 from hanzi_data.db_writer import build_simplifications, write_database  # noqa: E402
 from hanzi_data.download import ensure_sources, load_lock, sha256_file  # noqa: E402
 from hanzi_data.mmah import parse_mmah_dictionary  # noqa: E402
-from hanzi_data.mnemonics import JsonMnemonicProvider, import_mnemonics  # noqa: E402
+from hanzi_data.mnemonics import (  # noqa: E402
+    JsonMnemonicProvider,
+    MmahMnemonicProvider,
+    import_mnemonics,
+)
 from hanzi_data.opencc import merge_variants, parse_opencc_variants  # noqa: E402
 from hanzi_data.unihan import parse_unihan_variants  # noqa: E402
 
@@ -86,7 +90,19 @@ def write_notices(project_root: Path, lock: dict) -> None:
             "",
         ]
     )
-    (project_root / "THIRD_PARTY_NOTICES.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    notice = "\n".join(lines) + "\n"
+    (project_root / "THIRD_PARTY_NOTICES.md").write_text(notice, encoding="utf-8")
+    packaged_notice = (
+        project_root
+        / "app"
+        / "src"
+        / "main"
+        / "assets"
+        / "licenses"
+        / "HANZI_DATA_NOTICES.md"
+    )
+    packaged_notice.parent.mkdir(parents=True, exist_ok=True)
+    packaged_notice.write_text(notice, encoding="utf-8")
 
 
 def main() -> int:
@@ -135,7 +151,11 @@ def main() -> int:
                 path=seed_path,
                 name="project_seed",
                 source_priority=100,
-            )
+            ),
+            MmahMnemonicProvider(
+                records=hanzi,
+                source_priority=10,
+            ),
         ]
     )
 
@@ -182,8 +202,9 @@ def main() -> int:
         "assetPath": str(assets_db.relative_to(project_root)),
         "sourceChecksums": checksums,
         "mnemonicCoverageNote": (
-            "Only a small CC0 project-authored seed mnemonic set is bundled. "
-            "This is not a large ranked community mnemonic corpus."
+            "Project-authored CC0 stories are supplemented by deterministic local "
+            "memory cues derived from Make Me a Hanzi structure fields. "
+            "This is not a ranked community mnemonic corpus."
         ),
     }
     report_path = out_dir / "build-report.json"
@@ -194,6 +215,10 @@ def main() -> int:
     print(f"Wrote {assets_db}")
     print(f"Wrote {report_path}")
     print(f"Wrote {project_root / 'THIRD_PARTY_NOTICES.md'}")
+    print(
+        "Wrote "
+        f"{project_root / 'app/src/main/assets/licenses/HANZI_DATA_NOTICES.md'}"
+    )
     return 0
 
 

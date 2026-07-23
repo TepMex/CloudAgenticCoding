@@ -12,13 +12,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hanzi_data.mnemonics import (
     JsonMnemonicProvider,
+    MmahMnemonicProvider,
     import_mnemonics,
+    mmah_memory_cue,
     nearly_identical,
     normalize_provider_rows,
     normalize_story,
     rank_and_dedupe,
     truncate_code_points,
 )
+from hanzi_data.mmah import HanziRecord
 
 
 class MnemonicTests(unittest.TestCase):
@@ -142,6 +145,102 @@ class MnemonicTests(unittest.TestCase):
                 ]
             )
             self.assertEqual(out[0].story, "sun from b")
+
+    def test_mmah_pictophonetic_memory_cue(self):
+        record = HanziRecord(
+            character="清",
+            code_point=ord("清"),
+            decomposition="⿰氵青",
+            etymology_type="pictophonetic",
+            etymology_hint="water",
+            semantic_component="氵",
+            phonetic_component="青",
+            source_record_id="dictionary.txt:1",
+        )
+        self.assertEqual(
+            mmah_memory_cue(record),
+            "Meaning clue 氵 carries “water”; sound clue 青 suggests the pronunciation.",
+        )
+
+    def test_mmah_visual_memory_cue(self):
+        record = HanziRecord(
+            character="休",
+            code_point=ord("休"),
+            decomposition="⿰亻木",
+            etymology_type="ideographic",
+            etymology_hint="A person resting beside a tree",
+            semantic_component=None,
+            phonetic_component=None,
+        )
+        self.assertEqual(
+            mmah_memory_cue(record),
+            "Picture this structure: A person resting beside a tree.",
+        )
+
+    def test_mmah_provider_skips_records_without_source_backed_hint(self):
+        records = {
+            "清": HanziRecord(
+                character="清",
+                code_point=ord("清"),
+                decomposition="⿰氵青",
+                etymology_type="pictophonetic",
+                etymology_hint="water",
+                semantic_component="氵",
+                phonetic_component="青",
+                source_record_id="dictionary.txt:1",
+            ),
+            "〇": HanziRecord(
+                character="〇",
+                code_point=ord("〇"),
+                decomposition=None,
+                etymology_type=None,
+                etymology_hint=None,
+                semantic_component=None,
+                phonetic_component=None,
+                source_record_id="dictionary.txt:2",
+            ),
+        }
+        provider = MmahMnemonicProvider(records)
+        rows = provider.load()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["character"], "清")
+        self.assertEqual(rows[0]["source_record_id"], "derived-cue:dictionary.txt:1")
+
+    def test_authored_story_ranks_above_derived_mmah_cue(self):
+        with tempfile.TemporaryDirectory() as td:
+            seed = Path(td) / "seed.json"
+            seed.write_text(
+                json.dumps(
+                    [
+                        {
+                            "character": "休",
+                            "story": "A person rests beside a tree.",
+                            "normalized_score": 100,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            records = {
+                "休": HanziRecord(
+                    character="休",
+                    code_point=ord("休"),
+                    decomposition="⿰亻木",
+                    etymology_type="ideographic",
+                    etymology_hint="A person leaning against a tree",
+                    semantic_component=None,
+                    phonetic_component=None,
+                )
+            }
+            out = import_mnemonics(
+                [
+                    JsonMnemonicProvider(seed, source_priority=100),
+                    MmahMnemonicProvider(records, source_priority=10),
+                ]
+            )
+            self.assertEqual(len(out), 2)
+            self.assertEqual(out[0].source, "project_seed")
+            self.assertEqual(out[1].source, "makemeahanzi_derived_cue")
 
     def test_compound_word_keys_accepted(self):
         from hanzi_data.mnemonics import is_valid_mnemonic_key

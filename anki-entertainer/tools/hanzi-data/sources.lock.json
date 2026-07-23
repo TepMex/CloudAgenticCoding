@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "datasetVersion": "1.0.0",
+  "datasetVersion": "1.1.0",
   "sources": {
     "unihan": {
       "name": "Unicode Unihan Database",
@@ -36,7 +36,12 @@
       "sha256": "744bb05d5b0742e9ee35c37791f94d56a173349b3367569e7ca11e510364d203",
       "license": "LGPL-3.0-or-later",
       "licenseUrl": "https://github.com/skishore/makemeahanzi/blob/bddc96d41bef78427ed0e034e9f7e31d71fd1b92/COPYING",
-      "usedFor": ["SEMANTIC", "PHONETIC", "SIMPL_HISTORY IDS decomposition"]
+      "usedFor": [
+        "SEMANTIC",
+        "PHONETIC",
+        "SIMPL_HISTORY IDS decomposition",
+        "derived local memory cues"
+      ]
     },
     "project_seed_mnemonics": {
       "name": "anki-entertainer seed mnemonics",

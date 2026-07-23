@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .mmah import HanziRecord
+
 
 MNEMONIC_MAX_CODE_POINTS = 500
 MAX_PER_CHARACTER = 5
@@ -59,6 +61,8 @@ class MnemonicRecord:
 class MnemonicProvider(Protocol):
     name: str
     source_priority: int
+    default_license: str
+    default_attribution: str
 
     def load(self) -> list[dict[str, Any]]:
         ...
@@ -79,6 +83,57 @@ class JsonMnemonicProvider:
         if not isinstance(data, list):
             raise ValueError(f"Mnemonic seed must be a JSON list: {self.path}")
         return data
+
+
+def mmah_memory_cue(record: HanziRecord) -> str | None:
+    """Turn source-backed MMAH structure fields into a concise learning cue.
+
+    These rows are deliberately described as cues rather than historical stories:
+    they preserve MMAH's distinction between semantic/phonetic components and
+    free-form structure hints without inventing additional etymology.
+    """
+    hint = normalize_story(record.etymology_hint or "").rstrip(".")
+    semantic = normalize_story(record.semantic_component or "")
+    phonetic = normalize_story(record.phonetic_component or "")
+
+    if record.etymology_type == "pictophonetic" and semantic and phonetic:
+        meaning = hint or semantic
+        return (
+            f"Meaning clue {semantic} carries “{meaning}”; "
+            f"sound clue {phonetic} suggests the pronunciation."
+        )
+    if hint:
+        return f"Picture this structure: {hint}."
+    return None
+
+
+@dataclass
+class MmahMnemonicProvider:
+    """Derives broad offline memory-cue coverage from bundled MMAH records."""
+
+    records: dict[str, HanziRecord]
+    name: str = "makemeahanzi_derived_cue"
+    source_priority: int = 10
+    default_license: str = "LGPL-3.0-or-later"
+    default_attribution: str = "Derived from Make Me a Hanzi dictionary.txt"
+
+    def load(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for character in sorted(self.records, key=lambda ch: (ord(ch), ch)):
+            record = self.records[character]
+            cue = mmah_memory_cue(record)
+            if cue is None:
+                continue
+            rows.append(
+                {
+                    "character": character,
+                    "story": cue,
+                    "language": "en",
+                    "normalized_score": 10,
+                    "source_record_id": f"derived-cue:{record.source_record_id}",
+                }
+            )
+        return rows
 
 
 def normalize_story(story: str) -> str:
@@ -192,7 +247,7 @@ def rank_and_dedupe(records: list[MnemonicRecord]) -> list[MnemonicRecord]:
     return selected
 
 
-def import_mnemonics(providers: list[JsonMnemonicProvider]) -> list[MnemonicRecord]:
+def import_mnemonics(providers: list[MnemonicProvider]) -> list[MnemonicRecord]:
     all_rows: list[MnemonicRecord] = []
     for p in providers:
         rows = p.load()
