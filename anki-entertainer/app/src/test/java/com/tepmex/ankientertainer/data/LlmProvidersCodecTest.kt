@@ -17,6 +17,7 @@ class LlmProvidersCodecTest {
                 baseUrl = "https://a.example",
                 token = "token-a",
                 modelNames = listOf("model-a1", "model-a2"),
+                project = "folder-a",
             ),
             LlmProvider(
                 baseUrl = "https://b.example",
@@ -26,6 +27,22 @@ class LlmProvidersCodecTest {
         )
         val decoded = decodeProviders(encodeProviders(providers))
         assertEquals(providers, decoded)
+    }
+
+    @Test
+    fun encodeOmitsBlankProjectKey() {
+        val json = encodeProviders(
+            listOf(LlmProvider(baseUrl = "https://x", modelNames = listOf("m"))),
+        )
+        assertFalse(json.contains("\"project\""))
+    }
+
+    @Test
+    fun decodeMissingProjectDefaultsToEmpty() {
+        val providers = decodeProviders(
+            """[{"baseUrl":"https://x","token":"","models":"m"}]""",
+        )
+        assertEquals("", providers.single().project)
     }
 
     @Test

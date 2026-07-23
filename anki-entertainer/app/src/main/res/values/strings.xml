@@ -18,11 +18,12 @@
     <string name="liked_badge">Saved</string>
     <string name="hint_base_url">API base URL (OpenAI-compatible)</string>
     <string name="hint_token">Access token (Bearer)</string>
+    <string name="hint_project">Project / folder ID (optional; OpenAI-Project header)</string>
     <string name="hint_models">Model names (one per line)</string>
     <string name="hint_chunk_prompt">Chunk prompt (placeholders below)</string>
     <string name="hint_chunk_count">Number of chunks to show</string>
     <string name="settings_api_section">LLM providers (BYOK)</string>
-    <string name="settings_providers_help">Providers are tried in order. If one does not respond, the next is used. Each provider has its own base URL, token, and model list.</string>
+    <string name="settings_providers_help">Providers are tried in order. If one does not respond, the next is used. Each provider has its own base URL, token, optional project/folder ID, and model list. Leave project empty unless the provider requires it (for example Yandex Cloud folder ID → OpenAI-Project header). Base URL is the API root without a trailing /v1 (the app appends /v1/chat/completions).</string>
     <string name="provider_title">Provider %1$d</string>
     <string name="add_provider">Add provider</string>
     <string name="remove_provider">Remove</string>

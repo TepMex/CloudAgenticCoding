@@ -24,11 +24,16 @@ private val KEY_CHUNK_COUNT = intPreferencesKey("chunk_count")
 /**
  * One OpenAI-compatible LLM endpoint.
  * Providers are tried in list order when earlier ones fail to respond.
+ *
+ * [project] is optional. When non-blank, requests include the `OpenAI-Project`
+ * header (OpenAI SDK `project=`). Used by providers such as Yandex Cloud
+ * (folder ID); left empty for ordinary OpenAI-compatible endpoints.
  */
 data class LlmProvider(
     val baseUrl: String = "",
     val token: String = "",
     val modelNames: List<String> = emptyList(),
+    val project: String = "",
 )
 
 data class AppSettings(
@@ -134,12 +139,15 @@ fun AppSettings.isLlmConfigured(): Boolean =
 fun encodeProviders(providers: List<LlmProvider>): String {
     val array = JSONArray()
     for (provider in providers) {
-        array.put(
-            JSONObject()
-                .put("baseUrl", provider.baseUrl)
-                .put("token", provider.token)
-                .put("models", encodeModelLines(provider.modelNames)),
-        )
+        val obj = JSONObject()
+            .put("baseUrl", provider.baseUrl)
+            .put("token", provider.token)
+            .put("models", encodeModelLines(provider.modelNames))
+        // Omit empty project so older builds and plain OpenAI configs stay compact.
+        if (provider.project.isNotBlank()) {
+            obj.put("project", provider.project.trim())
+        }
+        array.put(obj)
     }
     return array.toString()
 }
@@ -156,6 +164,7 @@ fun decodeProviders(json: String): List<LlmProvider> {
                         baseUrl = obj.optString("baseUrl").trim(),
                         token = obj.optString("token"),
                         modelNames = parseModelLines(obj.optString("models")),
+                        project = obj.optString("project").trim(),
                     ),
                 )
             }

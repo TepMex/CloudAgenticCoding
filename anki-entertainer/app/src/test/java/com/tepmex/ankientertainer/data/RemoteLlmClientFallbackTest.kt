@@ -150,6 +150,49 @@ class RemoteLlmClientFallbackTest {
         assertEquals(1, secondServer.requestCount)
     }
 
+    @Test
+    fun sendsOpenAiProjectHeaderWhenConfigured() = runBlocking {
+        firstServer.enqueue(successBody("ok"))
+
+        client.generateChunkWithFallback(
+            providers = listOf(
+                LlmProvider(
+                    baseUrl = firstServer.url("/").toString().trimEnd('/'),
+                    token = "tok",
+                    modelNames = listOf("gpt://folder/model"),
+                    project = "b1g2hs7dkffsdn5l7j0p",
+                ),
+            ),
+            systemPrompt = "sys",
+            pickModel = { it.first() },
+        )
+
+        val request = firstServer.takeRequest()
+        assertEquals("Bearer tok", request.getHeader("Authorization"))
+        assertEquals("b1g2hs7dkffsdn5l7j0p", request.getHeader("OpenAI-Project"))
+    }
+
+    @Test
+    fun omitsOpenAiProjectHeaderWhenBlank() = runBlocking {
+        firstServer.enqueue(successBody("ok"))
+
+        client.generateChunkWithFallback(
+            providers = listOf(
+                LlmProvider(
+                    baseUrl = firstServer.url("/").toString().trimEnd('/'),
+                    token = "tok",
+                    modelNames = listOf("model-a"),
+                    project = "   ",
+                ),
+            ),
+            systemPrompt = "sys",
+            pickModel = { it.first() },
+        )
+
+        val request = firstServer.takeRequest()
+        assertEquals(null, request.getHeader("OpenAI-Project"))
+    }
+
     private fun successBody(content: String): MockResponse =
         MockResponse()
             .setResponseCode(200)

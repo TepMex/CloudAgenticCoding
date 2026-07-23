@@ -103,12 +103,14 @@ class SettingsActivity : AppCompatActivity() {
         )
         item.inputBaseUrl.setText(provider.baseUrl)
         item.inputToken.setText(provider.token)
+        item.inputProject.setText(provider.project)
         item.inputModels.setText(encodeModelLines(provider.modelNames))
         item.removeProviderButton.setOnClickListener {
             if (providerBindings.size <= 1) {
                 // Keep at least one empty slot so the user can still configure a provider.
                 item.inputBaseUrl.setText("")
                 item.inputToken.setText("")
+                item.inputProject.setText("")
                 item.inputModels.setText("")
                 return@setOnClickListener
             }
@@ -132,6 +134,7 @@ class SettingsActivity : AppCompatActivity() {
                 baseUrl = item.inputBaseUrl.text?.toString().orEmpty().trim(),
                 token = item.inputToken.text?.toString().orEmpty(),
                 modelNames = parseModelLines(item.inputModels.text?.toString().orEmpty()),
+                project = item.inputProject.text?.toString().orEmpty().trim(),
             )
         }
 
