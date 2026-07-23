@@ -27,8 +27,9 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 ## Settings
 
-- OpenAI-compatible API base URL and bearer token (BYOK)
-- Model names (one per line; each new chunk uses a random model)
+- Ordered OpenAI-compatible LLM providers (BYOK): each has its own base URL, bearer token, and model list
+- Providers are tried in order; if one does not respond, the next is used
+- Model names (one per line per provider; each new chunk picks a random model from the provider that responds)
 - Chunk generation prompt with offline placeholders (`{QUERY}`, `{OPPOSITE}`, `{SIMPL_HISTORY}`, `{MNEMO_EXAMPLES}`, `{SEMANTIC}`, `{PHONETIC}`) and prompt preview
 - Target chunk count (liked saved chunks do not reduce how many new chunks are generated)
 
