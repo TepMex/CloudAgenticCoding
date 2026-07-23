@@ -3,17 +3,20 @@ package com.tepmex.ankientertainer.ui
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tepmex.ankientertainer.AnkiEntertainerApp
 import com.tepmex.ankientertainer.R
 import com.tepmex.ankientertainer.data.AppPreferences
+import com.tepmex.ankientertainer.data.LlmProvider
 import com.tepmex.ankientertainer.data.encodeModelLines
 import com.tepmex.ankientertainer.data.hanzi.DefaultPromptTemplateEngine
 import com.tepmex.ankientertainer.data.hanzi.PromptPlaceholders
 import com.tepmex.ankientertainer.data.parseModelLines
 import com.tepmex.ankientertainer.databinding.ActivitySettingsBinding
+import com.tepmex.ankientertainer.databinding.ItemLlmProviderBinding
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -22,6 +25,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var prefs: AppPreferences
     private lateinit var app: AnkiEntertainerApp
+    private val providerBindings = mutableListOf<ItemLlmProviderBinding>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,9 +38,7 @@ class SettingsActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val settings = prefs.settings.first()
-            binding.inputBaseUrl.setText(settings.llmBaseUrl)
-            binding.inputToken.setText(settings.llmToken)
-            binding.inputModels.setText(encodeModelLines(settings.modelNames))
+            replaceProviders(settings.providers)
             binding.inputChunkPrompt.setText(settings.chunkPrompt)
             binding.inputChunkCount.setText(settings.chunkCount.toString())
             binding.inputPreviewQuery.setText("你好")
@@ -45,6 +47,11 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         binding.inputChunkPrompt.addTextChangedListener(SimpleWatcher { refreshPlaceholderWarning() })
+
+        binding.addProviderButton.setOnClickListener {
+            addProviderRow(LlmProvider())
+            renumberProviderTitles()
+        }
 
         binding.previewButton.setOnClickListener {
             lifecycleScope.launch {
@@ -67,9 +74,7 @@ class SettingsActivity : AppCompatActivity() {
                     val count = binding.inputChunkCount.text?.toString()?.toIntOrNull()
                         ?: AppPreferences.DEFAULT_CHUNK_COUNT
                     current.copy(
-                        llmBaseUrl = binding.inputBaseUrl.text?.toString().orEmpty().trim(),
-                        llmToken = binding.inputToken.text?.toString().orEmpty(),
-                        modelNames = parseModelLines(binding.inputModels.text?.toString().orEmpty()),
+                        providers = collectProviders().ifEmpty { listOf(LlmProvider()) },
                         chunkPrompt = binding.inputChunkPrompt.text?.toString().orEmpty()
                             .ifBlank { AppPreferences.DEFAULT_CHUNK_PROMPT },
                         chunkCount = count,
@@ -79,6 +84,56 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun replaceProviders(providers: List<LlmProvider>) {
+        binding.providersContainer.removeAllViews()
+        providerBindings.clear()
+        val initial = providers.ifEmpty { listOf(LlmProvider()) }
+        for (provider in initial) {
+            addProviderRow(provider)
+        }
+        renumberProviderTitles()
+    }
+
+    private fun addProviderRow(provider: LlmProvider) {
+        val item = ItemLlmProviderBinding.inflate(
+            LayoutInflater.from(this),
+            binding.providersContainer,
+            false,
+        )
+        item.inputBaseUrl.setText(provider.baseUrl)
+        item.inputToken.setText(provider.token)
+        item.inputModels.setText(encodeModelLines(provider.modelNames))
+        item.removeProviderButton.setOnClickListener {
+            if (providerBindings.size <= 1) {
+                // Keep at least one empty slot so the user can still configure a provider.
+                item.inputBaseUrl.setText("")
+                item.inputToken.setText("")
+                item.inputModels.setText("")
+                return@setOnClickListener
+            }
+            binding.providersContainer.removeView(item.root)
+            providerBindings.remove(item)
+            renumberProviderTitles()
+        }
+        providerBindings.add(item)
+        binding.providersContainer.addView(item.root)
+    }
+
+    private fun renumberProviderTitles() {
+        providerBindings.forEachIndexed { index, item ->
+            item.providerTitle.text = getString(R.string.provider_title, index + 1)
+        }
+    }
+
+    private fun collectProviders(): List<LlmProvider> =
+        providerBindings.map { item ->
+            LlmProvider(
+                baseUrl = item.inputBaseUrl.text?.toString().orEmpty().trim(),
+                token = item.inputToken.text?.toString().orEmpty(),
+                modelNames = parseModelLines(item.inputModels.text?.toString().orEmpty()),
+            )
+        }
 
     private fun refreshPlaceholderWarning() {
         val template = binding.inputChunkPrompt.text?.toString().orEmpty()

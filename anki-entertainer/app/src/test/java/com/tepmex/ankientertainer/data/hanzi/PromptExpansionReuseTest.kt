@@ -30,7 +30,7 @@ class PromptExpansionReuseTest {
         val expansion = engine.expand(settingsTemplate, vocab)
         val systemPrompt = expansion.prompt
         repeat(neededChunks) {
-            // RemoteLlmClient.generateChunk(settings, systemPrompt, model)
+            // RemoteLlmClient.generateChunkWithFallback(providers, systemPrompt)
             receivedPrompts.add(systemPrompt)
         }
 

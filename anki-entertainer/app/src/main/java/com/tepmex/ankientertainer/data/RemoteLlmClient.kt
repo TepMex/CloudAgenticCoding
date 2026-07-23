@@ -16,9 +16,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.random.Random
 
+data class GeneratedChunk(
+    val text: String,
+    val modelName: String,
+    val providerBaseUrl: String,
+)
+
 /**
  * OpenAI-compatible chat client.
  * Receives an already-expanded system prompt and never queries Hanzi metadata.
+ * When multiple providers are configured, they are tried in order until one responds.
  */
 class RemoteLlmClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -28,12 +35,42 @@ class RemoteLlmClient(
         .build(),
 ) {
 
+    /**
+     * Tries each configured provider in order. On network/HTTP/parse failure,
+     * moves to the next provider. Cancellation is never swallowed.
+     */
+    suspend fun generateChunkWithFallback(
+        providers: List<LlmProvider>,
+        systemPrompt: String,
+        pickModel: (List<String>) -> String = { pickRandomModel(it) },
+    ): GeneratedChunk {
+        val configured = providers.filter { it.isConfigured() }
+        require(configured.isNotEmpty()) { "No LLM providers configured" }
+        var lastError: Exception? = null
+        for (provider in configured) {
+            try {
+                val model = pickModel(provider.modelNames)
+                val text = generateChunk(provider, systemPrompt, model)
+                return GeneratedChunk(
+                    text = text,
+                    modelName = model,
+                    providerBaseUrl = provider.baseUrl,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+        throw lastError ?: IllegalStateException("All LLM providers failed")
+    }
+
     suspend fun generateChunk(
-        settings: AppSettings,
+        provider: LlmProvider,
         systemPrompt: String,
         modelName: String,
     ): String = withContext(Dispatchers.IO) {
-        val root = settings.llmBaseUrl.trimEnd('/')
+        val root = provider.baseUrl.trimEnd('/')
         val url = "$root/v1/chat/completions"
         val messages = JSONArray()
             .put(JSONObject().put("role", "system").put("content", systemPrompt))
@@ -50,8 +87,8 @@ class RemoteLlmClient(
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val requestBody = bodyJson.toString().toRequestBody(mediaType)
         val builder = Request.Builder().url(url).post(requestBody)
-        if (settings.llmToken.isNotBlank()) {
-            builder.header("Authorization", "Bearer ${settings.llmToken.trim()}")
+        if (provider.token.isNotBlank()) {
+            builder.header("Authorization", "Bearer ${provider.token.trim()}")
         }
         val request = builder.build()
         suspendCancellableCoroutine { cont ->

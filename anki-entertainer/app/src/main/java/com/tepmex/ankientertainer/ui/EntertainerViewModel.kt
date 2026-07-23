@@ -10,6 +10,7 @@ import com.tepmex.ankientertainer.data.StoredChunk
 import com.tepmex.ankientertainer.data.hanzi.OfflineMnemonicFallback
 import com.tepmex.ankientertainer.data.hanzi.PromptExpansionResult
 import com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine
+import com.tepmex.ankientertainer.data.configuredProviders
 import com.tepmex.ankientertainer.data.isLlmConfigured
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -148,17 +149,17 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
         generationJob = viewModelScope.launch {
             val generated = mutableListOf<TextChunk>()
             try {
+                val providers = settings.configuredProviders()
                 repeat(needed) { index ->
-                    val model = llmClient.pickRandomModel(settings.modelNames)
                     _uiState.value = _uiState.value.copy(
                         statusMessage = "Generating chunk ${index + 1} of $needed…$warningSuffix",
                     )
-                    val text = llmClient.generateChunk(settings, systemPrompt, model)
+                    val result = llmClient.generateChunkWithFallback(providers, systemPrompt)
                     val chunk = TextChunk(
                         id = LikedChunksRepository.newId(),
-                        text = text,
+                        text = result.text,
                         isLiked = false,
-                        modelName = model,
+                        modelName = result.modelName,
                     )
                     generated.add(chunk)
                     _uiState.value = _uiState.value.copy(
