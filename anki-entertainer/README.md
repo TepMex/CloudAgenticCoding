@@ -27,7 +27,7 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 ## Settings
 
-- Ordered OpenAI-compatible LLM providers (BYOK): each has its own base URL, bearer token, and model list
+- Ordered OpenAI-compatible LLM providers (BYOK): each has its own base URL, bearer token, optional project/folder ID (`OpenAI-Project` header), and model list
 - Providers are tried in order; if one does not respond, the next is used
 - Model names (one per line per provider; each new chunk picks a random model from the provider that responds)
 - Chunk generation prompt with offline placeholders (`{QUERY}`, `{OPPOSITE}`, `{SIMPL_HISTORY}`, `{MNEMO_EXAMPLES}`, `{SEMANTIC}`, `{PHONETIC}`) and prompt preview

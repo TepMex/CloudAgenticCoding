@@ -77,8 +77,9 @@ Settings store an ordered list of OpenAI-compatible providers. Each provider has
 
 | Setting | Description |
 |---------|-------------|
-| API base URL | OpenAI-compatible root (e.g. `https://api.openai.com`) |
+| API base URL | OpenAI-compatible root without trailing `/v1` (e.g. `https://api.openai.com`, `https://ai.api.cloud.yandex.net`) |
 | Access token | Bearer token (optional if the endpoint does not require auth) |
+| Project / folder ID | Optional. When set, sent as the `OpenAI-Project` HTTP header (same as OpenAI SDK `project=`). Required for Yandex Cloud (folder ID). Leave empty for providers that do not use it. |
 | Model list | One or more model names; **each new chunk** uses a **randomly picked** model from **that provider's** list |
 
 **Fallback order:** for each chunk request, the app tries providers in list order. If the first does not respond (network error, HTTP error, empty/invalid response), it tries the second, and so on. Cancellation does not fall through to the next provider. If every configured provider fails before any chunk is returned, offline mnemonic fallback applies (requirement 8).
@@ -136,6 +137,7 @@ data class LlmProvider(
     val baseUrl: String,
     val token: String,
     val modelNames: List<String>,
+    val project: String = "",  // optional; OpenAI-Project header when non-blank
 )
 
 data class AppSettings(
@@ -180,6 +182,7 @@ data class TextChunk(
 - Ordered LLM providers (add/remove); each with:
   - API base URL
   - Access token (password field)
+  - Project / folder ID (optional; maps to `OpenAI-Project` header)
   - Model names (multi-line: one model per line)
 - Chunk prompt with documented placeholders, unknown-placeholder warning (save still allowed), and offline prompt preview
 - Chunk count (number)
@@ -194,6 +197,7 @@ data class TextChunk(
 ## LLM integration
 
 - OpenAI-compatible `POST {baseUrl}/v1/chat/completions` per provider
+- Optional `OpenAI-Project` request header when the provider's project field is non-blank (OpenAI SDK `project=`; e.g. Yandex Cloud folder ID)
 - Per chunk: try providers in order until one succeeds; `temperature ≈ 0.8`
 - System message: **already-expanded** prompt from `PromptTemplateEngine` (client does not query Hanzi metadata)
 - User message: brief instruction to output a single short chunk (no markdown wrapper)
@@ -247,3 +251,4 @@ anki-entertainer/
 5. Unlike removes chunk from saved set for that vocab.
 6. With no LLM provider configured or all providers unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han compounds and characters in the vocabulary when the offline DB has them.
 7. With multiple providers configured, if the first fails a chunk request, the next provider in order is tried before falling back offline.
+8. When a provider's optional project/folder ID is set, chat completion requests include `OpenAI-Project: <value>`; when blank, that header is omitted.

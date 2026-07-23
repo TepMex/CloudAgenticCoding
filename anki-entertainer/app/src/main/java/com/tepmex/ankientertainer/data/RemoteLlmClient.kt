@@ -90,6 +90,10 @@ class RemoteLlmClient(
         if (provider.token.isNotBlank()) {
             builder.header("Authorization", "Bearer ${provider.token.trim()}")
         }
+        // OpenAI SDK `project=` → OpenAI-Project (e.g. Yandex Cloud folder ID).
+        if (provider.project.isNotBlank()) {
+            builder.header("OpenAI-Project", provider.project.trim())
+        }
         val request = builder.build()
         suspendCancellableCoroutine { cont ->
             val call = client.newCall(request)
