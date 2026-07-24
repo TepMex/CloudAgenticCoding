@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -108,8 +107,7 @@ fun RegularTasksScreen(
                                 headlineContent = {
                                     Text(
                                         task.name,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = true,
                                     )
                                 },
                                 supportingContent = {

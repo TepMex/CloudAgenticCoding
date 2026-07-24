@@ -46,7 +46,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.zuotasks.domain.TreeNodeItem
@@ -225,8 +224,7 @@ private fun ProjectListItem(
         headlineContent = {
             Text(
                 text = item.name,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                softWrap = true,
                 textDecoration = if (item.isTask && item.isCompleted) {
                     TextDecoration.LineThrough
                 } else {
