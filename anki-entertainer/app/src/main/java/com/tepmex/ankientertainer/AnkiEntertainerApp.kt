@@ -1,6 +1,7 @@
 package com.tepmex.ankientertainer
 
 import android.app.Application
+import androidx.appcompat.app.AppCompatDelegate
 import com.tepmex.ankientertainer.data.AppPreferences
 import com.tepmex.ankientertainer.data.LikedChunksRepository
 import com.tepmex.ankientertainer.data.hanzi.DefaultPromptTemplateEngine
@@ -26,6 +27,7 @@ class AnkiEntertainerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         preferences = AppPreferences(this)
         likedChunks = LikedChunksRepository(this)
         hanziMetadataRepository = RoomHanziMetadataRepository(

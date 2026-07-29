@@ -127,6 +127,7 @@ A provider is configured when its base URL is non-blank and its model list is no
 - **Offline**: LLM generation requires network. When the LLM is missing or unreachable, fall back to up to 5 local mnemonic stories (requirement 8) instead of leaving the session empty.
 - **Privacy**: API keys stored locally in DataStore on device only.
 - **Cancellation**: in-flight generation can be stopped; partial results remain until regenerate.
+- **Theme**: UI follows the system light/dark setting (`Theme.Material3.DayNight`, `MODE_NIGHT_FOLLOW_SYSTEM`). No in-app theme override in v1.
 
 ## Data model
 
@@ -165,6 +166,10 @@ data class TextChunk(
 - Vocabulary key = exact decoded string from deep link.
 
 ## UI
+
+### Appearance
+
+- Light and dark surfaces track the device system theme; brand primary remains purple with night-adjusted containers.
 
 ### Main screen
 
@@ -252,3 +257,4 @@ anki-entertainer/
 6. With no LLM provider configured or all providers unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han compounds and characters in the vocabulary when the offline DB has them.
 7. With multiple providers configured, if the first fails a chunk request, the next provider in order is tried before falling back offline.
 8. When a provider's optional project/folder ID is set, chat completion requests include `OpenAI-Project: <value>`; when blank, that header is omitted.
+9. With the device in light mode the app uses a light Material 3 surface; with the device in dark mode it uses a dark surface (system theme, no forced light theme).
