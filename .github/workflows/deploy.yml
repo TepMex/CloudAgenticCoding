@@ -16,7 +16,7 @@ permissions:
 
 env:
   WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike sense-of-text map-of-chinese mandarin-kanshu-pengyou
-  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo
+  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log
 
 jobs:
   detect:
@@ -42,6 +42,7 @@ jobs:
       build_zou_lu_shang: ${{ steps.plan.outputs.build_zou_lu_shang }}
       build_zou_lu_shang_2: ${{ steps.plan.outputs.build_zou_lu_shang_2 }}
       build_pair_comp_elo: ${{ steps.plan.outputs.build_pair_comp_elo }}
+      build_running_log: ${{ steps.plan.outputs.build_running_log }}
       refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
       any_web_build: ${{ steps.plan.outputs.any_web_build }}
       any_android_apk_build: ${{ steps.plan.outputs.any_android_apk_build }}
@@ -94,6 +95,8 @@ jobs:
               - 'zou-lu-shang-2/**'
             pair-comp-elo:
               - 'pair-comp-elo/**'
+            running-log:
+              - 'running-log/**'
             shared-android-signing:
               - 'android/sideload-signing.gradle.kts'
               - 'android/verify-apk-sideload-cert.sh'
@@ -137,6 +140,7 @@ jobs:
           CHANGED_ZOU_LU_SHANG: ${{ steps.changes.outputs.zou-lu-shang }}
           CHANGED_ZOU_LU_SHANG_2: ${{ steps.changes.outputs.zou-lu-shang-2 }}
           CHANGED_PAIR_COMP_ELO: ${{ steps.changes.outputs.pair-comp-elo }}
+          CHANGED_RUNNING_LOG: ${{ steps.changes.outputs.running-log }}
           CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
           CHANGED_ANDROID_LANDING: ${{ steps.changes.outputs.shared-android-landing }}
           CHANGED_SCRIPTS: ${{ steps.changes.outputs.shared-scripts }}
@@ -175,6 +179,7 @@ jobs:
           build_zou_lu_shang=false
           build_zou_lu_shang_2=false
           build_pair_comp_elo=false
+          build_running_log=false
           refresh_android_landings=false
 
           if $full_deploy; then
@@ -196,6 +201,7 @@ jobs:
             build_zou_lu_shang=true
             build_zou_lu_shang_2=true
             build_pair_comp_elo=true
+            build_running_log=true
           else
             is_true "$CHANGED_SOCRATUS" && build_socratus=true
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
@@ -215,6 +221,7 @@ jobs:
             is_true "$CHANGED_ZOU_LU_SHANG" && build_zou_lu_shang=true
             is_true "$CHANGED_ZOU_LU_SHANG_2" && build_zou_lu_shang_2=true
             is_true "$CHANGED_PAIR_COMP_ELO" && build_pair_comp_elo=true
+            is_true "$CHANGED_RUNNING_LOG" && build_running_log=true
 
             if is_true "$CHANGED_ANDROID_SIGNING"; then
               build_chesswatch=true
@@ -228,6 +235,7 @@ jobs:
               build_zou_lu_shang=true
               build_zou_lu_shang_2=true
               build_pair_comp_elo=true
+              build_running_log=true
             fi
 
             if is_true "$CHANGED_ANDROID_LANDING" || is_true "$CHANGED_SCRIPTS"; then
@@ -239,7 +247,7 @@ jobs:
           $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -265,6 +273,7 @@ jobs:
             echo "build_zou_lu_shang=$build_zou_lu_shang"
             echo "build_zou_lu_shang_2=$build_zou_lu_shang_2"
             echo "build_pair_comp_elo=$build_pair_comp_elo"
+            echo "build_running_log=$build_running_log"
             echo "refresh_android_landings=$refresh_android_landings"
             echo "any_web_build=$any_web_build"
             echo "any_android_apk_build=$any_android_apk_build"
@@ -460,6 +469,11 @@ jobs:
         working-directory: pair-comp-elo
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build running-log APK
+        if: needs.detect.outputs.build_running_log == 'true'
+        working-directory: running-log
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Verify APK sideload signing
         if: needs.detect.outputs.any_android_apk_build == 'true'
         env:
@@ -474,6 +488,7 @@ jobs:
           BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
+          BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
         run: |
           set -euo pipefail
           chmod +x android/verify-apk-sideload-cert.sh
@@ -492,6 +507,7 @@ jobs:
           if is_true "$BUILD_ZOU_LU_SHANG"; then verify zou-lu-shang; fi
           if is_true "$BUILD_ZOU_LU_SHANG_2"; then verify zou-lu-shang-2; fi
           if is_true "$BUILD_PAIR_COMP_ELO"; then verify pair-comp-elo; fi
+          if is_true "$BUILD_RUNNING_LOG"; then verify running-log; fi
 
       - name: Prepare GitHub Pages site
         env:
@@ -514,6 +530,7 @@ jobs:
           BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
+          BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -576,11 +593,12 @@ jobs:
               zou-lu-shang) is_true "$BUILD_ZOU_LU_SHANG" ;;
               zou-lu-shang-2) is_true "$BUILD_ZOU_LU_SHANG_2" ;;
               pair-comp-elo) is_true "$BUILD_PAIR_COMP_ELO" ;;
+              running-log) is_true "$BUILD_RUNNING_LOG" ;;
               *) return 1 ;;
             esac
           }
 
-          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo; do
+          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -615,6 +633,7 @@ jobs:
           BUILD_ZOU_LU_SHANG: ${{ needs.detect.outputs.build_zou_lu_shang }}
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
+          BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -634,6 +653,7 @@ jobs:
           should_inject zou-lu-shang "$BUILD_ZOU_LU_SHANG" && pages+=(deploy/zou-lu-shang/index.html)
           should_inject zou-lu-shang-2 "$BUILD_ZOU_LU_SHANG_2" && pages+=(deploy/zou-lu-shang-2/index.html)
           should_inject pair-comp-elo "$BUILD_PAIR_COMP_ELO" && pages+=(deploy/pair-comp-elo/index.html)
+          should_inject running-log "$BUILD_RUNNING_LOG" && pages+=(deploy/running-log/index.html)
           if [[ ${#pages[@]} -eq 0 ]]; then
             echo "No Android landing pages to update"
             exit 0
