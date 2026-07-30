@@ -36,15 +36,20 @@ object SportRecordParser {
             else -> JSONObject()
         }
 
-        val workoutId = rec.optString("sid").ifBlank { rec.optString("did") }
-        if (workoutId.isBlank()) return null
+        val sid = rec.optString("sid").trim().ifBlank { rec.optString("did").trim() }
+        val watermark = rec.optLong("watermark", 0L)
+        val timeHint = rec.optLong("time", 0L)
+        // Watermark is unique in Xiaomi's sync stream; include it so shared device
+        // sids cannot collapse many workouts into one Room row.
+        val workoutId = resolveWorkoutId(sid = sid, watermark = watermark, time = timeHint)
+            ?: return null
 
         val sportType = rec.optString("key").ifBlank {
             rec.optString("category", "unknown")
         }
 
         val start = value.optLong("start_time", 0L).takeIf { it > 0 }
-            ?: rec.optLong("time", 0L)
+            ?: timeHint
         val duration = value.optInt("duration", 0)
         val end = value.optLong("end_time", 0L).takeIf { it > 0 }
             ?: (start + duration)
@@ -80,10 +85,19 @@ object SportRecordParser {
             avgBpm = avgBpm,
             cadenceSpm = cadence,
             calories = calories,
-            watermark = rec.optLong("watermark", 0L),
+            watermark = watermark,
             rawJson = value.toString(),
             steps = steps,
         )
+    }
+
+    /** Stable unique key for a cloud sport record. */
+    fun resolveWorkoutId(sid: String, watermark: Long, time: Long): String? = when {
+        watermark > 0L && sid.isNotBlank() -> "$sid#$watermark"
+        watermark > 0L -> "wm:$watermark"
+        sid.isNotBlank() && time > 0L -> "$sid#$time"
+        sid.isNotBlank() -> sid
+        else -> null
     }
 }
 

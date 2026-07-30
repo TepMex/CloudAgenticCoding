@@ -65,7 +65,7 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 
 | Column | Type | Notes |
 |--------|------|-------|
-| workoutId | TEXT PK | Xiaomi `sid` |
+| workoutId | TEXT PK | `sid#watermark` (falls back to `wm:watermark` / `sid#time`) |
 | sportType | TEXT | e.g. `outdoor_running` |
 | startTimeEpochSec | LONG | |
 | endTimeEpochSec | LONG | |

@@ -62,7 +62,7 @@ class SportRecordParserTest {
             """.trimIndent(),
         )
         val parsed = SportRecordParser.parseCloudRecord(rec)!!
-        assertEquals("run-1", parsed.workoutId)
+        assertEquals("run-1#99", parsed.workoutId)
         assertEquals("outdoor_running", parsed.sportType)
         assertEquals(5000.0, parsed.distanceMeters, 0.01)
         assertEquals(360.0, parsed.paceSecPerKm, 0.01)
@@ -85,7 +85,16 @@ class SportRecordParserTest {
             """.trimIndent(),
         )
         val parsed = SportRecordParser.parseCloudRecord(rec)!!
+        assertEquals("run-2#1", parsed.workoutId)
         assertEquals(4120.0, parsed.distanceMeters, 0.01)
         assertEquals(1200 / 4.12, parsed.paceSecPerKm, 0.5)
+    }
+
+    @Test
+    fun resolveWorkoutId_prefersSidPlusWatermark() {
+        assertEquals("abc#10", SportRecordParser.resolveWorkoutId("abc", 10L, 0L))
+        assertEquals("wm:10", SportRecordParser.resolveWorkoutId("", 10L, 0L))
+        assertEquals("abc#1700", SportRecordParser.resolveWorkoutId("abc", 0L, 1700L))
+        assertEquals("abc", SportRecordParser.resolveWorkoutId("abc", 0L, 0L))
     }
 }
