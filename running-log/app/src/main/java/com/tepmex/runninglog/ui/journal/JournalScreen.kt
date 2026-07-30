@@ -235,6 +235,11 @@ private fun RunRow(run: RunningActivityEntity, averages: TrailingYearAverages) {
             run.cadenceSpm.takeIf { it > 0 }?.let { "%.0f spm".format(it) } ?: "—",
             vsAverage = cadenceVs,
         )
+        MetricLine(
+            "VO₂ max",
+            run.vo2MaxMlKgMin.takeIf { it > 0 }?.let { "${RunningMetrics.formatVo2Max(it)} ml/kg/min" }
+                ?: "—",
+        )
     }
 }
 

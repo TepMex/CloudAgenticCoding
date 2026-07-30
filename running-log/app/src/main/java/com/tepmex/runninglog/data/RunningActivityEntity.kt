@@ -15,6 +15,8 @@ data class RunningActivityEntity(
     val distanceMeters: Double,
     val paceSecPerKm: Double,
     val avgBpm: Int,
+    val maxBpm: Int = 0,
+    val cloudVo2Max: Int = 0,
     val cadenceSpm: Double,
     val calories: Double,
     val watermark: Long,
@@ -22,6 +24,15 @@ data class RunningActivityEntity(
 ) {
     val heartbitsPerKm: Double
         get() = RunningMetrics.heartbitsPerKm(avgBpm, paceSecPerKm)
+
+    /** Prefer cloud VO₂ max; fall back to ACSM pace + HR estimate. */
+    val vo2MaxMlKgMin: Double
+        get() = RunningMetrics.resolveVo2MaxMlKgMin(
+            cloudVo2Max = cloudVo2Max,
+            paceSecPerKm = paceSecPerKm,
+            avgBpm = avgBpm,
+            maxBpm = maxBpm,
+        )
 
     companion object {
         fun fromParsed(p: ParsedSportRecord) = RunningActivityEntity(
@@ -33,6 +44,8 @@ data class RunningActivityEntity(
             distanceMeters = p.distanceMeters,
             paceSecPerKm = p.paceSecPerKm,
             avgBpm = p.avgBpm,
+            maxBpm = p.maxBpm,
+            cloudVo2Max = p.cloudVo2Max,
             cadenceSpm = p.cadenceSpm,
             calories = p.calories,
             watermark = p.watermark,

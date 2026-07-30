@@ -15,6 +15,65 @@ class RunningMetricsTest {
     }
 
     @Test
+    fun runningOxygenCost_acsmFlatRunning() {
+        // 6:00/km → 166.666… m/min → 0.2×v + 3.5 = 36.833…
+        val cost = RunningMetrics.runningOxygenCostMlKgMin(360.0)
+        assertEquals(0.2 * (60_000.0 / 360.0) + 3.5, cost, 0.001)
+    }
+
+    @Test
+    fun estimateVo2Max_dividesCostByHrIntensity() {
+        // pace 6:00, avg 150, max 185 → cost / (150/185)
+        val paceSec = 360.0
+        val cost = RunningMetrics.runningOxygenCostMlKgMin(paceSec)
+        val expected = cost / (150.0 / 185.0)
+        assertEquals(expected, RunningMetrics.estimateVo2MaxMlKgMin(paceSec, 150, 185), 0.001)
+    }
+
+    @Test
+    fun estimateVo2Max_zeroWhenInputsInvalid() {
+        assertEquals(0.0, RunningMetrics.estimateVo2MaxMlKgMin(0.0, 150, 185), 0.0)
+        assertEquals(0.0, RunningMetrics.estimateVo2MaxMlKgMin(360.0, 0, 185), 0.0)
+        assertEquals(0.0, RunningMetrics.estimateVo2MaxMlKgMin(360.0, 150, 0), 0.0)
+        assertEquals(0.0, RunningMetrics.estimateVo2MaxMlKgMin(360.0, 190, 185), 0.0)
+    }
+
+    @Test
+    fun resolveVo2Max_prefersCloudValue() {
+        assertEquals(
+            49.0,
+            RunningMetrics.resolveVo2MaxMlKgMin(
+                cloudVo2Max = 49,
+                paceSecPerKm = 360.0,
+                avgBpm = 150,
+                maxBpm = 185,
+            ),
+            0.0,
+        )
+    }
+
+    @Test
+    fun resolveVo2Max_fallsBackToEstimateWhenCloudMissing() {
+        val estimated = RunningMetrics.estimateVo2MaxMlKgMin(360.0, 150, 185)
+        assertEquals(
+            estimated,
+            RunningMetrics.resolveVo2MaxMlKgMin(
+                cloudVo2Max = 0,
+                paceSecPerKm = 360.0,
+                avgBpm = 150,
+                maxBpm = 185,
+            ),
+            0.001,
+        )
+    }
+
+    @Test
+    fun formatVo2Max_roundedIntegerOrDash() {
+        assertEquals("45", RunningMetrics.formatVo2Max(45.4))
+        assertEquals("—", RunningMetrics.formatVo2Max(0.0))
+    }
+
+    @Test
     fun paceFallsBackToDurationOverDistance() {
         val pace = RunningMetrics.resolvePaceSecPerKm(
             avgPaceSec = 0.0,
@@ -100,7 +159,7 @@ class SportRecordParserTest {
               "sid": "run-1",
               "key": "outdoor_running",
               "watermark": 99,
-              "value": "{\"start_time\":1700000000,\"end_time\":1700001800,\"duration\":1800,\"distance\":5000,\"avg_hrm\":148,\"avg_pace\":360,\"avg_cadence\":170,\"calories\":320}"
+              "value": "{\"start_time\":1700000000,\"end_time\":1700001800,\"duration\":1800,\"distance\":5000,\"avg_hrm\":148,\"max_hrm\":182,\"vo2_max\":47,\"avg_pace\":360,\"avg_cadence\":170,\"calories\":320}"
             }
             """.trimIndent(),
         )
@@ -110,9 +169,55 @@ class SportRecordParserTest {
         assertEquals(5000.0, parsed.distanceMeters, 0.01)
         assertEquals(360.0, parsed.paceSecPerKm, 0.01)
         assertEquals(148, parsed.avgBpm)
+        assertEquals(182, parsed.maxBpm)
+        assertEquals(47, parsed.cloudVo2Max)
         assertEquals(170.0, parsed.cadenceSpm, 0.01)
         assertEquals(99L, parsed.watermark)
         assertEquals(148 * 6.0, RunningMetrics.heartbitsPerKm(parsed.avgBpm, parsed.paceSecPerKm), 0.01)
+        assertEquals(
+            47.0,
+            RunningMetrics.resolveVo2MaxMlKgMin(
+                parsed.cloudVo2Max,
+                parsed.paceSecPerKm,
+                parsed.avgBpm,
+                parsed.maxBpm,
+            ),
+            0.0,
+        )
+    }
+
+    @Test
+    fun estimatesVo2MaxWhenCloudFieldAbsent() {
+        val rec = JSONObject(
+            """
+            {
+              "sid": "run-3",
+              "key": "outdoor_running",
+              "watermark": 3,
+              "value": {
+                "distance": 5000,
+                "duration": 1800,
+                "avg_pace": 360,
+                "avg_hrm": 150,
+                "max_hrm": 185
+              }
+            }
+            """.trimIndent(),
+        )
+        val parsed = SportRecordParser.parseCloudRecord(rec)!!
+        assertEquals(0, parsed.cloudVo2Max)
+        assertEquals(185, parsed.maxBpm)
+        val expected = RunningMetrics.estimateVo2MaxMlKgMin(360.0, 150, 185)
+        assertEquals(
+            expected,
+            RunningMetrics.resolveVo2MaxMlKgMin(
+                parsed.cloudVo2Max,
+                parsed.paceSecPerKm,
+                parsed.avgBpm,
+                parsed.maxBpm,
+            ),
+            0.001,
+        )
     }
 
     @Test
