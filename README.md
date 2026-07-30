@@ -26,7 +26,8 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `zou-lu-shang` | [zou-lu-shang](https://tepmex.github.io/CloudAgenticCoding/zou-lu-shang/) | zou-lu-shang · Takeout location history tile grid on OSM (APK) |
 | `zou-lu-shang-2` | [zou-lu-shang-2](https://tepmex.github.io/CloudAgenticCoding/zou-lu-shang-2/) | zou-lu-shang-2 · Paint the map by walking with GPS brush (APK) |
 | `pair-comp-elo` | [pair-comp-elo](https://tepmex.github.io/CloudAgenticCoding/pair-comp-elo/) | Pair Comp Elo · pairwise ranking with Elo + decay (APK) |
+| `running-log` | [running-log](https://tepmex.github.io/CloudAgenticCoding/running-log/) | running-log · Mi Band running journal (APK) |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
-Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
+Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.

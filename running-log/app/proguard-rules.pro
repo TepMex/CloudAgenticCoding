@@ -1,0 +1,6 @@
+-keep class com.tepmex.runninglog.data.** { *; }
+-keep class com.tepmex.runninglog.mi.AuthToken { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
