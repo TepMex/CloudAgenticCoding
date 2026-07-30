@@ -263,6 +263,10 @@ class RunningLogViewModel(
         }
     }
 
+    fun consumeJournalMessage() {
+        _journalMeta.update { it.copy(statusMessage = null, error = null) }
+    }
+
     fun signOut() {
         cancelBrowserSignIn()
         repository.signOut()

@@ -90,8 +90,11 @@ class RunningRepository(
         if (runs.isEmpty()) {
             return SyncResult(0, "No new running activities")
         }
-        dao.upsertAll(runs.map { RunningActivityEntity.fromParsed(it) })
-        return SyncResult(runs.size, "Imported ${runs.size} run(s)")
+        val entities = runs
+            .map { RunningActivityEntity.fromParsed(it) }
+            .distinctBy { it.workoutId }
+        dao.upsertAll(entities)
+        return SyncResult(entities.size, "Imported ${entities.size} run(s)")
     }
 
     companion object {

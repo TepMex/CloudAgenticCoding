@@ -92,6 +92,7 @@ fun RunningLogAppShell(
             state = journal,
             onSync = vm::sync,
             onSignOut = vm::signOut,
+            onMessageConsumed = vm::consumeJournalMessage,
             modifier = modifier.fillMaxSize(),
         )
     }
