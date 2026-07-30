@@ -26,6 +26,10 @@
    - **cadence** (average steps per minute)
 6. Manual **Sync** action from the journal screen.
 7. Sign out clears stored credentials (journal data may remain until cleared/uninstall).
+8. Compete-with-self highlighting for **cadence** and **heartbits/km**:
+   - Compute arithmetic means over runs started in the **last 365 days** (valid values only: metric > 0).
+   - On each journal row, color those two metric values **green** when better than the trailing-year average, **red** when worse (equal / missing → default color).
+   - Better direction: **cadence higher** is better; **heartbits/km lower** is better (efficiency).
 
 ## Interfaces
 
@@ -54,6 +58,8 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 | Avg BPM | `avg_hrm` |
 | Heartbits/km | `avg_bpm * (pace_sec / 60.0)` |
 | Cadence | `avg_cadence` if > 0 else `steps / (duration_min)` |
+| Trailing-year cadence avg | Mean of `cadenceSpm > 0` for runs with `start` in `[now−365d, now]` |
+| Trailing-year heartbits/km avg | Mean of `heartbitsPerKm > 0` for runs with `start` in `[now−365d, now]` |
 
 ## Data model
 
@@ -81,7 +87,7 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 ## UI / UX
 
 1. **Login** — region; primary **Sign in with browser** / **Sign in with in-app browser**; optional password form; SMS sub-step when required.
-2. **Journal** — newest-first list of runs with the six metrics; top bar Sync + overflow Sign out.
+2. **Journal** — newest-first list of runs with the six metrics; cadence and heartbits/km colored vs trailing-year averages; top bar Sync + overflow Sign out.
 3. Empty states: not signed in → login; signed in with no runs → prompt to sync.
 
 Visual direction: trail/forest light theme (deep green + warm stone), not Material purple defaults. Utility journal (not a marketing landing).
@@ -99,9 +105,10 @@ Visual direction: trail/forest light theme (deep green + warm stone), not Materi
 
 1. With a valid Xiaomi Fitness account that has outdoor/treadmill runs, Sync imports those runs into the journal.
 2. Journal rows show date, distance, temp, avg bpm, heartbits/km, cadence with the formulas above.
-3. Non-running sport types are not listed.
-4. Unit tests cover crypto round-trip, sport JSON parsing, running filter, and metric formulas.
-5. Release APK builds with the monorepo sideload keystore.
+3. Cadence and heartbits/km values are green when better than the last-365-day mean, red when worse (cadence ↑ better; heartbits/km ↓ better).
+4. Non-running sport types are not listed.
+5. Unit tests cover crypto round-trip, sport JSON parsing, running filter, metric formulas, and trailing-year average / comparison.
+6. Release APK builds with the monorepo sideload keystore.
 
 ## Attribution / risk
 

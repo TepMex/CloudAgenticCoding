@@ -39,6 +39,49 @@ class RunningMetricsTest {
         assertEquals("5:30", RunningMetrics.formatPace(330.0))
         assertEquals("—", RunningMetrics.formatPace(0.0))
     }
+
+    @Test
+    fun trailingYearAverages_meansOfRunsInLast365Days() {
+        val day = 86_400L
+        val now = 400 * day
+        val samples = listOf(
+            // Inside window
+            RunMetricSample(startTimeEpochSec = now - 10 * day, cadenceSpm = 160.0, heartbitsPerKm = 800.0),
+            RunMetricSample(startTimeEpochSec = now - 100 * day, cadenceSpm = 180.0, heartbitsPerKm = 900.0),
+            // Outside window (>365 days ago)
+            RunMetricSample(startTimeEpochSec = now - 400 * day, cadenceSpm = 200.0, heartbitsPerKm = 700.0),
+            // Zero metrics ignored for that average
+            RunMetricSample(startTimeEpochSec = now - 5 * day, cadenceSpm = 0.0, heartbitsPerKm = 0.0),
+        )
+        val avg = RunningMetrics.trailingYearAverages(samples, nowEpochSec = now)
+        assertEquals(170.0, avg.avgCadenceSpm!!, 0.001)
+        assertEquals(850.0, avg.avgHeartbitsPerKm!!, 0.001)
+    }
+
+    @Test
+    fun trailingYearAverages_nullWhenNoValidSamplesInWindow() {
+        val avg = RunningMetrics.trailingYearAverages(emptyList(), nowEpochSec = 1_000_000L)
+        assertEquals(null, avg.avgCadenceSpm)
+        assertEquals(null, avg.avgHeartbitsPerKm)
+    }
+
+    @Test
+    fun compareCadence_higherIsBetter() {
+        assertEquals(MetricVsAverage.Better, RunningMetrics.compareCadence(180.0, 170.0))
+        assertEquals(MetricVsAverage.Worse, RunningMetrics.compareCadence(160.0, 170.0))
+        assertEquals(MetricVsAverage.Equal, RunningMetrics.compareCadence(170.0, 170.0))
+        assertEquals(MetricVsAverage.Unavailable, RunningMetrics.compareCadence(180.0, null))
+        assertEquals(MetricVsAverage.Unavailable, RunningMetrics.compareCadence(0.0, 170.0))
+    }
+
+    @Test
+    fun compareHeartbitsPerKm_lowerIsBetter() {
+        assertEquals(MetricVsAverage.Better, RunningMetrics.compareHeartbitsPerKm(800.0, 850.0))
+        assertEquals(MetricVsAverage.Worse, RunningMetrics.compareHeartbitsPerKm(900.0, 850.0))
+        assertEquals(MetricVsAverage.Equal, RunningMetrics.compareHeartbitsPerKm(850.0, 850.0))
+        assertEquals(MetricVsAverage.Unavailable, RunningMetrics.compareHeartbitsPerKm(800.0, null))
+        assertEquals(MetricVsAverage.Unavailable, RunningMetrics.compareHeartbitsPerKm(0.0, 850.0))
+    }
 }
 
 class SportRecordParserTest {

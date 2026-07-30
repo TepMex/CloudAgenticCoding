@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.runninglog.data.RunningRepository
+import com.tepmex.runninglog.domain.RunMetricSample
+import com.tepmex.runninglog.domain.RunningMetrics
 import com.tepmex.runninglog.mi.AuthException
 import com.tepmex.runninglog.mi.BrowserLoginCancelledException
 import com.tepmex.runninglog.mi.BrowserLoginSession
@@ -14,6 +16,7 @@ import com.tepmex.runninglog.mi.NotificationUrlRequiredException
 import com.tepmex.runninglog.ui.journal.JournalUiState
 import com.tepmex.runninglog.ui.login.LoginStep
 import com.tepmex.runninglog.ui.login.LoginUiState
+import java.time.Instant
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +52,17 @@ class RunningLogViewModel(
         repository.activities,
         _journalMeta,
     ) { activities, meta ->
-        meta.copy(activities = activities)
+        val averages = RunningMetrics.trailingYearAverages(
+            samples = activities.map {
+                RunMetricSample(
+                    startTimeEpochSec = it.startTimeEpochSec,
+                    cadenceSpm = it.cadenceSpm,
+                    heartbitsPerKm = it.heartbitsPerKm,
+                )
+            },
+            nowEpochSec = Instant.now().epochSecond,
+        )
+        meta.copy(activities = activities, trailingYearAverages = averages)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JournalUiState())
 
     private var browserJob: Job? = null

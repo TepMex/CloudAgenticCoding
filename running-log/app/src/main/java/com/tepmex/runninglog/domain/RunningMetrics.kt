@@ -101,7 +101,29 @@ object SportRecordParser {
     }
 }
 
+/** One run’s inputs for trailing-year averages (domain seam; not a Room entity). */
+data class RunMetricSample(
+    val startTimeEpochSec: Long,
+    val cadenceSpm: Double,
+    val heartbitsPerKm: Double,
+)
+
+data class TrailingYearAverages(
+    val avgCadenceSpm: Double?,
+    val avgHeartbitsPerKm: Double?,
+)
+
+enum class MetricVsAverage {
+    Better,
+    Worse,
+    Equal,
+    Unavailable,
+}
+
 object RunningMetrics {
+    const val TRAILING_YEAR_DAYS = 365
+    private const val SECONDS_PER_DAY = 86_400L
+
     fun resolvePaceSecPerKm(
         avgPaceSec: Double,
         durationSec: Int,
@@ -141,5 +163,46 @@ object RunningMetrics {
     fun formatDistanceKm(meters: Double): String {
         if (meters <= 0) return "—"
         return "%.2f km".format(meters / 1000.0)
+    }
+
+    /**
+     * Arithmetic means of cadence and heartbits/km for runs started in the last
+     * [TRAILING_YEAR_DAYS] days ending at [nowEpochSec]. Zero/missing metrics are skipped.
+     */
+    fun trailingYearAverages(
+        samples: List<RunMetricSample>,
+        nowEpochSec: Long,
+        windowDays: Int = TRAILING_YEAR_DAYS,
+    ): TrailingYearAverages {
+        val windowStart = nowEpochSec - windowDays.toLong() * SECONDS_PER_DAY
+        val inWindow = samples.filter {
+            it.startTimeEpochSec in windowStart..nowEpochSec
+        }
+        val cadences = inWindow.map { it.cadenceSpm }.filter { it > 0 }
+        val heartbits = inWindow.map { it.heartbitsPerKm }.filter { it > 0 }
+        return TrailingYearAverages(
+            avgCadenceSpm = cadences.takeIf { it.isNotEmpty() }?.average(),
+            avgHeartbitsPerKm = heartbits.takeIf { it.isNotEmpty() }?.average(),
+        )
+    }
+
+    /** Cadence: higher than the trailing-year average is better. */
+    fun compareCadence(value: Double, average: Double?): MetricVsAverage =
+        compareMetric(value, average, higherIsBetter = true)
+
+    /** Heartbits/km: lower than the trailing-year average is better (efficiency). */
+    fun compareHeartbitsPerKm(value: Double, average: Double?): MetricVsAverage =
+        compareMetric(value, average, higherIsBetter = false)
+
+    private fun compareMetric(
+        value: Double,
+        average: Double?,
+        higherIsBetter: Boolean,
+    ): MetricVsAverage {
+        if (value <= 0 || average == null) return MetricVsAverage.Unavailable
+        val cmp = value.compareTo(average)
+        if (cmp == 0) return MetricVsAverage.Equal
+        val better = if (higherIsBetter) cmp > 0 else cmp < 0
+        return if (better) MetricVsAverage.Better else MetricVsAverage.Worse
     }
 }
