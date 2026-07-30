@@ -22,5 +22,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".ui.login.XiaomiAuthWebActivity"
+            android:exported="false"
+            android:label="@string/xiaomi_sign_in"
+            android:theme="@style/Theme.RunningLog"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

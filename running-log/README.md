@@ -1,6 +1,6 @@
 # running-log
 
-Android journal for Mi Band / Xiaomi Fitness **running** workouts. Signs in with a Xiaomi account, syncs outdoor and treadmill activities from the unofficial Fitness cloud API (same protocol family as [miband-bot](https://github.com/alexgetmancom/miband-bot)), and shows date, distance, temp (pace), avg BPM, heartbits/km, and cadence.
+Android journal for Mi Band / Xiaomi Fitness **running** workouts. Signs in with a Xiaomi account (browser Custom Tabs / in-app WebView preferred), syncs outdoor and treadmill activities from the unofficial Fitness cloud API (same protocol family as [miband-bot](https://github.com/alexgetmancom/miband-bot)), and shows date, distance, temp (pace), avg BPM, heartbits/km, and cadence.
 
 See [SPEC.md](./SPEC.md).
 

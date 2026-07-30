@@ -15,7 +15,13 @@ object MiConstants {
     const val XIAOMI_PHONE_INFO_URL = "https://account.xiaomi.com/pass/phoneInfo"
     const val XIAOMI_SEND_TICKET_URL = "https://account.xiaomi.com/pass/sendServiceLoginTicket"
     const val XIAOMI_TICKET_AUTH_URL = "https://account.xiaomi.com/pass/serviceLoginTicketAuth"
+    const val XIAOMI_QR_LOGIN_URL = "https://account.xiaomi.com/longPolling/loginUrl"
+    const val XIAOMI_ACCOUNT_ORIGIN = "https://account.xiaomi.com"
     const val STS_HEALTH_URL = "https://sts-hlth.io.mi.com/healthapp/sts"
+
+    /** HTML login page (not `_json=true`) for WebView / Custom Tabs. */
+    fun accountWebLoginUrl(locale: String = "en_US"): String =
+        "$XIAOMI_LOGIN_URL?sid=$SERVICE_SID_HEALTH&_locale=$locale&appName=$APP_NAME"
 
     const val DEFAULT_USER_AGENT = "Android-12-3.53.1-vivo-V2284A"
     const val DEFAULT_LOGIN_USER_AGENT =
