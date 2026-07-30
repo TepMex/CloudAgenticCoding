@@ -2,6 +2,7 @@ package com.tepmex.runninglog.data
 
 import com.tepmex.runninglog.mi.AuthException
 import com.tepmex.runninglog.mi.AuthToken
+import com.tepmex.runninglog.mi.BrowserLoginSession
 import com.tepmex.runninglog.mi.DeviceUntrustedException
 import com.tepmex.runninglog.mi.MiAuth
 import com.tepmex.runninglog.mi.MiConstants
@@ -23,6 +24,28 @@ class RunningRepository(
     fun currentToken(): AuthToken? = tokenStore.load()?.also { auth.restore(it) }
 
     fun isSignedIn(): Boolean = currentToken()?.isAuthenticated == true
+
+    suspend fun startBrowserLogin(): BrowserLoginSession = auth.startBrowserLoginSession()
+
+    suspend fun completeBrowserLogin(
+        session: BrowserLoginSession,
+        region: String,
+    ): AuthToken {
+        val token = auth.awaitBrowserLogin(session, region)
+        tokenStore.save(token)
+        return token
+    }
+
+    suspend fun loginWithPassToken(
+        passToken: String,
+        userId: String,
+        region: String,
+        deviceId: String = "",
+    ): AuthToken {
+        val token = auth.loginWithPassToken(passToken, userId, region, deviceId)
+        tokenStore.save(token)
+        return token
+    }
 
     suspend fun login(username: String, password: String, region: String): AuthToken {
         return try {

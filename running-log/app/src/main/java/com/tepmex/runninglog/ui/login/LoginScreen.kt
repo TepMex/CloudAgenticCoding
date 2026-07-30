@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +46,9 @@ data class LoginUiState(
     val smsCode: String = "",
     val maskedPhone: String = "",
     val busy: Boolean = false,
+    val waitingBrowser: Boolean = false,
+    val showPasswordForm: Boolean = false,
+    val statusMessage: String? = null,
     val error: String? = null,
 )
 
@@ -56,6 +59,10 @@ fun LoginScreen(
     onPasswordChange: (String) -> Unit,
     onRegionChange: (String) -> Unit,
     onSmsCodeChange: (String) -> Unit,
+    onSignInBrowser: () -> Unit,
+    onSignInWebView: () -> Unit,
+    onCancelBrowser: () -> Unit,
+    onTogglePasswordForm: () -> Unit,
     onSubmitCredentials: () -> Unit,
     onSubmitSms: () -> Unit,
     onBackToCredentials: () -> Unit,
@@ -96,26 +103,6 @@ fun LoginScreen(
 
             AnimatedVisibility(visible = state.step == LoginStep.Credentials, enter = fadeIn(), exit = fadeOut()) {
                 Column {
-                    OutlinedTextField(
-                        value = state.username,
-                        onValueChange = onUsernameChange,
-                        label = { Text("Xiaomi account") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.busy,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = state.password,
-                        onValueChange = onPasswordChange,
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.busy,
-                    )
-                    Spacer(Modifier.height(12.dp))
                     Text("Region", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -130,11 +117,81 @@ fun LoginScreen(
                     }
                     Spacer(Modifier.height(20.dp))
                     Button(
-                        onClick = onSubmitCredentials,
-                        enabled = !state.busy && state.username.isNotBlank() && state.password.isNotBlank(),
+                        onClick = onSignInBrowser,
+                        enabled = !state.busy,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Sign in")
+                        Text("Sign in with browser")
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onSignInWebView,
+                        enabled = !state.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Sign in with in-app browser")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Uses Xiaomi account in Chrome (or an in-app page). " +
+                            "If you are already signed in there, confirm and return here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    if (state.waitingBrowser) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = state.statusMessage ?: "Waiting for Xiaomi sign-in…",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = onCancelBrowser, enabled = state.waitingBrowser) {
+                            Text("Cancel")
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    TextButton(
+                        onClick = onTogglePasswordForm,
+                        enabled = !state.busy || state.waitingBrowser.not(),
+                    ) {
+                        Text(if (state.showPasswordForm) "Hide password sign-in" else "Use password instead")
+                    }
+
+                    AnimatedVisibility(visible = state.showPasswordForm) {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = state.username,
+                                onValueChange = onUsernameChange,
+                                label = { Text("Xiaomi account") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !state.busy,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = state.password,
+                                onValueChange = onPasswordChange,
+                                label = { Text("Password") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !state.busy,
+                            )
+                            Spacer(Modifier.height(20.dp))
+                            Button(
+                                onClick = onSubmitCredentials,
+                                enabled = !state.busy &&
+                                    state.username.isNotBlank() &&
+                                    state.password.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Sign in with password")
+                            }
+                        }
                     }
                 }
             }

@@ -12,7 +12,21 @@ class CaptchaRequiredException(
     val captchaUrl: String,
 ) : AuthException(message)
 
+/** Password login needs interactive 2FA / identity check in a browser or WebView. */
+class NotificationUrlRequiredException(
+    message: String,
+    val notificationUrl: String,
+) : AuthException(message)
+
 class TokenExpiredException(message: String = "Auth token expired") : AuthException(message)
+
+class BrowserLoginTimeoutException(
+    message: String = "Xiaomi browser sign-in timed out",
+) : AuthException(message)
+
+class BrowserLoginCancelledException(
+    message: String = "Xiaomi browser sign-in cancelled",
+) : AuthException(message)
 
 class ApiException(
     message: String,

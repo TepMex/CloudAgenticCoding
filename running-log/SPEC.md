@@ -13,7 +13,7 @@
 
 ## Requirements
 
-1. Sign in with a Xiaomi account (password; SMS verification when the device is untrusted; optional captcha during SMS send).
+1. Sign in with a Xiaomi account via **browser Custom Tabs** or **in-app WebView** (preferred). Password + SMS remain as fallback when the device is untrusted; optional captcha during SMS send.
 2. Persist auth tokens on device; reuse them across launches; refresh via `passToken` when possible.
 3. Sync sport/workout records from Xiaomi Fitness cloud using watermark pagination (`/app/v1/data/get_sport_records_by_watermark`), targeting the signed-in user’s own UID.
 4. Keep only **running** activities: `outdoor_running` and `treadmill`.
@@ -37,7 +37,9 @@ Flow (inspired by miband-bot / mi-fitness-python protocol):
 Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 ```
 
-- Login: `account.xiaomi.com` serviceLogin for SID `miothealth`, then STS exchange at `sts-hlth.io.mi.com`.
+- Preferred login: Xiaomi long-poll session (`/longPolling/loginUrl`, SID `miothealth`) → open `loginUrl` in Custom Tabs (shares Chrome cookies when already signed in) or WebView → await `lp` credentials → STS exchange at `sts-hlth.io.mi.com`.
+- WebView cookie fallback: after interactive account login, read `passToken` + `userId` from CookieManager and exchange via `serviceLogin`.
+- Password fallback: `account.xiaomi.com` serviceLogin / serviceLoginAuth2; `notificationUrl` opens WebView for interactive 2FA.
 - API base (default): `https://ru.hlth.io.mi.com` (region selectable: `ru` / `cn`).
 - Health API requests: RC4-encrypted `data` param + `signature` / `rc4_hash__` / `_nonce`; cookies `cUserId` + `serviceToken`.
 - Workouts: `GET /app/v1/data/get_sport_records_by_watermark` with `relative_uid`, `watermark`, `limit`.
@@ -78,7 +80,7 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 
 ## UI / UX
 
-1. **Login** — username/password + region; progress and error text; SMS / captcha sub-steps when required.
+1. **Login** — region; primary **Sign in with browser** / **Sign in with in-app browser**; optional password form; SMS sub-step when required.
 2. **Journal** — newest-first list of runs with the six metrics; top bar Sync + overflow Sign out.
 3. Empty states: not signed in → login; signed in with no runs → prompt to sync.
 
