@@ -42,14 +42,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.tepmex.runninglog.data.RunningActivityEntity
+import com.tepmex.runninglog.domain.MetricVsAverage
 import com.tepmex.runninglog.domain.RunningMetrics
+import com.tepmex.runninglog.domain.TrailingYearAverages
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private val BetterGreen = Color(0xFF1B7A4A)
+private val WorseRed = Color(0xFFB53A2E)
+
 data class JournalUiState(
     val activities: List<RunningActivityEntity> = emptyList(),
+    val trailingYearAverages: TrailingYearAverages = TrailingYearAverages(
+        avgCadenceSpm = null,
+        avgHeartbitsPerKm = null,
+    ),
     val syncing: Boolean = false,
     val statusMessage: String? = null,
     val error: String? = null,
@@ -178,7 +188,7 @@ fun JournalScreen(
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         items(state.activities, key = { it.workoutId }) { run ->
-                            RunRow(run)
+                            RunRow(run, state.trailingYearAverages)
                         }
                     }
                 }
@@ -188,7 +198,7 @@ fun JournalScreen(
 }
 
 @Composable
-private fun RunRow(run: RunningActivityEntity) {
+private fun RunRow(run: RunningActivityEntity, averages: TrailingYearAverages) {
     val date = remember(run.startTimeEpochSec) {
         DateTimeFormatter.ofPattern("EEE, d MMM yyyy")
             .withZone(ZoneId.systemDefault())
@@ -199,6 +209,11 @@ private fun RunRow(run: RunningActivityEntity) {
         "treadmill" -> "Treadmill"
         else -> run.sportType
     }
+    val heartbitsVs = RunningMetrics.compareHeartbitsPerKm(
+        run.heartbitsPerKm,
+        averages.avgHeartbitsPerKm,
+    )
+    val cadenceVs = RunningMetrics.compareCadence(run.cadenceSpm, averages.avgCadenceSpm)
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(date, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
         Text(
@@ -213,16 +228,29 @@ private fun RunRow(run: RunningActivityEntity) {
         MetricLine(
             "Heartbits / km",
             run.heartbitsPerKm.takeIf { it > 0 }?.let { "%.0f".format(it) } ?: "—",
+            vsAverage = heartbitsVs,
         )
         MetricLine(
             "Cadence",
             run.cadenceSpm.takeIf { it > 0 }?.let { "%.0f spm".format(it) } ?: "—",
+            vsAverage = cadenceVs,
         )
     }
 }
 
 @Composable
-private fun MetricLine(label: String, value: String) {
+private fun MetricLine(
+    label: String,
+    value: String,
+    vsAverage: MetricVsAverage = MetricVsAverage.Unavailable,
+) {
+    val valueColor = when (vsAverage) {
+        MetricVsAverage.Better -> BetterGreen
+        MetricVsAverage.Worse -> WorseRed
+        MetricVsAverage.Equal,
+        MetricVsAverage.Unavailable,
+        -> MaterialTheme.colorScheme.onBackground
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -230,6 +258,6 @@ private fun MetricLine(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor)
     }
 }
