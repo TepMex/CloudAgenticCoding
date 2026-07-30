@@ -13,6 +13,8 @@ data class ParsedSportRecord(
     val distanceMeters: Double,
     val paceSecPerKm: Double,
     val avgBpm: Int,
+    val maxBpm: Int,
+    val cloudVo2Max: Int,
     val cadenceSpm: Double,
     val calories: Double,
     val watermark: Long,
@@ -59,6 +61,8 @@ object SportRecordParser {
             ?: value.optDouble("distance", 0.0)
 
         val avgBpm = value.optInt("avg_hrm", 0)
+        val maxBpm = value.optInt("max_hrm", 0)
+        val cloudVo2Max = value.optInt("vo2_max", 0)
         val steps = value.optInt("steps", 0)
         val calories = value.optDouble("calories", 0.0).takeIf { it > 0 }
             ?: value.optDouble("total_cal", 0.0)
@@ -83,6 +87,8 @@ object SportRecordParser {
             distanceMeters = distance,
             paceSecPerKm = pace,
             avgBpm = avgBpm,
+            maxBpm = maxBpm,
+            cloudVo2Max = cloudVo2Max,
             cadenceSpm = cadence,
             calories = calories,
             watermark = watermark,
@@ -151,6 +157,51 @@ object RunningMetrics {
 
     fun heartbitsPerKm(avgBpm: Int, paceSecPerKm: Double): Double =
         if (avgBpm <= 0 || paceSecPerKm <= 0) 0.0 else avgBpm * tempoMinutes(paceSecPerKm)
+
+    /**
+     * ACSM oxygen cost of level running (ml/kg/min).
+     * Speed \(v\) in m/min; cost = 0.2×v + 3.5.
+     */
+    fun runningOxygenCostMlKgMin(paceSecPerKm: Double): Double {
+        if (paceSecPerKm <= 0) return 0.0
+        val speedMPerMin = 60_000.0 / paceSecPerKm
+        return 0.2 * speedMPerMin + 3.5
+    }
+
+    /**
+     * Approximate VO₂ max from pace and HR intensity (avg / max).
+     * VO₂max ≈ ACSM cost ÷ (avgBPM / maxBPM). Returns 0 when inputs are invalid.
+     */
+    fun estimateVo2MaxMlKgMin(
+        paceSecPerKm: Double,
+        avgBpm: Int,
+        maxBpm: Int,
+    ): Double {
+        if (paceSecPerKm <= 0 || avgBpm <= 0 || maxBpm <= 0 || avgBpm > maxBpm) return 0.0
+        val cost = runningOxygenCostMlKgMin(paceSecPerKm)
+        if (cost <= 0) return 0.0
+        return cost / (avgBpm.toDouble() / maxBpm.toDouble())
+    }
+
+    /**
+     * Prefer Xiaomi cloud `vo2_max` when present; otherwise ACSM + HR estimate.
+     */
+    fun resolveVo2MaxMlKgMin(
+        cloudVo2Max: Int,
+        paceSecPerKm: Double,
+        avgBpm: Int,
+        maxBpm: Int,
+    ): Double =
+        if (cloudVo2Max > 0) {
+            cloudVo2Max.toDouble()
+        } else {
+            estimateVo2MaxMlKgMin(paceSecPerKm, avgBpm, maxBpm)
+        }
+
+    fun formatVo2Max(vo2MaxMlKgMin: Double): String {
+        if (vo2MaxMlKgMin <= 0) return "—"
+        return "${vo2MaxMlKgMin.roundToInt()}"
+    }
 
     fun formatPace(paceSecPerKm: Double): String {
         if (paceSecPerKm <= 0) return "—"

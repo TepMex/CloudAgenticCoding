@@ -24,6 +24,7 @@
    - **average bpm**
    - **heartbits per km** = `avg_bpm × temp_minutes` (temp in fractional minutes/km)
    - **cadence** (average steps per minute)
+   - **VO₂ max** (ml/kg/min): prefer cloud `vo2_max` when present; otherwise approximate from pace + avg/max HR
 6. Manual **Sync** action from the journal screen.
 7. Sign out clears stored credentials (journal data may remain until cleared/uninstall).
 8. Compete-with-self highlighting for **cadence** and **heartbits/km**:
@@ -56,8 +57,11 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 | Pace (sec/km) | `avg_pace` if > 0 else `duration / (distance_km)` |
 | Temp display | `mm:ss` per km from pace seconds |
 | Avg BPM | `avg_hrm` |
+| Max BPM | `max_hrm` |
 | Heartbits/km | `avg_bpm * (pace_sec / 60.0)` |
 | Cadence | `avg_cadence` if > 0 else `steps / (duration_min)` |
+| VO₂ max (cloud) | `vo2_max` when > 0 (Xiaomi band estimate for qualifying outdoor runs) |
+| VO₂ max (approx) | When cloud value missing: ACSM flat-running cost ÷ (avg BPM / max BPM). Speed \(v\) m/min = `60000 / pace_sec_per_km`; cost = `0.2 × v + 3.5`; VO₂max ≈ cost / (avg/max). Requires pace, avg BPM, and max BPM all > 0 and avg ≤ max. |
 | Trailing-year cadence avg | Mean of `cadenceSpm > 0` for runs with `start` in `[now−365d, now]` |
 | Trailing-year heartbits/km avg | Mean of `heartbitsPerKm > 0` for runs with `start` in `[now−365d, now]` |
 
@@ -79,6 +83,8 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 | distanceMeters | DOUBLE | |
 | paceSecPerKm | DOUBLE | |
 | avgBpm | INT | |
+| maxBpm | INT | from `max_hrm` |
+| cloudVo2Max | INT | from `vo2_max` when present; else 0 |
 | cadenceSpm | DOUBLE | |
 | calories | DOUBLE | |
 | watermark | LONG | sync cursor |
@@ -87,7 +93,7 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 ## UI / UX
 
 1. **Login** — region; primary **Sign in with browser** / **Sign in with in-app browser**; optional password form; SMS sub-step when required.
-2. **Journal** — newest-first list of runs with the six metrics; cadence and heartbits/km colored vs trailing-year averages; top bar Sync + overflow Sign out.
+2. **Journal** — newest-first list of runs with the seven metrics (incl. VO₂ max); cadence and heartbits/km colored vs trailing-year averages; top bar Sync + overflow Sign out.
 3. Empty states: not signed in → login; signed in with no runs → prompt to sync.
 
 Visual direction: trail/forest light theme (deep green + warm stone), not Material purple defaults. Utility journal (not a marketing landing).
@@ -104,10 +110,10 @@ Visual direction: trail/forest light theme (deep green + warm stone), not Materi
 ## Acceptance criteria
 
 1. With a valid Xiaomi Fitness account that has outdoor/treadmill runs, Sync imports those runs into the journal.
-2. Journal rows show date, distance, temp, avg bpm, heartbits/km, cadence with the formulas above.
+2. Journal rows show date, distance, temp, avg bpm, heartbits/km, cadence, and VO₂ max with the formulas above.
 3. Cadence and heartbits/km values are green when better than the last-365-day mean, red when worse (cadence ↑ better; heartbits/km ↓ better).
 4. Non-running sport types are not listed.
-5. Unit tests cover crypto round-trip, sport JSON parsing, running filter, metric formulas, and trailing-year average / comparison.
+5. Unit tests cover crypto round-trip, sport JSON parsing, running filter, metric formulas (incl. VO₂ max prefer-cloud / ACSM-HR fallback), and trailing-year average / comparison.
 6. Release APK builds with the monorepo sideload keystore.
 
 ## Attribution / risk
