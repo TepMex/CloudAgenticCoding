@@ -31,7 +31,8 @@ CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefi
 ## Gameplay notes
 
 - **RTH lists:** Enemies spawn from one Remembering the Hanzi / RSH list at a time. Every character in the current list shares the same difficulty (spawn rate + drift speed). Clear each unique hanzi in the list to unlock the next list; difficulty then increases.
-- **Hints:** For each Hanzi, the first five times it appears in a spawn (persisted in `localStorage`), the pinyin hint is shown above the character — matching the “first through fifth meeting” idea.
+- **Quiz mode:** Settings lets you choose **Reading (pinyin)** or **Meaning (keyword)**. The choice is saved in `localStorage`.
+- **Hints:** For each Hanzi, the first five times it appears in a spawn (persisted in `localStorage`), a hint for the active quiz mode is shown above the character.
 - **Images:** Enemies use mythological character sprites (财神, 猪八戒, 关羽, 孙悟空) with the Hanzi drawn in each belly placeholder. Regenerate sprites from `source/character-grid.png` via `scripts/split-character-grid.py`.
 
 ## Vocabulary data

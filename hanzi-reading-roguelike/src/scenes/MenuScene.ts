@@ -1,12 +1,14 @@
 import Phaser from "phaser";
+import { loadSettings, quizModeLabel } from "../settings";
 import { THEME } from "../theme";
-import { SCENE_MENU, SCENE_GAME } from "./sceneKeys";
+import { SCENE_MENU, SCENE_GAME, SCENE_SETTINGS } from "./sceneKeys";
 
 export default class MenuScene extends Phaser.Scene {
   private title?: Phaser.GameObjects.Text;
   private subtitle?: Phaser.GameObjects.Text;
   private hint?: Phaser.GameObjects.Text;
   private btnNew?: Phaser.GameObjects.Text;
+  private btnSettings?: Phaser.GameObjects.Text;
   private btnExit?: Phaser.GameObjects.Text;
 
   constructor() {
@@ -26,6 +28,7 @@ export default class MenuScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
     const cx = w / 2;
+    const mode = loadSettings().quizMode;
 
     if (!this.title) {
       this.title = this.add
@@ -37,11 +40,11 @@ export default class MenuScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     }
-    this.title.setPosition(cx, h * 0.18);
+    this.title.setPosition(cx, h * 0.16);
 
     if (!this.subtitle) {
       this.subtitle = this.add
-        .text(0, 0, "Clear each RTH list to unlock the next — type pinyin to defeat enemies.", {
+        .text(0, 0, "", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "14px",
           color: THEME.textMuted,
@@ -50,7 +53,10 @@ export default class MenuScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     }
-    this.subtitle.setPosition(cx, h * 0.28);
+    this.subtitle.setText(
+      `Clear each RTH list to unlock the next.\nAsk for: ${quizModeLabel(mode)}`,
+    );
+    this.subtitle.setPosition(cx, h * 0.26);
     this.subtitle.setStyle({ wordWrap: { width: Math.min(w - 32, 360) } });
 
     if (!this.btnNew) {
@@ -71,7 +77,31 @@ export default class MenuScene extends Phaser.Scene {
         this.scene.start(SCENE_GAME);
       });
     }
-    this.btnNew.setPosition(cx, h * 0.45);
+    this.btnNew.setPosition(cx, h * 0.4);
+
+    if (!this.btnSettings) {
+      this.btnSettings = this.add
+        .text(0, 0, "Settings", {
+          fontFamily: "system-ui, sans-serif",
+          fontSize: "22px",
+          color: THEME.panel,
+          backgroundColor: THEME.accent,
+          padding: { x: 28, y: 14 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      this.btnSettings.on("pointerover", () =>
+        this.btnSettings?.setStyle({ backgroundColor: THEME.accentHover }),
+      );
+      this.btnSettings.on("pointerout", () =>
+        this.btnSettings?.setStyle({ backgroundColor: THEME.accent }),
+      );
+      this.btnSettings.on("pointerup", () => {
+        this.scene.start(SCENE_SETTINGS);
+      });
+    }
+    this.btnSettings.setPosition(cx, h * 0.4 + 68);
 
     if (!this.btnExit) {
       this.btnExit = this.add
@@ -98,13 +128,13 @@ export default class MenuScene extends Phaser.Scene {
             })
             .setOrigin(0.5);
         }
-        this.hint.setPosition(cx, h * 0.45 + 80);
+        this.hint.setPosition(cx, h * 0.4 + 68 + 80);
       });
     }
-    this.btnExit.setPosition(cx, h * 0.45 + 64);
+    this.btnExit.setPosition(cx, h * 0.4 + 136);
 
     if (this.hint) {
-      this.hint.setPosition(cx, h * 0.45 + 80);
+      this.hint.setPosition(cx, h * 0.4 + 68 + 80);
     }
   };
 }

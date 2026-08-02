@@ -21,7 +21,9 @@ import {
   pixelsPerTickForList,
   spawnIntervalForList,
 } from "../listProgress";
-import { normalizePinyin, promptPinyin } from "../pinyinModal";
+import { matchesMeaning, matchesPinyin } from "../answerMatching";
+import { promptAnswer } from "../answerModal";
+import { loadSettings, type QuizMode } from "../settings";
 import { THEME } from "../theme";
 import { SCENE_GAME, SCENE_MENU } from "./sceneKeys";
 
@@ -35,12 +37,13 @@ export default class GameScene extends Phaser.Scene {
   private answering = false;
   private gameOver = false;
   private kills = 0;
+  private quizMode: QuizMode = "reading";
 
   /** Current RTH list index — difficulty rises only when this advances. */
   private listIndex = 0;
   /** Unique hanzi cleared from the current list this run. */
   private clearedInList = new Set<string>();
-  private currentSpawnInterval = SPAWN_BASE_MS;
+  private currentSpawnInterval = spawnIntervalForList(0);
 
   private tickEvent?: Phaser.Time.TimerEvent;
   private spawnTimer?: Phaser.Time.TimerEvent;
@@ -68,6 +71,7 @@ export default class GameScene extends Phaser.Scene {
     this.kills = 0;
     this.listIndex = 0;
     this.clearedInList = new Set();
+    this.quizMode = loadSettings().quizMode;
     this.currentSpawnInterval = spawnIntervalForList(this.listIndex);
 
     this.drawCore();
@@ -217,6 +221,12 @@ export default class GameScene extends Phaser.Scene {
     const showHint = seen < 5;
     this.encounterMap = bumpEncounter(this.encounterMap, entry.hanzi);
 
+    const hintText = showHint
+      ? this.quizMode === "reading"
+        ? (entry.pinyin[0] ?? null)
+        : entry.keyword
+      : null;
+
     const character = pickRandomCharacter();
     const enemy = new HanziEnemy(
       this,
@@ -224,7 +234,8 @@ export default class GameScene extends Phaser.Scene {
       y,
       entry.hanzi,
       entry.pinyin,
-      showHint,
+      entry.keyword,
+      hintText,
       character,
     );
     this.add.existing(enemy);
@@ -257,7 +268,7 @@ export default class GameScene extends Phaser.Scene {
     const listOrdinal = `${this.listIndex + 1}/${rthListCount()}`;
 
     this.hud.setText(
-      `Cleared: ${this.kills}\nList: ${listLabel} (${listOrdinal})\nProgress: ${done}/${total}\nDifficulty: ${this.listIndex}\nSpawn: ${(this.currentSpawnInterval / 1000).toFixed(1)}s`,
+      `Cleared: ${this.kills}\nMode: ${this.quizMode === "reading" ? "reading" : "meaning"}\nList: ${listLabel} (${listOrdinal})\nProgress: ${done}/${total}\nDifficulty: ${this.listIndex}\nSpawn: ${(this.currentSpawnInterval / 1000).toFixed(1)}s`,
     );
 
     if (this.listBanner && list) {
@@ -282,11 +293,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  private matchesPinyin(answer: string, expected: string[]): boolean {
-    const n = normalizePinyin(answer);
-    return expected.some((p) => normalizePinyin(p) === n);
-  }
-
   private async beginAnswer(enemy: HanziEnemy): Promise<void> {
     if (!this.enemies.includes(enemy)) return;
 
@@ -295,7 +301,14 @@ export default class GameScene extends Phaser.Scene {
       e.frozen = true;
     }
 
-    const res = await promptPinyin(enemy.hanzi);
+    const res = await promptAnswer({
+      hanzi: enemy.hanzi,
+      promptLabel:
+        this.quizMode === "reading"
+          ? "Type the pinyin (no tones)"
+          : "Type the English meaning (keyword)",
+      placeholder: this.quizMode === "reading" ? "e.g. yi" : "e.g. one",
+    });
 
     this.answering = false;
     for (const e of this.enemies) {
@@ -308,7 +321,10 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    const ok = this.matchesPinyin(res.answer, enemy.expectedPinyins);
+    const ok =
+      this.quizMode === "reading"
+        ? matchesPinyin(res.answer, enemy.expectedPinyins)
+        : matchesMeaning(res.answer, enemy.keyword);
 
     if (ok) {
       this.kills += 1;

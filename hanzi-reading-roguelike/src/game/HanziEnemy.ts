@@ -12,6 +12,7 @@ export class HanziEnemy extends Phaser.GameObjects.Container {
   readonly hanzi: string;
   /** All accepted toneless readings. */
   readonly expectedPinyins: string[];
+  readonly keyword: string;
   readonly character: CharacterDef;
 
   frozen = false;
@@ -22,16 +23,16 @@ export class HanziEnemy extends Phaser.GameObjects.Container {
     y: number,
     hanzi: string,
     expectedPinyins: string[],
-    showPinyinHint: boolean,
+    keyword: string,
+    hintText: string | null,
     character: CharacterDef,
   ) {
     super(scene, x, y);
 
     this.hanzi = hanzi;
     this.expectedPinyins = expectedPinyins;
+    this.keyword = keyword;
     this.character = character;
-
-    const hintPinyin = expectedPinyins[0] ?? "";
 
     const scale = HanziEnemy.DISPLAY_HEIGHT / CHARACTER_CELL_HEIGHT;
     const sprite = scene.add.image(0, 0, character.textureKey);
@@ -48,13 +49,15 @@ export class HanziEnemy extends Phaser.GameObjects.Container {
     hanziText.setOrigin(0.5);
 
     const parts: Phaser.GameObjects.GameObject[] = [sprite];
-    if (showPinyinHint && hintPinyin) {
-      const hint = scene.add.text(0, -HanziEnemy.DISPLAY_HEIGHT / 2 - 14, hintPinyin, {
+    if (hintText) {
+      const hint = scene.add.text(0, -HanziEnemy.DISPLAY_HEIGHT / 2 - 14, hintText, {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "15px",
+        fontSize: "14px",
         color: THEME.textMuted,
         backgroundColor: "rgba(250, 243, 230, 0.85)",
         padding: { x: 6, y: 2 },
+        wordWrap: { width: 120 },
+        align: "center",
       });
       hint.setOrigin(0.5);
       parts.push(hint);
