@@ -30,9 +30,20 @@ CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefi
 
 ## Gameplay notes
 
+- **RTH lists:** Enemies spawn from one Remembering the Hanzi / RSH list at a time. Every character in the current list shares the same difficulty (spawn rate + drift speed). Clear each unique hanzi in the list to unlock the next list; difficulty then increases.
 - **Hints:** For each Hanzi, the first five times it appears in a spawn (persisted in `localStorage`), the pinyin hint is shown above the character — matching the “first through fifth meeting” idea.
-- **Roguelike pressure:** Spawn interval shortens and drift speed increases over time.
 - **Images:** Enemies use mythological character sprites (财神, 猪八戒, 关羽, 孙悟空) with the Hanzi drawn in each belly placeholder. Regenerate sprites from `source/character-grid.png` via `scripts/split-character-grid.py`.
+
+## Vocabulary data
+
+Game lists live in `src/data/rshLists.json` (110 lists, ~2974 characters with toneless pinyin). Regenerate from the slim knowledge base:
+
+```bash
+cd hanzi-reading-roguelike
+bun run build:rsh-lists -- data/rsh_knowledge_base.slim.json
+```
+
+Pinyin is joined from `../map-of-chinese/src/data/characters.json` (with a small fallback map for rare glyphs).
 
 ## Character sprite pipeline
 

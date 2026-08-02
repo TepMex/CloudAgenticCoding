@@ -41,7 +41,7 @@ export default class MenuScene extends Phaser.Scene {
 
     if (!this.subtitle) {
       this.subtitle = this.add
-        .text(0, 0, "Mythic heroes drift to the center — type pinyin to clear them.", {
+        .text(0, 0, "Clear each RTH list to unlock the next — type pinyin to defeat enemies.", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "14px",
           color: THEME.textMuted,
