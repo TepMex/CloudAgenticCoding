@@ -15,17 +15,17 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/CloudAgenticCoding/hanzi-reading-roguelike/assets/index-De_FtbDe.js"></script>
-    <link rel="stylesheet" crossorigin href="/CloudAgenticCoding/hanzi-reading-roguelike/assets/index-Cxk742f5.css">
+    <script type="module" crossorigin src="/CloudAgenticCoding/hanzi-reading-roguelike/assets/index-Z09AE9Vn.js"></script>
+    <link rel="stylesheet" crossorigin href="/CloudAgenticCoding/hanzi-reading-roguelike/assets/index-kfJ3q0lA.css">
   </head>
   <body>
     <div id="game-container"></div>
-    <div id="pinyin-modal" class="pinyin-modal hidden" aria-hidden="true">
-      <div class="pinyin-modal__panel">
-        <p id="pinyin-modal-hanzi" class="pinyin-modal__hanzi"></p>
-        <p class="pinyin-modal__label">Type the pinyin (no tones)</p>
+    <div id="answer-modal" class="answer-modal hidden" aria-hidden="true">
+      <div class="answer-modal__panel">
+        <p id="answer-modal-hanzi" class="answer-modal__hanzi"></p>
+        <p id="answer-modal-label" class="answer-modal__label">Type the pinyin (no tones)</p>
         <input
-          id="pinyin-modal-input"
+          id="answer-modal-input"
           type="text"
           inputmode="text"
           autocapitalize="off"
@@ -33,11 +33,11 @@
           spellcheck="false"
           enterkeyhint="done"
         />
-        <div class="pinyin-modal__actions">
-          <button type="button" id="pinyin-modal-cancel" class="btn btn--ghost">
+        <div class="answer-modal__actions">
+          <button type="button" id="answer-modal-cancel" class="btn btn--ghost">
             Cancel
           </button>
-          <button type="button" id="pinyin-modal-submit" class="btn btn--primary">
+          <button type="button" id="answer-modal-submit" class="btn btn--primary">
             OK
           </button>
         </div>
