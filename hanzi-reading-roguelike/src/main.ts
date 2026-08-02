@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import MenuScene from "./scenes/MenuScene";
 import GameScene from "./scenes/GameScene";
+import SettingsScene from "./scenes/SettingsScene";
 import { THEME } from "./theme";
 
 import "./style.css";
@@ -15,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
     width: Math.max(window.innerWidth, 320),
     height: Math.max(window.innerHeight, 480),
   },
-  scene: [MenuScene, GameScene],
+  scene: [MenuScene, SettingsScene, GameScene],
   input: {
     activePointers: 2,
   },
