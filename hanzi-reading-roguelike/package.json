@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "bun test",
     "build:rsh-lists": "bun run scripts/build-rsh-lists.ts"
   },
   "dependencies": {

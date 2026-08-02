@@ -16,27 +16,18 @@ import {
   type EncounterMap,
 } from "../encounters";
 import { HanziEnemy } from "../game/HanziEnemy";
+import {
+  isListComplete,
+  pixelsPerTickForList,
+  spawnIntervalForList,
+} from "../listProgress";
 import { normalizePinyin, promptPinyin } from "../pinyinModal";
 import { THEME } from "../theme";
 import { SCENE_GAME, SCENE_MENU } from "./sceneKeys";
 
 /** Movement update cadence — balances smooth motion and CPU on mobile. */
 const MOVE_TICK_MS = 120;
-const SPAWN_BASE_MS = 2600;
-const SPAWN_MIN_MS = 720;
 const CORE_FAIL_DIST = 26;
-
-/** Spawn interval and drift scale by RTH list index only (equal within a list). */
-function spawnIntervalForList(listIndex: number): number {
-  return Math.max(
-    SPAWN_MIN_MS,
-    Math.floor(SPAWN_BASE_MS * Math.pow(0.92, listIndex)),
-  );
-}
-
-function pixelsPerTickForList(listIndex: number): number {
-  return 2.6 + listIndex * 0.4;
-}
 
 export default class GameScene extends Phaser.Scene {
   private encounterMap: EncounterMap = {};
@@ -346,7 +337,7 @@ export default class GameScene extends Phaser.Scene {
   private tryAdvanceList(): void {
     const list = this.currentList();
     if (!list) return;
-    if (this.clearedInList.size < list.entries.length) return;
+    if (!isListComplete(list.entries.length, this.clearedInList)) return;
 
     const next = this.listIndex + 1;
     if (next >= rthListCount()) {
