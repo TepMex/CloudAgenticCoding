@@ -29,4 +29,13 @@ if [[ ! -f "$OUT/index.html" ]]; then
   exit 1
 fi
 
+# Keep the assets directory trackable without committing the Phaser build.
+cat > "$OUT/.gitignore" <<'EOF'
+# Bundled Phaser build is produced by scripts/sync-web-assets.sh — do not commit.
+*
+!.gitkeep
+!.gitignore
+EOF
+touch "$OUT/.gitkeep"
+
 echo "Synced web assets ($(du -sh "$OUT" | awk '{print $1}'))"
