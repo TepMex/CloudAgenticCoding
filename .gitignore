@@ -71,3 +71,11 @@ pair-comp-elo/local.properties
 running-log/.gradle/
 running-log/**/build/
 running-log/local.properties
+
+# Android (han-count-android)
+han-count-android/.gradle/
+han-count-android/**/build/
+han-count-android/local.properties
+han-count-android/app/src/main/assets/www/**
+!han-count-android/app/src/main/assets/www/.gitkeep
+!han-count-android/app/src/main/assets/www/.gitignore

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none" role="img" aria-label="Han Count Me">
+  <rect width="72" height="72" rx="16" fill="#526D62"/>
+  <rect x="16" y="20" width="40" height="6" rx="2" fill="#F4EAD2"/>
+  <rect x="20" y="26" width="6" height="28" rx="2" fill="#F4EAD2"/>
+  <rect x="46" y="26" width="6" height="28" rx="2" fill="#F4EAD2"/>
+  <rect x="32" y="34" width="8" height="20" rx="2" fill="#F4EAD2"/>
+  <path d="M28 18c0-5 4-8 8-8s8 3 8 8v4H28z" fill="#EADFC4"/>
+</svg>

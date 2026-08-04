@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="hc_paper">#EADFC4</color>
+    <color name="hc_paper_light">#F4EAD2</color>
+    <color name="hc_ink">#252722</color>
+    <color name="hc_jade">#526D62</color>
+    <color name="hc_jade_dark">#33483F</color>
+    <color name="hc_cinnabar">#943A31</color>
+    <color name="ic_launcher_background">#526D62</color>
+</resources>
