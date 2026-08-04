@@ -1,0 +1,4 @@
+# Bundled Phaser build is produced by scripts/sync-web-assets.sh — do not commit.
+*
+!.gitkeep
+!.gitignore
