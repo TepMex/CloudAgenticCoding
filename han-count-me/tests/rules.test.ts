@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import seed from '../data/chinese_classifier_game_seed.json';
 import { GameCatalog } from '../src/data/catalog';
-import { choicesForTarget, damageFor, maxHpFor, nextCombo, rulesForWave, scoreForHit } from '../src/game/rules';
+import { choicesForTarget, damageFor, hintChargesAfterUse, hintChargesAtWaveStart, maxHpFor, nextCombo, rulesForWave, scoreForHit } from '../src/game/rules';
 import type { GameSeed } from '../src/types';
 
 const catalog = new GameCatalog(seed as GameSeed);
@@ -47,5 +47,12 @@ describe('progression rules', () => {
     const choices = choicesForTarget(catalog, 'N001', 2, () => 0.25);
     expect(choices.some((item) => item.classifier_id === 'CL001')).toBe(true);
     expect(choices.some((item) => damageFor(catalog, 'N001', item.classifier_id) > 1)).toBe(true);
+  });
+
+  it('добавляет одну подсказку в начале волны и сохраняет неиспользованные', () => {
+    expect(hintChargesAtWaveStart(0)).toBe(1);
+    expect(hintChargesAtWaveStart(1)).toBe(2);
+    expect(hintChargesAtWaveStart(hintChargesAfterUse(2))).toBe(2);
+    expect(hintChargesAfterUse(0)).toBe(0);
   });
 });

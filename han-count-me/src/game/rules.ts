@@ -49,6 +49,14 @@ export function nextCombo(current: number, damage: number): number {
   return damage > 0 ? current + 1 : 0;
 }
 
+export function hintChargesAtWaveStart(unspentCharges: number): number {
+  return Math.max(0, Math.floor(unspentCharges)) + 1;
+}
+
+export function hintChargesAfterUse(charges: number): number {
+  return Math.max(0, Math.floor(charges) - 1);
+}
+
 export function choicesForTarget(
   catalog: GameCatalog,
   nounId: string,

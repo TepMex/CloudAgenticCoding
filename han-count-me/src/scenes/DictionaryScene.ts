@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { getCatalog } from '../data/catalog';
 import { sheetTextureKey } from '../game/assets';
+import { showNounCard } from '../game/nounCard';
 import { loadProgress } from '../game/storage';
-import { addBackButton, addButton, addInkBackdrop, addPanel, CINNABAR, GAME_WIDTH, INK, JADE_DARK, PAPER_LIGHT } from '../game/theme';
+import { addBackButton, addButton, addInkBackdrop, GAME_WIDTH, INK, JADE_DARK, PAPER_LIGHT } from '../game/theme';
 import type { Noun } from '../types';
 
 const PAGE_SIZE = 12;
@@ -74,25 +75,6 @@ export class DictionaryScene extends Phaser.Scene {
   }
 
   private showDetails(noun: Noun): void {
-    const catalog = getCatalog();
-    const overlay = this.add.container(0, 0).setDepth(20);
-    const shade = this.add.rectangle(GAME_WIDTH / 2, 360, GAME_WIDTH, 720, 0x111510, 0.68).setInteractive();
-    const panel = addPanel(this, GAME_WIDTH / 2, 360, 840, 500, 0.99);
-    const index = Number(noun.noun_id.slice(1)) - 1;
-    const image = this.add.image(360, 355, sheetTextureKey(Math.floor(index / 16)), noun.noun_id).setDisplaySize(255, 255);
-    const pairs = catalog.seed.pairs.filter((pair) => pair.noun_id === noun.noun_id)
-      .sort((a, b) => b.game_damage - a.game_damage || b.linguistic_fit - a.linguistic_fit);
-    const text = this.add.text(530, 170, `${noun.noun_zh}  ·  ${noun.noun_pinyin}`, {
-      fontFamily: '"Noto Serif SC", serif', fontSize: '34px', color: '#282b26', fontStyle: 'bold',
-    });
-    const info = this.add.text(530, 222, `${noun.noun_ru}\nКатегория: ${noun.category}\nСложность: ${'●'.repeat(noun.difficulty)}${'○'.repeat(3 - noun.difficulty)}`, {
-      fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#575249', lineSpacing: 8,
-    });
-    const pairText = pairs.slice(0, 5).map((pair) => `${pair.classifier_hanzi}  ${catalog.classifierById.get(pair.classifier_id)?.pinyin ?? ''}  ·  ${pair.game_damage} урон  ·  ${pair.example}`).join('\n');
-    const combinations = this.add.text(530, 330, pairText || 'Нет боевых сочетаний', {
-      fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#39463f', lineSpacing: 10, wordWrap: { width: 450 },
-    });
-    const close = addButton(this, 910, 552, 180, 50, 'Закрыть', () => overlay.destroy(true), { fill: CINNABAR, fontSize: 18 });
-    overlay.add([shade, panel, image, text, info, combinations, close]);
+    showNounCard(this, getCatalog(), noun);
   }
 }

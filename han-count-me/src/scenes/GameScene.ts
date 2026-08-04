@@ -1,13 +1,18 @@
 import Phaser from 'phaser';
 import { getCatalog, type GameCatalog } from '../data/catalog';
 import { sheetTextureKey } from '../game/assets';
-import { choicesForTarget, damageFor, maxHpFor, nextCombo, rulesForWave, scoreForHit, scoreForKill, type WaveRules } from '../game/rules';
+import { showNounCard, type NounCardOverlay } from '../game/nounCard';
+import { choicesForTarget, damageFor, hintChargesAfterUse, hintChargesAtWaveStart, maxHpFor, nextCombo, rulesForWave, scoreForHit, scoreForKill, type WaveRules } from '../game/rules';
 import { loadProgress, recordRun, type PlayerProgress } from '../game/storage';
 import { addButton, CINNABAR, GAME_HEIGHT, GAME_WIDTH, GOLD, INK, JADE, JADE_DARK, PAPER, PAPER_LIGHT, SOFT_INK } from '../game/theme';
 import type { Classifier, Noun } from '../types';
 
 const GATE_X = 118;
 const LANES = [220, 360, 500];
+const HINT_TIME_SCALE = 1 / 3;
+const WEAPON_START_X = 91;
+const WEAPON_GAP = 183;
+const WEAPON_WIDTH = 158;
 
 class EnemyView extends Phaser.GameObjects.Container {
   readonly noun: Noun;
@@ -75,12 +80,16 @@ export class GameScene extends Phaser.Scene {
   private runEnded = false;
   private discovered = new Set<string>();
   private fireLockedUntil = 0;
+  private hintCharges = 0;
+  private gameplayTimeScale = 1;
+  private hintCard?: NounCardOverlay;
   private hotkeyHandler?: (event: KeyboardEvent) => void;
 
   constructor() { super('GameScene'); }
 
   create(): void {
     this.resetRunState();
+    this.applyGameplayTimeScale(1);
     this.catalog = getCatalog();
     this.progress = loadProgress();
     this.drawArena();
@@ -90,12 +99,15 @@ export class GameScene extends Phaser.Scene {
     addButton(this, 1206, 43, 112, 46, 'Ⅱ Пауза', () => this.pauseGame(), { fontSize: 15, fill: SOFT_INK });
     this.hotkeyHandler = (event: KeyboardEvent) => {
       if (event.key === 'Escape' || event.key.toLowerCase() === 'p') this.pauseGame();
+      if (event.key.toLowerCase() === 'h') this.useHint();
       const index = Number(event.key) - 1;
       if (index >= 0 && index < this.choices.length) this.fire(this.choices[index]);
     };
     this.input.keyboard?.on('keydown', this.hotkeyHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.hotkeyHandler) this.input.keyboard?.off('keydown', this.hotkeyHandler);
+      this.applyGameplayTimeScale(1);
+      this.hintCard = undefined;
       if (this.wave > 0 && !this.runEnded) {
         this.progress = recordRun(this.progress, this.score, this.wave, this.discovered);
       }
@@ -118,6 +130,9 @@ export class GameScene extends Phaser.Scene {
     this.runEnded = false;
     this.discovered = new Set<string>();
     this.fireLockedUntil = 0;
+    this.hintCharges = 0;
+    this.gameplayTimeScale = 1;
+    this.hintCard = undefined;
     this.hotkeyHandler = undefined;
   }
 
@@ -125,7 +140,7 @@ export class GameScene extends Phaser.Scene {
     if (this.runEnded) return;
     // Mobile browsers may resume a throttled tab with a multi-second delta.
     // Clamping prevents an entire wave from teleporting through the gate.
-    const frameDelta = Math.min(delta, 50);
+    const frameDelta = Math.min(delta, 50) * this.gameplayTimeScale;
     for (const enemy of [...this.enemies]) {
       enemy.x -= enemy.speed * (frameDelta / 1000);
       if (enemy.x <= GATE_X) this.enemyBreached(enemy);
@@ -185,9 +200,15 @@ export class GameScene extends Phaser.Scene {
     this.weaponContainer = container;
     const target = this.target;
     if (!target) {
-      container.add(this.add.text(GAME_WIDTH / 2, 645, 'Меры появятся вместе с целью', {
+      container.add(this.add.text(500, 645, 'Меры появятся вместе с целью', {
         fontFamily: 'system-ui, sans-serif', fontSize: '17px', color: '#bdb39d',
       }).setOrigin(0.5));
+      container.add(addButton(this, WEAPON_START_X + 6 * WEAPON_GAP, 646, WEAPON_WIDTH, 104, '提示', () => this.useHint(), {
+        fill: CINNABAR,
+        fontSize: 32,
+        subtitle: `H · зарядов: ${this.hintCharges}`,
+        enabled: false,
+      }));
       this.choices = [];
       return;
     }
@@ -195,8 +216,8 @@ export class GameScene extends Phaser.Scene {
     this.choices = choicesForTarget(this.catalog, target.noun.noun_id, rules.tier, Math.random, 6);
     this.choices.forEach((classifier, index) => {
       const damage = damageFor(this.catalog, target.noun.noun_id, classifier.classifier_id);
-      const x = 152 + index * 196;
-      const button = addButton(this, x, 646, 174, 104, classifier.hanzi, () => this.fire(classifier), {
+      const x = WEAPON_START_X + index * WEAPON_GAP;
+      const button = addButton(this, x, 646, WEAPON_WIDTH, 104, classifier.hanzi, () => this.fire(classifier), {
         fill: classifier.classifier_id === 'CL001' ? CINNABAR : JADE_DARK,
         hoverFill: classifier.classifier_id === 'CL001' ? 0xae4b41 : JADE,
         fontSize: 36,
@@ -204,14 +225,24 @@ export class GameScene extends Phaser.Scene {
       });
       container.add(button);
     });
+    container.add(addButton(this, WEAPON_START_X + 6 * WEAPON_GAP, 646, WEAPON_WIDTH, 104, '提示', () => this.useHint(), {
+      fill: CINNABAR,
+      hoverFill: 0xae4b41,
+      fontSize: 32,
+      subtitle: this.hintCharges > 0 ? `H · зарядов: ${this.hintCharges}` : 'H · нет зарядов',
+      enabled: this.hintCharges > 0 && !this.hintCard,
+    }));
   }
 
   private startNextWave(): void {
     this.wave += 1;
+    this.hintCharges = hintChargesAtWaveStart(this.hintCharges);
     const rules = rulesForWave(this.wave, this.progress.highestWave);
     this.waveText.setText(String(this.wave));
     this.remainingSpawns = rules.enemyCount;
-    this.showBanner(`Волна ${this.wave}`, rules.tier > 1 ? `Открыты меры уровня ${rules.tier}` : 'Соблюдай ритм');
+    this.createWeaponTray();
+    const waveMessage = rules.tier > 1 ? `Открыты меры уровня ${rules.tier}` : 'Соблюдай ритм';
+    this.showBanner(`Волна ${this.wave}`, `Подсказок: ${this.hintCharges} · ${waveMessage}`);
     this.time.addEvent({
       delay: rules.spawnDelayMs,
       repeat: rules.enemyCount - 1,
@@ -258,7 +289,7 @@ export class GameScene extends Phaser.Scene {
 
   private fire(classifier: Classifier): void {
     const enemy = this.target;
-    if (!enemy || !this.enemies.includes(enemy) || this.time.now < this.fireLockedUntil || this.runEnded) return;
+    if (!enemy || !this.enemies.includes(enemy) || this.time.now < this.fireLockedUntil || this.runEnded || this.hintCard) return;
     this.fireLockedUntil = this.time.now + 160;
     this.pendingProjectiles += 1;
     const projectile = this.add.container(153, enemy.y).setDepth(12);
@@ -341,6 +372,7 @@ export class GameScene extends Phaser.Scene {
   private endRun(): void {
     if (this.runEnded) return;
     this.runEnded = true;
+    this.closeHintCard();
     const previousBest = this.progress.bestScore;
     this.progress = recordRun(this.progress, this.score, this.wave, this.discovered);
     this.time.delayedCall(380, () => {
@@ -353,6 +385,38 @@ export class GameScene extends Phaser.Scene {
         discovered: this.discovered.size,
       });
     });
+  }
+
+  private useHint(): void {
+    const enemy = this.target;
+    if (!enemy || !this.enemies.includes(enemy) || this.hintCharges <= 0 || this.hintCard || this.runEnded) return;
+    this.hintCharges = hintChargesAfterUse(this.hintCharges);
+    this.applyGameplayTimeScale(HINT_TIME_SCALE);
+    this.hintCard = showNounCard(this, this.catalog, enemy.noun, {
+      eyebrow: '提示 · ПОДСКАЗКА · игровое время ×⅓',
+      closeLabel: 'Вернуться в бой',
+      onClose: () => this.finishHint(),
+    });
+    this.createWeaponTray();
+  }
+
+  private finishHint(): void {
+    this.hintCard = undefined;
+    this.applyGameplayTimeScale(1);
+    if (!this.runEnded) this.createWeaponTray();
+  }
+
+  private closeHintCard(): void {
+    const card = this.hintCard;
+    this.hintCard = undefined;
+    if (card) card.close();
+    else this.applyGameplayTimeScale(1);
+  }
+
+  private applyGameplayTimeScale(scale: number): void {
+    this.gameplayTimeScale = scale;
+    this.time.timeScale = scale;
+    this.tweens.timeScale = scale;
   }
 
   private showBanner(title: string, subtitle: string): void {

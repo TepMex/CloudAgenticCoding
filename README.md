@@ -12,6 +12,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `mandarin-koan` | [mandarin-koan](https://tepmex.github.io/CloudAgenticCoding/mandarin-koan/) | Mandarin Koan |
 | `hanzi-info` | [hanzi-info](https://tepmex.github.io/CloudAgenticCoding/hanzi-info/) | Hanzi Info · phonetic DB (EN/RU UI, Russian glosses) |
 | `hanzi-reading-roguelike` | [hanzi-reading-roguelike](https://tepmex.github.io/CloudAgenticCoding/hanzi-reading-roguelike/) | Hanzi Reading Roguelike · creature sprites & game scaffold |
+| `han-count-me` | [han-count-me](https://tepmex.github.io/CloudAgenticCoding/han-count-me/) | Han Count Me · Chinese classifier / measure-word gate defense |
 | `sense-of-text` | [sense-of-text](https://tepmex.github.io/CloudAgenticCoding/sense-of-text/) | Sense of Text · highlight important words (WASM embeddings or LLM) |
 | `map-of-chinese` | [map-of-chinese](https://tepmex.github.io/CloudAgenticCoding/map-of-chinese/) | Map of Chinese · Mandarin characters on an initial × final matrix |
 | `mandarin-kanshu-pengyou` | [mandarin-kanshu-pengyou](https://tepmex.github.io/CloudAgenticCoding/mandarin-kanshu-pengyou/) | 看书朋友 · local-first Chinese EPUB reading companion |

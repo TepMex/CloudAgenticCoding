@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike sense-of-text map-of-chinese mandarin-kanshu-pengyou
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou
   ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log
 
 jobs:
@@ -28,6 +28,7 @@ jobs:
       build_mandarin_koan: ${{ steps.plan.outputs.build_mandarin_koan }}
       build_hanzi_info: ${{ steps.plan.outputs.build_hanzi_info }}
       build_hanzi_reading_roguelike: ${{ steps.plan.outputs.build_hanzi_reading_roguelike }}
+      build_han_count_me: ${{ steps.plan.outputs.build_han_count_me }}
       build_sense_of_text: ${{ steps.plan.outputs.build_sense_of_text }}
       build_map_of_chinese: ${{ steps.plan.outputs.build_map_of_chinese }}
       build_mandarin_kanshu_pengyou: ${{ steps.plan.outputs.build_mandarin_kanshu_pengyou }}
@@ -67,6 +68,8 @@ jobs:
               - 'hanzi-info/**'
             hanzi-reading-roguelike:
               - 'hanzi-reading-roguelike/**'
+            han-count-me:
+              - 'han-count-me/**'
             sense-of-text:
               - 'sense-of-text/**'
             map-of-chinese:
@@ -126,6 +129,7 @@ jobs:
           CHANGED_MANDARIN_KOAN: ${{ steps.changes.outputs.mandarin-koan }}
           CHANGED_HANZI_INFO: ${{ steps.changes.outputs.hanzi-info }}
           CHANGED_HANZI_READING_ROGUELIKE: ${{ steps.changes.outputs.hanzi-reading-roguelike }}
+          CHANGED_HAN_COUNT_ME: ${{ steps.changes.outputs.han-count-me }}
           CHANGED_SENSE_OF_TEXT: ${{ steps.changes.outputs.sense-of-text }}
           CHANGED_MAP_OF_CHINESE: ${{ steps.changes.outputs.map-of-chinese }}
           CHANGED_MANDARIN_KANSHU_PENGYOU: ${{ steps.changes.outputs.mandarin-kanshu-pengyou }}
@@ -165,6 +169,7 @@ jobs:
           build_mandarin_koan=false
           build_hanzi_info=false
           build_hanzi_reading_roguelike=false
+          build_han_count_me=false
           build_sense_of_text=false
           build_map_of_chinese=false
           build_mandarin_kanshu_pengyou=false
@@ -187,6 +192,7 @@ jobs:
             build_mandarin_koan=true
             build_hanzi_info=true
             build_hanzi_reading_roguelike=true
+            build_han_count_me=true
             build_sense_of_text=true
             build_map_of_chinese=true
             build_mandarin_kanshu_pengyou=true
@@ -207,6 +213,7 @@ jobs:
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
             is_true "$CHANGED_HANZI_INFO" && build_hanzi_info=true
             is_true "$CHANGED_HANZI_READING_ROGUELIKE" && build_hanzi_reading_roguelike=true
+            is_true "$CHANGED_HAN_COUNT_ME" && build_han_count_me=true
             is_true "$CHANGED_SENSE_OF_TEXT" && build_sense_of_text=true
             is_true "$CHANGED_MAP_OF_CHINESE" && build_map_of_chinese=true
             is_true "$CHANGED_MANDARIN_KANSHU_PENGYOU" && build_mandarin_kanshu_pengyou=true
@@ -244,7 +251,7 @@ jobs:
           fi
 
           any_web_build=false
-          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou && any_web_build=true
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou && any_web_build=true
 
           any_android_apk_build=false
           $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log && any_android_apk_build=true
@@ -259,6 +266,7 @@ jobs:
             echo "build_mandarin_koan=$build_mandarin_koan"
             echo "build_hanzi_info=$build_hanzi_info"
             echo "build_hanzi_reading_roguelike=$build_hanzi_reading_roguelike"
+            echo "build_han_count_me=$build_han_count_me"
             echo "build_sense_of_text=$build_sense_of_text"
             echo "build_map_of_chinese=$build_map_of_chinese"
             echo "build_mandarin_kanshu_pengyou=$build_mandarin_kanshu_pengyou"
@@ -335,6 +343,19 @@ jobs:
         working-directory: hanzi-reading-roguelike
         run: bun install --frozen-lockfile
 
+      - name: Setup Node (han-count-me)
+        if: needs.detect.outputs.build_han_count_me == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: han-count-me/package-lock.json
+
+      - name: Install dependencies (han-count-me)
+        if: needs.detect.outputs.build_han_count_me == 'true'
+        working-directory: han-count-me
+        run: npm ci
+
       - name: Install dependencies (sense-of-text)
         if: needs.detect.outputs.build_sense_of_text == 'true'
         working-directory: sense-of-text
@@ -381,6 +402,13 @@ jobs:
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/hanzi-reading-roguelike/
         run: bun run build
+
+      - name: Build (han-count-me)
+        if: needs.detect.outputs.build_han_count_me == 'true'
+        working-directory: han-count-me
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/han-count-me/
+        run: npm run build
 
       - name: Build (sense-of-text)
         if: needs.detect.outputs.build_sense_of_text == 'true'
@@ -516,6 +544,7 @@ jobs:
           BUILD_MANDARIN_KOAN: ${{ needs.detect.outputs.build_mandarin_koan }}
           BUILD_HANZI_INFO: ${{ needs.detect.outputs.build_hanzi_info }}
           BUILD_HANZI_READING_ROGUELIKE: ${{ needs.detect.outputs.build_hanzi_reading_roguelike }}
+          BUILD_HAN_COUNT_ME: ${{ needs.detect.outputs.build_han_count_me }}
           BUILD_SENSE_OF_TEXT: ${{ needs.detect.outputs.build_sense_of_text }}
           BUILD_MAP_OF_CHINESE: ${{ needs.detect.outputs.build_map_of_chinese }}
           BUILD_MANDARIN_KANSHU_PENGYOU: ${{ needs.detect.outputs.build_mandarin_kanshu_pengyou }}
@@ -576,6 +605,7 @@ jobs:
           if is_true "$BUILD_MANDARIN_KOAN"; then copy_web_app mandarin-koan; else require_dir mandarin-koan; fi
           if is_true "$BUILD_HANZI_INFO"; then copy_web_app hanzi-info; else require_dir hanzi-info; fi
           if is_true "$BUILD_HANZI_READING_ROGUELIKE"; then copy_web_app hanzi-reading-roguelike; else require_dir hanzi-reading-roguelike; fi
+          if is_true "$BUILD_HAN_COUNT_ME"; then copy_web_app han-count-me; else require_dir han-count-me; fi
           if is_true "$BUILD_SENSE_OF_TEXT"; then copy_web_app sense-of-text; else require_dir sense-of-text; fi
           if is_true "$BUILD_MAP_OF_CHINESE"; then copy_web_app map-of-chinese; else require_dir map-of-chinese; fi
           if is_true "$BUILD_MANDARIN_KANSHU_PENGYOU"; then copy_web_app mandarin-kanshu-pengyou; else require_dir mandarin-kanshu-pengyou; fi
