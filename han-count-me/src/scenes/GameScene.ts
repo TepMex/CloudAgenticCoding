@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import { getCatalog, type GameCatalog } from '../data/catalog';
 import { sheetTextureKey } from '../game/assets';
 import { showNounCard, type NounCardOverlay } from '../game/nounCard';
-import { choicesForTarget, damageFor, hintChargesAfterUse, hintChargesAtWaveStart, maxHpFor, nextCombo, rulesForWave, scoreForHit, scoreForKill, type WaveRules } from '../game/rules';
+import { choicesForTarget, damageFor, hintChargesAfterUse, hintChargesAtWaveStart, maxHpFor, nextCombo, pickLaneIndex, rulesForWave, scoreForHit, scoreForKill, spawnXForLane, waveEnemySpeed, type WaveRules } from '../game/rules';
 import { loadProgress, recordRun, type PlayerProgress } from '../game/storage';
 import { addButton, CINNABAR, GAME_HEIGHT, GAME_WIDTH, GOLD, INK, JADE, JADE_DARK, PAPER, PAPER_LIGHT, SOFT_INK } from '../game/theme';
 import type { Classifier, Noun } from '../types';
 
 const GATE_X = 118;
 const LANES = [220, 360, 500];
+const ENEMY_SPAWN_X = GAME_WIDTH + 110;
 const HINT_TIME_SCALE = 1 / 3;
 const WEAPON_START_X = 91;
 const WEAPON_GAP = 183;
@@ -22,8 +23,8 @@ class EnemyView extends Phaser.GameObjects.Container {
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly ring: Phaser.GameObjects.Ellipse;
 
-  constructor(scene: Phaser.Scene, noun: Noun, laneY: number, speed: number) {
-    super(scene, GAME_WIDTH + 110, laneY);
+  constructor(scene: Phaser.Scene, noun: Noun, laneY: number, speed: number, spawnX: number = ENEMY_SPAWN_X) {
+    super(scene, spawnX, laneY);
     this.noun = noun;
     this.maxHp = maxHpFor(noun);
     this.hp = this.maxHp;
@@ -260,9 +261,12 @@ export class GameScene extends Phaser.Scene {
       });
     });
     const noun = Phaser.Utils.Array.GetRandom(pool);
-    const lane = Phaser.Math.Between(0, LANES.length - 1);
-    const speed = rules.baseSpeed + noun.difficulty * 7 + Phaser.Math.Between(-7, 9);
-    const enemy = new EnemyView(this, noun, LANES[lane], speed);
+    const occupants = this.enemies.map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    const lane = pickLaneIndex(LANES, occupants, ENEMY_SPAWN_X, Math.random);
+    const laneY = LANES[lane]!;
+    const spawnX = spawnXForLane(ENEMY_SPAWN_X, laneY, occupants);
+    const speed = waveEnemySpeed(rules);
+    const enemy = new EnemyView(this, noun, laneY, speed, spawnX);
     enemy.on('pointerup', () => this.selectTarget(enemy));
     this.enemies.push(enemy);
     this.remainingSpawns -= 1;

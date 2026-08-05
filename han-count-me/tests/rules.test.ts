@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import seed from '../data/chinese_classifier_game_seed.json';
 import { GameCatalog } from '../src/data/catalog';
-import { choicesForTarget, damageFor, hintChargesAfterUse, hintChargesAtWaveStart, maxHpFor, nextCombo, rulesForWave, scoreForHit } from '../src/game/rules';
+import {
+  choicesForTarget,
+  damageFor,
+  ENEMY_MIN_SPACING,
+  hintChargesAfterUse,
+  hintChargesAtWaveStart,
+  maxHpFor,
+  nextCombo,
+  pickLaneIndex,
+  rulesForWave,
+  scoreForHit,
+  spawnXForLane,
+  waveEnemySpeed,
+} from '../src/game/rules';
 import type { GameSeed } from '../src/types';
 
 const catalog = new GameCatalog(seed as GameSeed);
@@ -37,6 +50,12 @@ describe('progression rules', () => {
     expect(rulesForWave(100).spawnDelayMs).toBe(700);
   });
 
+  it('даёт одинаковую скорость всем врагам одной волны', () => {
+    const rules = rulesForWave(5);
+    expect(waveEnemySpeed(rules)).toBe(rules.baseSpeed);
+    expect(waveEnemySpeed(rules)).toBe(waveEnemySpeed(rulesForWave(5)));
+  });
+
   it('сбрасывает серию только на нулевом уроне', () => {
     expect(nextCombo(4, 0)).toBe(0);
     expect(nextCombo(4, 1)).toBe(5);
@@ -54,5 +73,33 @@ describe('progression rules', () => {
     expect(hintChargesAtWaveStart(1)).toBe(2);
     expect(hintChargesAtWaveStart(hintChargesAfterUse(2))).toBe(2);
     expect(hintChargesAfterUse(0)).toBe(0);
+  });
+});
+
+describe('enemy lane spacing', () => {
+  const lanes = [220, 360, 500];
+  const defaultX = 1390;
+
+  it('не ставит врага поверх уже занятого места на полосе', () => {
+    const existing = [{ x: defaultX, y: lanes[0]! }];
+    expect(spawnXForLane(defaultX, lanes[0]!, existing)).toBe(defaultX + ENEMY_MIN_SPACING);
+    expect(spawnXForLane(defaultX, lanes[1]!, existing)).toBe(defaultX);
+  });
+
+  it('выбирает свободную полосу вместо удлинения очереди', () => {
+    const existing = [{ x: defaultX, y: lanes[0]! }];
+    expect(pickLaneIndex(lanes, existing, defaultX, () => 0)).toBe(1);
+  });
+
+  it('сохраняет зазор при очереди на всех полосах', () => {
+    const existing = lanes.map((y) => ({ x: defaultX, y }));
+    const lane = pickLaneIndex(lanes, existing, defaultX, () => 0.99);
+    const x = spawnXForLane(defaultX, lanes[lane]!, existing);
+    expect(x).toBe(defaultX + ENEMY_MIN_SPACING);
+    for (const occupant of existing) {
+      if (Math.abs(occupant.y - lanes[lane]!) < 0.5) {
+        expect(x - occupant.x).toBeGreaterThanOrEqual(ENEMY_MIN_SPACING);
+      }
+    }
   });
 });
