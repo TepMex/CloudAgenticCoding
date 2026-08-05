@@ -26,6 +26,9 @@ export interface WaveRules {
   tier: 1 | 2 | 3;
 }
 
+/** Horizontal clearance between enemies on the same lane (sprite + label footprint). */
+export const ENEMY_MIN_SPACING = 190;
+
 export function rulesForWave(wave: number, highestWave = 0): WaveRules {
   const safeWave = Math.max(1, Math.floor(wave));
   return {
@@ -34,6 +37,56 @@ export function rulesForWave(wave: number, highestWave = 0): WaveRules {
     baseSpeed: Math.min(190, 18 + safeWave * 2),
     tier: unlockedTier(safeWave, highestWave),
   };
+}
+
+/** All enemies in a wave share one speed — no per-noun or random variance. */
+export function waveEnemySpeed(rules: Pick<WaveRules, 'baseSpeed'>): number {
+  return rules.baseSpeed;
+}
+
+export interface LaneOccupant {
+  x: number;
+  y: number;
+}
+
+/**
+ * Spawn X so the new enemy does not overlap others already on this lane.
+ * With equal wave speed, this gap is preserved for the rest of the march.
+ */
+export function spawnXForLane(
+  defaultX: number,
+  laneY: number,
+  existing: readonly LaneOccupant[],
+  minSpacing: number = ENEMY_MIN_SPACING,
+): number {
+  let x = defaultX;
+  for (const occupant of existing) {
+    if (Math.abs(occupant.y - laneY) < 0.5) {
+      x = Math.max(x, occupant.x + minSpacing);
+    }
+  }
+  return x;
+}
+
+/**
+ * Prefer the lane that lets the enemy spawn furthest left (least queue depth).
+ * Ties are broken with `random` so lane choice stays unpredictable.
+ */
+export function pickLaneIndex(
+  laneYs: readonly number[],
+  existing: readonly LaneOccupant[],
+  defaultSpawnX: number,
+  random: () => number = Math.random,
+  minSpacing: number = ENEMY_MIN_SPACING,
+): number {
+  if (laneYs.length === 0) return 0;
+  const spawnXs = laneYs.map((laneY) => spawnXForLane(defaultSpawnX, laneY, existing, minSpacing));
+  const bestX = Math.min(...spawnXs);
+  const candidates = spawnXs
+    .map((x, index) => ({ x, index }))
+    .filter((item) => item.x === bestX);
+  const pick = Math.floor(random() * candidates.length);
+  return candidates[Math.min(pick, candidates.length - 1)]!.index;
 }
 
 export function scoreForHit(damage: number, combo: number): number {
