@@ -5,8 +5,10 @@ import {
   choicesForTarget,
   damageFor,
   ENEMY_MIN_SPACING,
+  ENEMY_VERTICAL_FOOTPRINT,
   hintChargesAfterUse,
   hintChargesAtWaveStart,
+  lanesVerticallyOverlap,
   maxHpFor,
   nextCombo,
   pickLaneIndex,
@@ -77,13 +79,26 @@ describe('progression rules', () => {
 });
 
 describe('enemy lane spacing', () => {
-  const lanes = [220, 360, 500];
+  const lanes = [200, 360, 520];
   const defaultX = 1390;
+
+  it('игровые полосы разведены шире вертикального силуэта врага', () => {
+    expect(lanes[1]! - lanes[0]!).toBeGreaterThanOrEqual(ENEMY_VERTICAL_FOOTPRINT);
+    expect(lanes[2]! - lanes[1]!).toBeGreaterThanOrEqual(ENEMY_VERTICAL_FOOTPRINT);
+    expect(lanesVerticallyOverlap(lanes[0]!, lanes[1]!)).toBe(false);
+  });
 
   it('не ставит врага поверх уже занятого места на полосе', () => {
     const existing = [{ x: defaultX, y: lanes[0]! }];
     expect(spawnXForLane(defaultX, lanes[0]!, existing)).toBe(defaultX + ENEMY_MIN_SPACING);
     expect(spawnXForLane(defaultX, lanes[1]!, existing)).toBe(defaultX);
+  });
+
+  it('сдвигает X, если соседняя полоса слишком близко по вертикали', () => {
+    const crowded = [220, 300, 500];
+    const existing = [{ x: defaultX, y: crowded[0]! }];
+    expect(lanesVerticallyOverlap(crowded[0]!, crowded[1]!)).toBe(true);
+    expect(spawnXForLane(defaultX, crowded[1]!, existing)).toBe(defaultX + ENEMY_MIN_SPACING);
   });
 
   it('выбирает свободную полосу вместо удлинения очереди', () => {
@@ -97,7 +112,7 @@ describe('enemy lane spacing', () => {
     const x = spawnXForLane(defaultX, lanes[lane]!, existing);
     expect(x).toBe(defaultX + ENEMY_MIN_SPACING);
     for (const occupant of existing) {
-      if (Math.abs(occupant.y - lanes[lane]!) < 0.5) {
+      if (lanesVerticallyOverlap(lanes[lane]!, occupant.y)) {
         expect(x - occupant.x).toBeGreaterThanOrEqual(ENEMY_MIN_SPACING);
       }
     }

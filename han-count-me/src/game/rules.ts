@@ -26,8 +26,14 @@ export interface WaveRules {
   tier: 1 | 2 | 3;
 }
 
-/** Horizontal clearance between enemies on the same lane (sprite + label footprint). */
+/** Horizontal clearance between enemy sprites (same lane or vertically overlapping). */
 export const ENEMY_MIN_SPACING = 190;
+
+/**
+ * Vertical half-extent of an enemy (HP bar through label). Lane centers must be
+ * at least this far apart so adjacent lines do not visually intersect.
+ */
+export const ENEMY_VERTICAL_FOOTPRINT = 152;
 
 export function rulesForWave(wave: number, highestWave = 0): WaveRules {
   const safeWave = Math.max(1, Math.floor(wave));
@@ -49,19 +55,29 @@ export interface LaneOccupant {
   y: number;
 }
 
+/** True when two lane centers are close enough that sprites would overlap vertically. */
+export function lanesVerticallyOverlap(
+  laneY: number,
+  otherY: number,
+  footprint: number = ENEMY_VERTICAL_FOOTPRINT,
+): boolean {
+  return Math.abs(laneY - otherY) < footprint;
+}
+
 /**
- * Spawn X so the new enemy does not overlap others already on this lane.
- * With equal wave speed, this gap is preserved for the rest of the march.
+ * Spawn X so the new enemy does not overlap others on the same or vertically
+ * conflicting lanes. Equal wave speed keeps that gap for the rest of the march.
  */
 export function spawnXForLane(
   defaultX: number,
   laneY: number,
   existing: readonly LaneOccupant[],
   minSpacing: number = ENEMY_MIN_SPACING,
+  verticalFootprint: number = ENEMY_VERTICAL_FOOTPRINT,
 ): number {
   let x = defaultX;
   for (const occupant of existing) {
-    if (Math.abs(occupant.y - laneY) < 0.5) {
+    if (lanesVerticallyOverlap(laneY, occupant.y, verticalFootprint)) {
       x = Math.max(x, occupant.x + minSpacing);
     }
   }
@@ -78,9 +94,12 @@ export function pickLaneIndex(
   defaultSpawnX: number,
   random: () => number = Math.random,
   minSpacing: number = ENEMY_MIN_SPACING,
+  verticalFootprint: number = ENEMY_VERTICAL_FOOTPRINT,
 ): number {
   if (laneYs.length === 0) return 0;
-  const spawnXs = laneYs.map((laneY) => spawnXForLane(defaultSpawnX, laneY, existing, minSpacing));
+  const spawnXs = laneYs.map((laneY) =>
+    spawnXForLane(defaultSpawnX, laneY, existing, minSpacing, verticalFootprint),
+  );
   const bestX = Math.min(...spawnXs);
   const candidates = spawnXs
     .map((x, index) => ({ x, index }))

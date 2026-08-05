@@ -8,7 +8,8 @@ import { addButton, CINNABAR, GAME_HEIGHT, GAME_WIDTH, GOLD, INK, JADE, JADE_DAR
 import type { Classifier, Noun } from '../types';
 
 const GATE_X = 118;
-const LANES = [220, 360, 500];
+/** Centers ≥ ENEMY_VERTICAL_FOOTPRINT apart so adjacent-lane sprites do not intersect. */
+const LANES = [200, 360, 520];
 const ENEMY_SPAWN_X = GAME_WIDTH + 110;
 const HINT_TIME_SCALE = 1 / 3;
 const WEAPON_START_X = 91;
@@ -30,21 +31,21 @@ class EnemyView extends Phaser.GameObjects.Container {
     this.hp = this.maxHp;
     this.speed = speed;
 
-    this.ring = scene.add.ellipse(0, 10, 164, 150).setStrokeStyle(4, CINNABAR, 0).setFillStyle(0xffffff, 0);
-    const shadow = scene.add.ellipse(0, 62, 124, 22, INK, 0.16);
+    this.ring = scene.add.ellipse(0, 6, 138, 128).setStrokeStyle(4, CINNABAR, 0).setFillStyle(0xffffff, 0);
+    const shadow = scene.add.ellipse(0, 52, 108, 18, INK, 0.16);
     const index = Number(noun.noun_id.slice(1)) - 1;
-    const image = scene.add.image(0, -3, sheetTextureKey(Math.floor(index / 16)), noun.noun_id).setDisplaySize(145, 145);
-    const labelBg = scene.add.rectangle(0, 67, 168, 47, PAPER_LIGHT, 0.94).setStrokeStyle(1, INK, 0.2);
-    const hanzi = scene.add.text(0, 57, noun.noun_zh, {
-      fontFamily: '"Noto Serif SC", serif', fontSize: '19px', color: '#252722', fontStyle: 'bold',
+    const image = scene.add.image(0, -6, sheetTextureKey(Math.floor(index / 16)), noun.noun_id).setDisplaySize(118, 118);
+    const labelBg = scene.add.rectangle(0, 56, 148, 40, PAPER_LIGHT, 0.94).setStrokeStyle(1, INK, 0.2);
+    const hanzi = scene.add.text(0, 47, noun.noun_zh, {
+      fontFamily: '"Noto Serif SC", serif', fontSize: '17px', color: '#252722', fontStyle: 'bold',
     }).setOrigin(0.5);
-    const russian = scene.add.text(0, 77, noun.noun_ru, {
+    const russian = scene.add.text(0, 65, noun.noun_ru, {
       fontFamily: 'system-ui, sans-serif', fontSize: '10px', color: '#605a50',
     }).setOrigin(0.5);
-    const hpTrack = scene.add.rectangle(0, -83, 142, 10, INK, 0.22);
-    this.hpFill = scene.add.rectangle(-71, -83, 142, 10, CINNABAR, 0.95).setOrigin(0, 0.5);
+    const hpTrack = scene.add.rectangle(0, -70, 124, 9, INK, 0.22);
+    this.hpFill = scene.add.rectangle(-62, -70, 124, 9, CINNABAR, 0.95).setOrigin(0, 0.5);
     this.add([this.ring, shadow, image, labelBg, hanzi, russian, hpTrack, this.hpFill]);
-    this.setSize(174, 176).setInteractive({ useHandCursor: true });
+    this.setSize(152, 148).setInteractive({ useHandCursor: true });
     scene.add.existing(this);
   }
 
@@ -54,7 +55,7 @@ class EnemyView extends Phaser.GameObjects.Container {
 
   applyDamage(amount: number): void {
     this.hp = Math.max(0, this.hp - amount);
-    this.hpFill.width = 142 * (this.hp / this.maxHp);
+    this.hpFill.width = 124 * (this.hp / this.maxHp);
   }
 }
 
@@ -163,9 +164,9 @@ export class GameScene extends Phaser.Scene {
     g.beginPath();
     g.moveTo(0, 300); g.lineTo(180, 145); g.lineTo(320, 280); g.lineTo(500, 115); g.lineTo(690, 310); g.lineTo(900, 135); g.lineTo(1100, 300); g.lineTo(1280, 160); g.lineTo(1280, 550); g.lineTo(0, 550); g.closePath(); g.fillPath();
     g.fillStyle(0xe9dfc8, 0.78);
-    LANES.forEach((y) => g.fillRoundedRect(96, y - 62, 1170, 124, 25));
+    LANES.forEach((y) => g.fillRoundedRect(96, y - 70, 1170, 140, 25));
     g.lineStyle(1, INK, 0.16);
-    LANES.forEach((y) => { g.beginPath(); g.moveTo(105, y + 62); g.lineTo(1270, y + 62); g.strokePath(); });
+    LANES.forEach((y) => { g.beginPath(); g.moveTo(105, y + 70); g.lineTo(1270, y + 70); g.strokePath(); });
     g.fillStyle(JADE_DARK, 0.96); g.fillRect(0, 0, GAME_WIDTH, 88);
     g.fillStyle(INK, 0.96); g.fillRect(0, 570, GAME_WIDTH, 150);
 
