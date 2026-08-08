@@ -18,6 +18,10 @@ npm run build
 npm run preview
 ```
 
+Иллюстрированная HTML-таблица счётных слов находится рядом с игрой по адресу
+`presentation.html`. Она строится из того же JSON и тех же десяти атласов
+предметов, что и игра; фильтр умеет искать по русскому, китайскому и pinyin.
+
 ## GitHub Pages (this monorepo)
 
 The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) builds this app and copies `dist/` to `deploy/han-count-me/` on the `gh-pages` branch. After a push to `master`, the game is available at:

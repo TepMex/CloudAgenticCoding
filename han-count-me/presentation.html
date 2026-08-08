@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#812f28" />
+    <meta
+      name="description"
+      content="Иллюстрированная таблица счётных слов китайского языка по данным игры Han Count Me."
+    />
+    <title>量词图鉴 · Счётные слова китайского языка</title>
+  </head>
+  <body>
+    <header class="hero">
+      <nav class="topbar" aria-label="Навигация">
+        <a class="brand" href="./" aria-label="Вернуться в Han Count Me">
+          <span class="brand-mark" aria-hidden="true">量</span>
+          <span><b>HAN COUNT ME</b><small>量词守门人</small></span>
+        </a>
+        <a class="game-link" href="./">Открыть игру <span aria-hidden="true">→</span></a>
+      </nav>
+
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> ИЛЛЮСТРИРОВАННЫЙ СПРАВОЧНИК <span></span></p>
+        <h1><span lang="zh-Hans">量词图鉴</span><small>Счётные слова китайского языка</small></h1>
+        <p class="lead">
+          Выберите предмет и сравните естественный вариант с самым точным.
+          Все примеры, сочетания и иллюстрации взяты из игры.
+        </p>
+        <div class="legend" aria-label="Легенда вариантов">
+          <span><i class="legend-mark legend-good" aria-hidden="true"></i> подходящий вариант</span>
+          <span><i class="legend-mark legend-best" aria-hidden="true"></i> наиболее подходящий</span>
+          <span><i class="legend-mark legend-fallback" aria-hidden="true"></i> универсальный 个</span>
+        </div>
+      </div>
+      <div class="mountains" aria-hidden="true"></div>
+    </header>
+
+    <main>
+      <section class="catalog" aria-labelledby="catalog-title">
+        <div class="catalog-heading">
+          <div>
+            <p class="section-kicker" lang="zh-Hans">一物 · 一量 · 一意</p>
+            <h2 id="catalog-title">Таблица сочетаний</h2>
+          </div>
+          <p class="catalog-note">Если специальной пары нет, показан универсальный вариант 个.</p>
+        </div>
+
+        <div class="toolbar" role="search">
+          <label class="search-field">
+            <span class="sr-only">Найти предмет или счётное слово</span>
+            <span aria-hidden="true">⌕</span>
+            <input id="search" type="search" placeholder="Найти предмет, иероглиф или pinyin…" autocomplete="off" />
+          </label>
+          <label class="category-field">
+            <span class="sr-only">Фильтр по категории</span>
+            <select id="category">
+              <option value="">Все категории</option>
+            </select>
+          </label>
+          <output id="result-count" class="result-count" aria-live="polite"></output>
+        </div>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="column-number">01</span> Предмет</th>
+                <th scope="col"><span class="column-number">02</span> Подходящее счётное слово</th>
+                <th scope="col"><span class="column-number">03</span> Наиболее подходящее</th>
+              </tr>
+            </thead>
+            <tbody id="catalog-body"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state" hidden>
+            <span lang="zh-Hans">未找到</span>
+            <strong>Ничего не найдено</strong>
+            <p>Попробуйте другой запрос или сбросьте категорию.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span class="footer-seal" aria-hidden="true">量词</span>
+      <p>Данные и изображения: <strong>Han Count Me · 量词守门人</strong></p>
+      <button id="to-top" type="button">Наверх ↑</button>
+    </footer>
+
+    <script type="module" src="/src/presentation.ts"></script>
+  </body>
+</html>
