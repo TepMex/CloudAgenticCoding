@@ -627,31 +627,49 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   .world-summary span:first-child { display: none; }
   .map-canvas { inset: 6% 2% 30%; }
   .field-grid { inset: 8% 4%; }
-  .field-panel { top: auto; right: 15px; bottom: 16px; left: 15px; width: auto; padding: 19px 23px; transform: none; }
+  .field-panel { top: auto; right: 15px; bottom: max(16px, env(safe-area-inset-bottom)); left: 15px; width: auto; padding: 19px 23px; transform: none; }
   .field-panel h1 { font-size: 1.5rem; }
   .field-subtitle { min-height: auto; margin-bottom: 10px; }
   .field-panel .health-line, .field-panel .field-meta { display: none; }
   .field-panel .primary-button { min-height: 39px; }
   .zoom-controls, .reset-button, .map-hint { display: none; }
   .welcome-card { padding: 58px 28px 40px; }
-  .prompt-scroll { top: 10px; width: 68vw; min-height: 72px; }
-  .back-button { top: 15px; left: 14px; width: 45px; height: 45px; }
+  .prompt-scroll { top: max(10px, env(safe-area-inset-top)); width: 68vw; min-height: 72px; }
+  .back-button { top: max(15px, env(safe-area-inset-top)); left: 14px; width: 45px; height: 45px; }
   .writing-circle { top: 52%; width: min(78vw, 51vh); }
   .weed-core { top: 18%; scale: .74; }
   .battle-progress { right: 11px; }
-  .hint-button { right: 12px; bottom: 16px; font-size: .78rem; }
+  .hint-button { right: 12px; bottom: max(16px, env(safe-area-inset-bottom)); font-size: .78rem; }
   .stroke-feedback { bottom: 61px; min-width: 250px; padding: 7px 16px; }
-  .field-cleanliness { left: 13px; bottom: 22px; }
+  .field-cleanliness { left: 13px; bottom: max(22px, env(safe-area-inset-bottom)); }
   .field-cleanliness > span { width: 72px; }
 }
 
 @media (max-height: 650px) {
   .prompt-scroll { min-height: 62px; }
   .prompt-scroll strong { font-size: 1.6rem; }
-  .writing-circle { width: min(390px, 62vh); }
-  .weed-core { top: 11%; scale: .68; }
-  .stroke-feedback { bottom: 11px; }
-  .hint-button, .field-cleanliness { bottom: 12px; }
+  .writing-circle { width: min(390px, 62vh, calc(100vw - 32px)); }
+  .weed-core { top: 14%; scale: .68; }
+  .stroke-feedback {
+    left: 12px;
+    right: 12px;
+    bottom: 58px;
+    min-width: 0;
+    width: auto;
+    padding: 6px 10px;
+    transform: none;
+  }
+  .hint-button {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    justify-content: center;
+  }
+  .field-cleanliness {
+    top: 92px;
+    bottom: auto;
+    left: 13px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
