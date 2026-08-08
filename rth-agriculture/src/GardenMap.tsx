@@ -6,7 +6,6 @@ import { fieldInfection } from './garden'
 type GardenMapProps = {
   mapRootRef: RefObject<HTMLElement | null>
   save: SaveGame
-  zoom: number
 }
 
 function drawCover(
@@ -66,7 +65,7 @@ function eraseSoftEllipse(
  * patch per field according to its learning progress. The field buttons only
  * provide geometry and interaction; they no longer draw card-like plots.
  */
-export function GardenMap({ mapRootRef, save, zoom }: GardenMapProps) {
+export function GardenMap({ mapRootRef, save }: GardenMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -173,7 +172,7 @@ export function GardenMap({ mapRootRef, save, zoom }: GardenMapProps) {
       resizeObserver.disconnect()
       overgrownMap.removeEventListener('load', repaintWhileLayoutMoves)
     }
-  }, [mapRootRef, save.cards, zoom])
+  }, [mapRootRef, save.cards])
 
   return <canvas className="garden-map-overlay" ref={canvasRef} aria-hidden="true" />
 }

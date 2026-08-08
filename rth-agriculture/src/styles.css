@@ -451,22 +451,6 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 .field-panel .primary-button { position: relative; z-index: 2; width: 100%; }
 .locked-note { display: flex; align-items: center; gap: 8px; margin-top: 24px; opacity: .65; }
 
-.zoom-controls {
-  position: absolute;
-  left: 26px;
-  bottom: 26px;
-  z-index: 12;
-  display: flex;
-  overflow: hidden;
-  border: 1px solid rgba(218, 195, 145, .5);
-  background: rgba(23, 33, 28, .82);
-  box-shadow: 0 7px 18px rgba(10, 16, 13, .32);
-}
-
-.zoom-controls button { width: 39px; height: 39px; display: grid; place-items: center; color: #e7d8b6; border: 0; border-right: 1px solid rgba(218, 195, 145, .24); background: transparent; cursor: pointer; }
-.zoom-controls button:last-child { border-right: 0; }
-.zoom-controls svg { width: 17px; }
-.reset-button { position: absolute; left: 120px; bottom: 28px; z-index: 12; display: flex; align-items: center; gap: 7px; padding: 8px 10px; color: #e4d5b5; border: 0; background: rgba(23, 33, 28, .66); cursor: pointer; }
 .map-hint { position: absolute; bottom: 22px; left: 50%; z-index: 10; margin: 0; transform: translateX(-50%); color: rgba(239, 226, 196, .72); font-size: .83rem; letter-spacing: .06em; text-shadow: 0 2px 4px #101815; }
 
 .battle-backdrop { background-image: url('/assets/cleaning-court-clear.png'); }
@@ -512,8 +496,6 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 
 .prompt-scroll span { font-size: .76rem; letter-spacing: .1em; opacity: .72; }
 .prompt-scroll strong { font-size: clamp(1.65rem, 3vw, 2.3rem); font-weight: 600; line-height: 1.05; letter-spacing: .035em; }
-.prompt-scroll small { position: absolute; right: 24px; bottom: 10px; opacity: .55; }
-
 .writing-circle {
   position: absolute;
   z-index: 10;
@@ -632,7 +614,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   .field-subtitle { min-height: auto; margin-bottom: 10px; }
   .field-panel .health-line, .field-panel .field-meta { display: none; }
   .field-panel .primary-button { min-height: 39px; }
-  .zoom-controls, .reset-button, .map-hint { display: none; }
+  .map-hint { display: none; }
   .welcome-card { padding: 58px 28px 40px; }
   .prompt-scroll { top: max(10px, env(safe-area-inset-top)); width: 68vw; min-height: 72px; }
   .back-button { top: max(15px, env(safe-area-inset-top)); left: 14px; width: 45px; height: 45px; }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import HanziWriter from 'hanzi-writer'
-import { ArrowLeft, Brush, Flower2, HelpCircle, Leaf, LockKeyhole, Minus, Plus, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowLeft, Brush, Flower2, HelpCircle, Leaf, LockKeyhole, Sparkles } from 'lucide-react'
 import { fieldById, fields, type CharacterDefinition, type FieldDefinition } from './data/model'
-import { initialSave, loadSave, persistSave, resetSave, type SaveGame } from './db'
+import { initialSave, loadSave, persistSave, type SaveGame } from './db'
 import { GardenMap } from './GardenMap'
 import { fieldInfection } from './garden'
 import { isCardDue, reviewCard, type ReviewEvent } from './learning'
@@ -23,14 +23,11 @@ function strokeLabel(count: number): string {
 function MapScreen({
   save,
   onEnter,
-  onReset,
 }: {
   save: SaveGame
   onEnter: (field: FieldDefinition) => void
-  onReset: () => void
 }) {
   const mapRootRef = useRef<HTMLElement>(null)
-  const [zoom, setZoom] = useState(1)
   const [selectedId, setSelectedId] = useState('field-001')
   const selected = fieldById.get(selectedId) ?? fields[0]
   const selectedUnlocked = save.unlockedFieldIds.includes(selected.id)
@@ -42,7 +39,7 @@ function MapScreen({
   return (
     <main className="map-screen" ref={mapRootRef}>
       <div className="map-backdrop" aria-hidden="true" />
-      <GardenMap mapRootRef={mapRootRef} save={save} zoom={zoom} />
+      <GardenMap mapRootRef={mapRootRef} save={save} />
       <header className="map-header">
         <div className="brand-mark"><Leaf size={18} /><span>Сад памяти</span></div>
         <div className="world-summary">
@@ -52,7 +49,7 @@ function MapScreen({
       </header>
 
       <section className="map-stage" aria-label="Карта сада">
-        <div className="map-canvas" style={{ transform: `scale(${zoom})` }}>
+        <div className="map-canvas">
           <div className="field-grid">
             {fields.map((field) => {
               const unlocked = save.unlockedFieldIds.includes(field.id)
@@ -103,12 +100,6 @@ function MapScreen({
         ) : <div className="locked-note"><LockKeyhole size={17} /> Поле заросло, но путь пока закрыт</div>}
       </aside>
 
-      <div className="zoom-controls" aria-label="Масштаб карты">
-        <button onClick={() => setZoom((value) => Math.max(0.88, value - 0.06))} aria-label="Уменьшить"><Minus /></button>
-        <button onClick={() => setZoom((value) => Math.min(1.18, value + 0.06))} aria-label="Увеличить"><Plus /></button>
-      </div>
-
-      <button className="reset-button" onClick={onReset} title="Начать сад заново"><RotateCcw size={15} /> Сбросить</button>
       <p className="map-hint">
         {selectedUnlocked ? 'Нажмите выбранное поле ещё раз, чтобы войти' : 'Замок закрывает путь, но не скрывает сорняк'}
       </p>
@@ -286,9 +277,6 @@ function BattleScreen({
       <header className="prompt-scroll">
         <span>Целевое значение</span>
         <strong>{activeCharacter?.keyword.ru.toLocaleUpperCase('ru') ?? 'ПОЛЕ ОЧИЩЕНО'}</strong>
-        {activeCharacter && activeCharacter.keyword.ru === activeCharacter.keyword.en && (
-          <small>{activeCharacter.keyword.en}</small>
-        )}
       </header>
 
       {activeCharacter ? (
@@ -370,12 +358,6 @@ export default function App() {
     setScreen('battle')
   }
 
-  const handleReset = async () => {
-    if (!window.confirm('Вернуть сад к первоначальному состоянию? История повторений будет удалена.')) return
-    const fresh = await resetSave()
-    setSave(fresh)
-  }
-
   if (!loaded) return <div className="loading-screen"><Leaf /> Сад пробуждается…</div>
   if (!welcomed) return <Welcome onEnter={() => {
     sessionStorage.setItem('memory-garden-welcomed', 'yes')
@@ -386,5 +368,5 @@ export default function App() {
     return <BattleScreen field={activeField} save={save} onSave={updateSave} onExit={() => setScreen('map')} />
   }
 
-  return <MapScreen save={save} onEnter={enterField} onReset={handleReset} />
+  return <MapScreen save={save} onEnter={enterField} />
 }
