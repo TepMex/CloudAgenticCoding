@@ -36,7 +36,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 .welcome-screen {
   display: grid;
   place-items: center;
-  background: url('/assets/garden-map.png') center / cover;
+  background: var(--bg-garden-map) center / cover;
 }
 
 .welcome-screen::before {
@@ -126,7 +126,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   background-size: cover;
 }
 
-.map-backdrop { background-image: url('/assets/garden-map.png'); }
+.map-backdrop { background-image: var(--bg-garden-map); }
 .garden-map-overlay {
   position: absolute;
   inset: -3%;
@@ -453,7 +453,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 
 .map-hint { position: absolute; bottom: 22px; left: 50%; z-index: 10; margin: 0; transform: translateX(-50%); color: rgba(239, 226, 196, .72); font-size: .83rem; letter-spacing: .06em; text-shadow: 0 2px 4px #101815; }
 
-.battle-backdrop { background-image: url('/assets/cleaning-court-clear.png'); }
+.battle-backdrop { background-image: var(--bg-battle); }
 .battle-screen { touch-action: none; }
 .battle-screen.is-destroyed .battle-backdrop { animation: garden-breathe .9s ease; filter: saturate(1.15) brightness(1.08); }
 

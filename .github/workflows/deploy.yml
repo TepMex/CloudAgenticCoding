@@ -15,8 +15,8 @@ permissions:
   contents: write
 
 env:
-  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou
-  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou rth-agriculture
+  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android
 
 jobs:
   detect:
@@ -32,6 +32,7 @@ jobs:
       build_sense_of_text: ${{ steps.plan.outputs.build_sense_of_text }}
       build_map_of_chinese: ${{ steps.plan.outputs.build_map_of_chinese }}
       build_mandarin_kanshu_pengyou: ${{ steps.plan.outputs.build_mandarin_kanshu_pengyou }}
+      build_rth_agriculture: ${{ steps.plan.outputs.build_rth_agriculture }}
       build_chesswatch: ${{ steps.plan.outputs.build_chesswatch }}
       build_ankidroid_llm: ${{ steps.plan.outputs.build_ankidroid_llm }}
       build_anki_entertainer: ${{ steps.plan.outputs.build_anki_entertainer }}
@@ -45,6 +46,7 @@ jobs:
       build_pair_comp_elo: ${{ steps.plan.outputs.build_pair_comp_elo }}
       build_running_log: ${{ steps.plan.outputs.build_running_log }}
       build_han_count_android: ${{ steps.plan.outputs.build_han_count_android }}
+      build_rth_agriculture_android: ${{ steps.plan.outputs.build_rth_agriculture_android }}
       refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
       any_web_build: ${{ steps.plan.outputs.any_web_build }}
       any_android_apk_build: ${{ steps.plan.outputs.any_android_apk_build }}
@@ -77,6 +79,8 @@ jobs:
               - 'map-of-chinese/**'
             mandarin-kanshu-pengyou:
               - 'mandarin-kanshu-pengyou/**'
+            rth-agriculture:
+              - 'rth-agriculture/**'
             chesswatch:
               - 'chesswatch/**'
             ankidroid-llm:
@@ -103,6 +107,8 @@ jobs:
               - 'running-log/**'
             han-count-android:
               - 'han-count-android/**'
+            rth-agriculture-android:
+              - 'rth-agriculture-android/**'
             shared-android-signing:
               - 'android/sideload-signing.gradle.kts'
               - 'android/verify-apk-sideload-cert.sh'
@@ -136,6 +142,7 @@ jobs:
           CHANGED_SENSE_OF_TEXT: ${{ steps.changes.outputs.sense-of-text }}
           CHANGED_MAP_OF_CHINESE: ${{ steps.changes.outputs.map-of-chinese }}
           CHANGED_MANDARIN_KANSHU_PENGYOU: ${{ steps.changes.outputs.mandarin-kanshu-pengyou }}
+          CHANGED_RTH_AGRICULTURE: ${{ steps.changes.outputs.rth-agriculture }}
           CHANGED_CHESSWATCH: ${{ steps.changes.outputs.chesswatch }}
           CHANGED_ANKIDROID_LLM: ${{ steps.changes.outputs.ankidroid-llm }}
           CHANGED_ANKI_ENTERTAINER: ${{ steps.changes.outputs.anki-entertainer }}
@@ -149,6 +156,7 @@ jobs:
           CHANGED_PAIR_COMP_ELO: ${{ steps.changes.outputs.pair-comp-elo }}
           CHANGED_RUNNING_LOG: ${{ steps.changes.outputs.running-log }}
           CHANGED_HAN_COUNT_ANDROID: ${{ steps.changes.outputs.han-count-android }}
+          CHANGED_RTH_AGRICULTURE_ANDROID: ${{ steps.changes.outputs.rth-agriculture-android }}
           CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
           CHANGED_ANDROID_LANDING: ${{ steps.changes.outputs.shared-android-landing }}
           CHANGED_SCRIPTS: ${{ steps.changes.outputs.shared-scripts }}
@@ -177,6 +185,7 @@ jobs:
           build_sense_of_text=false
           build_map_of_chinese=false
           build_mandarin_kanshu_pengyou=false
+          build_rth_agriculture=false
           build_chesswatch=false
           build_ankidroid_llm=false
           build_anki_entertainer=false
@@ -190,6 +199,7 @@ jobs:
           build_pair_comp_elo=false
           build_running_log=false
           build_han_count_android=false
+          build_rth_agriculture_android=false
           refresh_android_landings=false
 
           if $full_deploy; then
@@ -201,6 +211,7 @@ jobs:
             build_sense_of_text=true
             build_map_of_chinese=true
             build_mandarin_kanshu_pengyou=true
+            build_rth_agriculture=true
             build_chesswatch=true
             build_ankidroid_llm=true
             build_anki_entertainer=true
@@ -214,6 +225,7 @@ jobs:
             build_pair_comp_elo=true
             build_running_log=true
             build_han_count_android=true
+            build_rth_agriculture_android=true
           else
             is_true "$CHANGED_SOCRATUS" && build_socratus=true
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
@@ -223,6 +235,7 @@ jobs:
             is_true "$CHANGED_SENSE_OF_TEXT" && build_sense_of_text=true
             is_true "$CHANGED_MAP_OF_CHINESE" && build_map_of_chinese=true
             is_true "$CHANGED_MANDARIN_KANSHU_PENGYOU" && build_mandarin_kanshu_pengyou=true
+            is_true "$CHANGED_RTH_AGRICULTURE" && build_rth_agriculture=true
             is_true "$CHANGED_CHESSWATCH" && build_chesswatch=true
             is_true "$CHANGED_ANKIDROID_LLM" && build_ankidroid_llm=true
             is_true "$CHANGED_ANKI_ENTERTAINER" && build_anki_entertainer=true
@@ -236,8 +249,10 @@ jobs:
             is_true "$CHANGED_PAIR_COMP_ELO" && build_pair_comp_elo=true
             is_true "$CHANGED_RUNNING_LOG" && build_running_log=true
             is_true "$CHANGED_HAN_COUNT_ANDROID" && build_han_count_android=true
+            is_true "$CHANGED_RTH_AGRICULTURE_ANDROID" && build_rth_agriculture_android=true
             # Bundled assets must track the web game.
             is_true "$CHANGED_HAN_COUNT_ME" && build_han_count_android=true
+            is_true "$CHANGED_RTH_AGRICULTURE" && build_rth_agriculture_android=true
 
             if is_true "$CHANGED_ANDROID_SIGNING"; then
               build_chesswatch=true
@@ -253,6 +268,7 @@ jobs:
               build_pair_comp_elo=true
               build_running_log=true
               build_han_count_android=true
+              build_rth_agriculture_android=true
             fi
 
             if is_true "$CHANGED_ANDROID_LANDING" || is_true "$CHANGED_SCRIPTS"; then
@@ -261,10 +277,10 @@ jobs:
           fi
 
           any_web_build=false
-          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou && any_web_build=true
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou || $build_rth_agriculture && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_han_count_android && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_han_count_android || $build_rth_agriculture_android && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -280,6 +296,7 @@ jobs:
             echo "build_sense_of_text=$build_sense_of_text"
             echo "build_map_of_chinese=$build_map_of_chinese"
             echo "build_mandarin_kanshu_pengyou=$build_mandarin_kanshu_pengyou"
+            echo "build_rth_agriculture=$build_rth_agriculture"
             echo "build_chesswatch=$build_chesswatch"
             echo "build_ankidroid_llm=$build_ankidroid_llm"
             echo "build_anki_entertainer=$build_anki_entertainer"
@@ -293,6 +310,7 @@ jobs:
             echo "build_pair_comp_elo=$build_pair_comp_elo"
             echo "build_running_log=$build_running_log"
             echo "build_han_count_android=$build_han_count_android"
+            echo "build_rth_agriculture_android=$build_rth_agriculture_android"
             echo "refresh_android_landings=$refresh_android_landings"
             echo "any_web_build=$any_web_build"
             echo "any_android_apk_build=$any_android_apk_build"
@@ -382,6 +400,11 @@ jobs:
         working-directory: mandarin-kanshu-pengyou
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (rth-agriculture)
+        if: needs.detect.outputs.build_rth_agriculture == 'true' || needs.detect.outputs.build_rth_agriculture_android == 'true'
+        working-directory: rth-agriculture
+        run: bun install --frozen-lockfile
+
       - name: Set deployment timestamp
         if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
@@ -440,6 +463,13 @@ jobs:
         working-directory: mandarin-kanshu-pengyou
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/mandarin-kanshu-pengyou/
+        run: bun run build
+
+      - name: Build (rth-agriculture)
+        if: needs.detect.outputs.build_rth_agriculture == 'true'
+        working-directory: rth-agriculture
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/rth-agriculture/
         run: bun run build
 
       - name: Setup Java
@@ -522,6 +552,15 @@ jobs:
         working-directory: han-count-android
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Sync rth-agriculture into Android assets
+        if: needs.detect.outputs.build_rth_agriculture_android == 'true'
+        run: chmod +x rth-agriculture-android/scripts/sync-web-assets.sh && rth-agriculture-android/scripts/sync-web-assets.sh
+
+      - name: Build Memory Garden Android APK
+        if: needs.detect.outputs.build_rth_agriculture_android == 'true'
+        working-directory: rth-agriculture-android
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Verify APK sideload signing
         if: needs.detect.outputs.any_android_apk_build == 'true'
         env:
@@ -538,6 +577,7 @@ jobs:
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
+          BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
         run: |
           set -euo pipefail
           chmod +x android/verify-apk-sideload-cert.sh
@@ -558,6 +598,7 @@ jobs:
           if is_true "$BUILD_PAIR_COMP_ELO"; then verify pair-comp-elo; fi
           if is_true "$BUILD_RUNNING_LOG"; then verify running-log; fi
           if is_true "$BUILD_HAN_COUNT_ANDROID"; then verify han-count-android; fi
+          if is_true "$BUILD_RTH_AGRICULTURE_ANDROID"; then verify rth-agriculture-android; fi
 
       - name: Prepare GitHub Pages site
         env:
@@ -570,6 +611,7 @@ jobs:
           BUILD_SENSE_OF_TEXT: ${{ needs.detect.outputs.build_sense_of_text }}
           BUILD_MAP_OF_CHINESE: ${{ needs.detect.outputs.build_map_of_chinese }}
           BUILD_MANDARIN_KANSHU_PENGYOU: ${{ needs.detect.outputs.build_mandarin_kanshu_pengyou }}
+          BUILD_RTH_AGRICULTURE: ${{ needs.detect.outputs.build_rth_agriculture }}
           BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
           BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
           BUILD_ANKI_ENTERTAINER: ${{ needs.detect.outputs.build_anki_entertainer }}
@@ -583,6 +625,7 @@ jobs:
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
+          BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -632,6 +675,7 @@ jobs:
           if is_true "$BUILD_SENSE_OF_TEXT"; then copy_web_app sense-of-text; else require_dir sense-of-text; fi
           if is_true "$BUILD_MAP_OF_CHINESE"; then copy_web_app map-of-chinese; else require_dir map-of-chinese; fi
           if is_true "$BUILD_MANDARIN_KANSHU_PENGYOU"; then copy_web_app mandarin-kanshu-pengyou; else require_dir mandarin-kanshu-pengyou; fi
+          if is_true "$BUILD_RTH_AGRICULTURE"; then copy_web_app rth-agriculture; else require_dir rth-agriculture; fi
 
           android_should_build() {
             case "$1" in
@@ -648,11 +692,12 @@ jobs:
               pair-comp-elo) is_true "$BUILD_PAIR_COMP_ELO" ;;
               running-log) is_true "$BUILD_RUNNING_LOG" ;;
               han-count-android) is_true "$BUILD_HAN_COUNT_ANDROID" ;;
+              rth-agriculture-android) is_true "$BUILD_RTH_AGRICULTURE_ANDROID" ;;
               *) return 1 ;;
             esac
           }
 
-          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android; do
+          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -689,6 +734,7 @@ jobs:
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
+          BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -710,6 +756,7 @@ jobs:
           should_inject pair-comp-elo "$BUILD_PAIR_COMP_ELO" && pages+=(deploy/pair-comp-elo/index.html)
           should_inject running-log "$BUILD_RUNNING_LOG" && pages+=(deploy/running-log/index.html)
           should_inject han-count-android "$BUILD_HAN_COUNT_ANDROID" && pages+=(deploy/han-count-android/index.html)
+          should_inject rth-agriculture-android "$BUILD_RTH_AGRICULTURE_ANDROID" && pages+=(deploy/rth-agriculture-android/index.html)
           if [[ ${#pages[@]} -eq 0 ]]; then
             echo "No Android landing pages to update"
             exit 0

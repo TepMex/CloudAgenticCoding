@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mg_garden">#19211E</color>
+    <color name="mg_garden_mid">#273A31</color>
+    <color name="mg_cream">#EFE5C9</color>
+    <color name="mg_jade">#40574B</color>
+    <color name="mg_jade_dark">#18201D</color>
+    <color name="mg_cinnabar">#7D302B</color>
+    <color name="ic_launcher_background">#273A31</color>
+</resources>

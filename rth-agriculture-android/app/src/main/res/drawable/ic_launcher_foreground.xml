@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple garden mound + sprout for Memory Garden -->
+    <path
+        android:fillColor="#40574B"
+        android:pathData="M22,72c8,-18 24,-28 32,-28s24,10 32,28c-10,10 -22,14 -32,14s-22,-4 -32,-14z" />
+    <path
+        android:fillColor="#EFE5C9"
+        android:pathData="M52,38c0,10 2,18 2,26h4c0,-8 2,-16 2,-26c-2,-8 -6,-12 -8,-12s-6,4 -8,12z" />
+    <path
+        android:fillColor="#EAD9B5"
+        android:pathData="M40,48c6,-2 12,2 16,8c-8,2 -14,0 -16,-8z" />
+    <path
+        android:fillColor="#EAD9B5"
+        android:pathData="M68,48c-6,-2 -12,2 -16,8c8,2 14,0 16,-8z" />
+</vector>

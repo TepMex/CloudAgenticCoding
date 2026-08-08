@@ -14,6 +14,8 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `hanzi-reading-roguelike` | [hanzi-reading-roguelike](https://tepmex.github.io/CloudAgenticCoding/hanzi-reading-roguelike/) | Hanzi Reading Roguelike · creature sprites & game scaffold |
 | `han-count-me` | [han-count-me](https://tepmex.github.io/CloudAgenticCoding/han-count-me/) | Han Count Me · Chinese classifier / measure-word gate defense |
 | `han-count-android` | [han-count-android](https://tepmex.github.io/CloudAgenticCoding/han-count-android/) | Han Count Me · Android WebView wrapper (APK) |
+| `rth-agriculture` | [rth-agriculture](https://tepmex.github.io/CloudAgenticCoding/rth-agriculture/) | Memory Garden · meaning→write Hanzi garden (Сад памяти) |
+| `rth-agriculture-android` | [rth-agriculture-android](https://tepmex.github.io/CloudAgenticCoding/rth-agriculture-android/) | Memory Garden · Android WebView wrapper (APK) |
 | `sense-of-text` | [sense-of-text](https://tepmex.github.io/CloudAgenticCoding/sense-of-text/) | Sense of Text · highlight important words (WASM embeddings or LLM) |
 | `map-of-chinese` | [map-of-chinese](https://tepmex.github.io/CloudAgenticCoding/map-of-chinese/) | Map of Chinese · Mandarin characters on an initial × final matrix |
 | `mandarin-kanshu-pengyou` | [mandarin-kanshu-pengyou](https://tepmex.github.io/CloudAgenticCoding/mandarin-kanshu-pengyou/) | 看书朋友 · local-first Chinese EPUB reading companion |
@@ -32,4 +34,4 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
-Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `han-count-android`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
+Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `han-count-android`, `rth-agriculture-android`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.

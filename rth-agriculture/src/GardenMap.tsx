@@ -163,7 +163,7 @@ export function GardenMap({ mapRootRef, save }: GardenMapProps) {
     const resizeObserver = new ResizeObserver(repaintWhileLayoutMoves)
     resizeObserver.observe(mapRoot)
     overgrownMap.addEventListener('load', repaintWhileLayoutMoves)
-    overgrownMap.src = '/assets/garden-map_negative.png'
+    overgrownMap.src = `${import.meta.env.BASE_URL}assets/garden-map_negative.png`
     if (overgrownMap.complete) repaintWhileLayoutMoves()
 
     return () => {

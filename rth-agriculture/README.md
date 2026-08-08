@@ -15,6 +15,14 @@ Production-сборка:
 bun run build
 ```
 
+## GitHub Pages (this monorepo)
+
+The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) builds this app and copies `dist/` to `deploy/rth-agriculture/` on the `gh-pages` branch. After a push to `master`, the game is available at:
+
+`https://<user-or-org>.github.io/<repository>/rth-agriculture/`
+
+CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefix. For local/`file://` (and the Android wrapper), unset that variable so `base` stays `./`.
+
 ## Что реализовано
 
 - непрерывная карта из 110 полей по 110 уникальным спискам RSH;

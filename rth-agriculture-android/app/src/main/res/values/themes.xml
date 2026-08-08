@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MemoryGarden" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/mg_jade</item>
+        <item name="colorOnPrimary">@color/mg_cream</item>
+        <item name="colorSurface">@color/mg_garden</item>
+        <item name="android:statusBarColor">@color/mg_jade_dark</item>
+        <item name="android:navigationBarColor">@color/mg_jade_dark</item>
+        <item name="android:colorBackground">@color/mg_garden</item>
+        <item name="android:windowBackground">@color/mg_garden</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
