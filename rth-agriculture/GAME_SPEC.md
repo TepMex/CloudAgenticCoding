@@ -210,6 +210,11 @@ Possible states:
 
 The authoritative state is FSRS. `weedLevel` is only a rendering projection.
 
+Field accessibility never changes infection. A locked field contains new
+characters and is therefore rendered as overgrown; the lock only prevents the
+player from entering it. The garden map must keep those weeds visible rather
+than replacing the field with fog or an empty disabled state.
+
 ## 8. Map Presentation
 
 The map should look like **one continuous magical garden divided into neighboring plots**, not a UI grid of cards.

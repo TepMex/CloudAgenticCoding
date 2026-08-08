@@ -21,7 +21,37 @@ export type FieldDefinition = {
   neighbors: string[]
   row: number
   column: number
+  mapRect: { x: number; y: number; width: number; height: number }
+  visual: FieldVisualPreset
 }
+
+export type FieldVisualPreset = {
+  id: string
+  ground: string
+  primaryPlant: PlantKind
+  secondaryPlants: readonly PlantKind[]
+  decoration: DecorationKind
+  palette: string
+  weedFamily: WeedFamily
+  seed: number
+}
+
+export type PlantKind =
+  | 'plum'
+  | 'bamboo'
+  | 'lotus'
+  | 'hydrangea'
+  | 'chrysanthemum'
+  | 'reed'
+  | 'peony'
+  | 'tea'
+  | 'magnolia'
+  | 'lily'
+  | 'moss'
+  | 'bells'
+
+export type DecorationKind = 'stones' | 'lanterns' | 'water' | 'terraces' | 'paths' | 'stepping-stones' | 'star-bells'
+export type WeedFamily = 'vine' | 'thistle' | 'bramble' | 'shadow-grass'
 
 type RawCharacter = {
   frame: number
@@ -51,6 +81,21 @@ const plantStyles = [
   'серебряный тростник', 'пионы', 'чайные кусты', 'магнолии', 'огненные лилии',
   'нефритовый мох', 'звёздные колокольчики',
 ]
+
+const visualPalettes = [
+  { ground: 'jade', primaryPlant: 'plum', secondaryPlants: ['moss', 'bells'], decoration: 'stones', palette: 'rose-jade', weedFamily: 'vine' },
+  { ground: 'reed-bed', primaryPlant: 'bamboo', secondaryPlants: ['tea', 'moss'], decoration: 'terraces', palette: 'amber-bamboo', weedFamily: 'shadow-grass' },
+  { ground: 'water-soil', primaryPlant: 'lotus', secondaryPlants: ['reed', 'lily'], decoration: 'water', palette: 'water-lotus', weedFamily: 'bramble' },
+  { ground: 'blue-earth', primaryPlant: 'hydrangea', secondaryPlants: ['moss', 'bells'], decoration: 'paths', palette: 'blue-iris', weedFamily: 'thistle' },
+  { ground: 'warm-loam', primaryPlant: 'chrysanthemum', secondaryPlants: ['tea', 'peony'], decoration: 'lanterns', palette: 'golden-sun', weedFamily: 'vine' },
+  { ground: 'silver-grass', primaryPlant: 'reed', secondaryPlants: ['bamboo', 'lily'], decoration: 'stepping-stones', palette: 'silver-mist', weedFamily: 'shadow-grass' },
+  { ground: 'rose-loam', primaryPlant: 'peony', secondaryPlants: ['plum', 'moss'], decoration: 'stones', palette: 'coral-rose', weedFamily: 'bramble' },
+  { ground: 'tea-earth', primaryPlant: 'tea', secondaryPlants: ['bells', 'chrysanthemum'], decoration: 'terraces', palette: 'tea-olive', weedFamily: 'thistle' },
+  { ground: 'pale-earth', primaryPlant: 'magnolia', secondaryPlants: ['moss', 'plum'], decoration: 'paths', palette: 'moon-magnolia', weedFamily: 'vine' },
+  { ground: 'ember-earth', primaryPlant: 'lily', secondaryPlants: ['reed', 'peony'], decoration: 'lanterns', palette: 'ember-lily', weedFamily: 'bramble' },
+  { ground: 'moss-soil', primaryPlant: 'moss', secondaryPlants: ['lotus', 'tea'], decoration: 'water', palette: 'jade-moss', weedFamily: 'shadow-grass' },
+  { ground: 'night-earth', primaryPlant: 'bells', secondaryPlants: ['hydrangea', 'bamboo'], decoration: 'star-bells', palette: 'night-bells', weedFamily: 'thistle' },
+] as const
 
 const source = rawCharacters as RawCharacter[]
 const listNames = [...new Set(source.map((item) => item.rth_list))]
@@ -101,9 +146,19 @@ export const fields: FieldDefinition[] = listNames.map((list, index) => {
     neighbors: neighborIndexes.map((neighbor) => `field-${String(neighbor + 1).padStart(3, '0')}`),
     row,
     column,
+    mapRect: {
+      x: column / 11,
+      y: row / 10,
+      width: 1 / 11,
+      height: 1 / 10,
+    },
+    visual: {
+      ...visualPalettes[index % visualPalettes.length],
+      id: `plot-${visualPalettes[index % visualPalettes.length].palette}`,
+      seed: (index + 1) * 2654435761,
+    },
   }
 })
 
 export const fieldById = new Map(fields.map((field) => [field.id, field]))
 export const characterById = new Map(characters.map((character) => [character.id, character]))
-

@@ -3,21 +3,11 @@ import HanziWriter from 'hanzi-writer'
 import { ArrowLeft, Brush, Flower2, HelpCircle, Leaf, LockKeyhole, Minus, Plus, RotateCcw, Sparkles } from 'lucide-react'
 import { fieldById, fields, type CharacterDefinition, type FieldDefinition } from './data/model'
 import { initialSave, loadSave, persistSave, resetSave, type SaveGame } from './db'
+import { GardenMap } from './GardenMap'
+import { fieldInfection } from './garden'
 import { isCardDue, reviewCard, type ReviewEvent } from './learning'
 
 type Screen = 'map' | 'battle'
-
-const averageCharacters = fields.reduce((sum, field) => sum + field.characters.length, 0) / fields.length
-
-function infectionFor(field: FieldDefinition, save: SaveGame): number {
-  if (!save.unlockedFieldIds.includes(field.id)) return 1
-  const totalWeight = field.characters.reduce((sum, character) => sum + character.strokeCount, 0)
-  const dueWeight = field.characters.reduce(
-    (sum, character) => sum + (isCardDue(save.cards[character.id]) ? character.strokeCount : 0),
-    0,
-  )
-  return totalWeight ? dueWeight / totalWeight : 0
-}
 
 function getInputDevice(): ReviewEvent['inputDevice'] {
   if (navigator.maxTouchPoints > 0) return 'touch'
@@ -39,21 +29,24 @@ function MapScreen({
   onEnter: (field: FieldDefinition) => void
   onReset: () => void
 }) {
+  const mapRootRef = useRef<HTMLElement>(null)
   const [zoom, setZoom] = useState(1)
   const [selectedId, setSelectedId] = useState('field-001')
   const selected = fieldById.get(selectedId) ?? fields[0]
   const selectedUnlocked = save.unlockedFieldIds.includes(selected.id)
-  const selectedInfection = infectionFor(selected, save)
+  const selectedInfection = fieldInfection(selected, save.cards)
   const selectedDue = selected.characters.filter((character) => isCardDue(save.cards[character.id])).length
   const cleanedCharacters = Object.keys(save.cards).length
+  const clearedFields = fields.filter((field) => fieldInfection(field, save.cards) === 0).length
 
   return (
-    <main className="map-screen">
+    <main className="map-screen" ref={mapRootRef}>
       <div className="map-backdrop" aria-hidden="true" />
+      <GardenMap mapRootRef={mapRootRef} save={save} zoom={zoom} />
       <header className="map-header">
         <div className="brand-mark"><Leaf size={18} /><span>Сад памяти</span></div>
         <div className="world-summary">
-          <span><Flower2 size={16} /> {save.masteredFieldIds.length} цветущих полей</span>
+          <span><Flower2 size={16} /> {clearedFields} очищенных полей</span>
           <span><Brush size={16} /> {cleanedCharacters} изучено</span>
         </div>
       </header>
@@ -63,26 +56,24 @@ function MapScreen({
           <div className="field-grid">
             {fields.map((field) => {
               const unlocked = save.unlockedFieldIds.includes(field.id)
-              const infection = infectionFor(field, save)
+              const infection = fieldInfection(field, save.cards)
               const weedLevel = Math.ceil(infection * 10)
-              const scale = Math.max(0.72, Math.min(1.08, (field.characters.length / averageCharacters) ** 0.22))
               return (
                 <button
-                  className={`field-hotspot ${unlocked ? 'is-unlocked' : 'is-locked'} ${selectedId === field.id ? 'is-selected' : ''}`}
+                  className={`field-hotspot field-shape--${(field.row * 11 + field.column) % 8} ${unlocked ? 'is-unlocked' : 'is-locked'} ${infection === 0 ? 'is-cleared' : 'is-overgrown'} ${selectedId === field.id ? 'is-selected' : ''}`}
                   key={field.id}
                   style={{
                     gridRow: field.row + 1,
                     gridColumn: field.column + 1,
-                    '--infection': infection,
-                    '--plot-scale': scale,
-                  } as React.CSSProperties}
+                  }}
+                  data-field-id={field.id}
                   onClick={() => {
                     setSelectedId(field.id)
                     if (unlocked && selectedId === field.id) onEnter(field)
                   }}
                   onDoubleClick={() => unlocked && onEnter(field)}
-                  aria-label={`${field.title}, ${unlocked ? `уровень зарастания ${weedLevel}` : 'закрыто'}`}
-                  title={unlocked ? `${field.title} · зарастание ${weedLevel}/10` : 'Эта часть сада ещё скрыта туманом'}
+                  aria-label={`${field.title}, зарастание ${weedLevel} из 10${unlocked ? '' : ', путь закрыт'}`}
+                  title={`${field.title} · зарастание ${weedLevel}/10${unlocked ? '' : ' · путь закрыт'}`}
                 >
                   <span className="field-status">
                     {unlocked ? (infection === 0 ? <Flower2 /> : <span className="weed-orb" />) : <LockKeyhole />}
@@ -96,8 +87,8 @@ function MapScreen({
 
       <aside className="field-panel">
         <p className="eyebrow">Участок {selected.row * 11 + selected.column + 1} из 110</p>
-        <h1>{selectedUnlocked ? selected.plantStyle : 'Земля в тумане'}</h1>
-        <p className="field-subtitle">{selectedUnlocked ? selected.title : 'Очистите соседний участок, чтобы открыть путь.'}</p>
+        <h1>{selectedUnlocked ? selected.plantStyle : 'Заросший участок'}</h1>
+        <p className="field-subtitle">{selectedUnlocked ? selected.title : 'Сорняк уже захватил эту землю. Очистите соседний участок, чтобы открыть путь.'}</p>
         {selectedUnlocked ? (
           <>
             <div className="health-line"><span style={{ width: `${Math.max(4, (1 - selectedInfection) * 100)}%` }} /></div>
@@ -109,7 +100,7 @@ function MapScreen({
               {selectedDue ? 'Войти и очистить' : 'Пройти через сад'} <Sparkles size={17} />
             </button>
           </>
-        ) : <div className="locked-note"><LockKeyhole size={17} /> Путь пока закрыт</div>}
+        ) : <div className="locked-note"><LockKeyhole size={17} /> Поле заросло, но путь пока закрыт</div>}
       </aside>
 
       <div className="zoom-controls" aria-label="Масштаб карты">
@@ -118,7 +109,9 @@ function MapScreen({
       </div>
 
       <button className="reset-button" onClick={onReset} title="Начать сад заново"><RotateCcw size={15} /> Сбросить</button>
-      <p className="map-hint">Нажмите выбранное поле ещё раз, чтобы войти</p>
+      <p className="map-hint">
+        {selectedUnlocked ? 'Нажмите выбранное поле ещё раз, чтобы войти' : 'Замок закрывает путь, но не скрывает сорняк'}
+      </p>
     </main>
   )
 }
@@ -281,7 +274,7 @@ function BattleScreen({
     setFeedback('Запомните движение кисти')
   }
 
-  const infection = infectionFor(field, save)
+  const infection = fieldInfection(field, save.cards)
   const remaining = activeCharacter ? Math.max(0, activeCharacter.strokeCount - correctStrokes) : 0
   const weedDamage = activeCharacter ? correctStrokes / activeCharacter.strokeCount : 1
 
