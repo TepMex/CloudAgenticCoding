@@ -7,13 +7,28 @@
 }
 
 * { box-sizing: border-box; }
+html {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  /* Avoid 100vw horizontal overflow (classic Android WebView scrollbar gutter bug). */
+  overflow: hidden;
+}
 html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
-body { min-height: 100vh; overflow: hidden; }
+body, #root {
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 button { font: inherit; }
 button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 
 .loading-screen {
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
   display: grid;
   place-content: center;
   gap: 12px;
@@ -27,8 +42,10 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 .map-screen,
 .battle-screen {
   position: relative;
-  width: 100vw;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   isolation: isolate;
 }
@@ -57,7 +74,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
 
 .welcome-card {
   position: relative;
-  width: min(560px, calc(100vw - 36px));
+  width: min(560px, calc(100% - 36px));
   padding: 68px 62px 54px;
   text-align: center;
   color: #3a3027;
@@ -505,10 +522,21 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   cursor: crosshair;
-  filter: drop-shadow(0 7px 5px rgba(28, 23, 18, .14));
+  /* Avoid CSS filter on this node: Android WebView mis-composites filtered SVG and bleeds strokes. */
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 7px 14px rgba(28, 23, 18, .22);
 }
 
-.writing-circle svg { width: 100%; height: 100%; overflow: visible; }
+.writing-circle svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
 .weed-core { position: absolute; z-index: 7; top: 17%; left: 50%; width: 130px; height: 90px; transform: translateX(-50%) scale(calc(1 - var(--damage) * .28)); filter: opacity(calc(1 - var(--damage) * .68)) drop-shadow(0 0 12px #765272); transition: transform .25s, filter .25s; pointer-events: none; }
 .weed-core::before,
 .weed-core::after,
@@ -566,7 +594,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   z-index: 12;
   top: 50%;
   left: 50%;
-  width: min(460px, calc(100vw - 40px));
+  width: min(460px, calc(100% - 40px));
   padding: 40px;
   color: #3c3428;
   text-align: center;
@@ -609,33 +637,48 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   .world-summary span:first-child { display: none; }
   .map-canvas { inset: 6% 2% 30%; }
   .field-grid { inset: 8% 4%; }
-  .field-panel { top: auto; right: 15px; bottom: max(16px, env(safe-area-inset-bottom)); left: 15px; width: auto; padding: 19px 23px; transform: none; }
+  .field-panel { top: auto; right: 15px; bottom: max(16px, env(safe-area-inset-bottom, 0px)); left: 15px; width: auto; padding: 19px 23px; transform: none; }
   .field-panel h1 { font-size: 1.5rem; }
   .field-subtitle { min-height: auto; margin-bottom: 10px; }
   .field-panel .health-line, .field-panel .field-meta { display: none; }
   .field-panel .primary-button { min-height: 39px; }
   .map-hint { display: none; }
   .welcome-card { padding: 58px 28px 40px; }
-  .prompt-scroll { top: max(10px, env(safe-area-inset-top)); width: 68vw; min-height: 72px; }
-  .back-button { top: max(15px, env(safe-area-inset-top)); left: 14px; width: 45px; height: 45px; }
-  .writing-circle { top: 52%; width: min(78vw, 51vh); }
-  .weed-core { top: 18%; scale: .74; }
-  .battle-progress { right: 11px; }
-  .hint-button { right: 12px; bottom: max(16px, env(safe-area-inset-bottom)); font-size: .78rem; }
-  .stroke-feedback { bottom: 61px; min-width: 250px; padding: 7px 16px; }
-  .field-cleanliness { left: 13px; bottom: max(22px, env(safe-area-inset-bottom)); }
+  .prompt-scroll { top: max(10px, env(safe-area-inset-top, 0px)); width: min(68vw, calc(100% - 96px)); min-height: 72px; }
+  .back-button { top: max(15px, env(safe-area-inset-top, 0px)); left: 14px; width: 45px; height: 45px; }
+  /* Keep the writer inside the chrome-free middle band on tall phones / WebView. */
+  .writing-circle { top: 46%; width: min(78vw, 46vh, calc(100% - 56px)); }
+  .weed-core { top: 16%; scale: .74; }
+  .battle-progress { right: 11px; max-height: 36vh; }
+  .hint-button {
+    left: 56px;
+    right: 12px;
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+    font-size: .78rem;
+  }
+  .stroke-feedback {
+    left: 12px;
+    right: 12px;
+    bottom: max(58px, calc(env(safe-area-inset-bottom, 0px) + 52px));
+    min-width: 0;
+    width: auto;
+    padding: 7px 16px;
+    transform: none;
+  }
+  .field-cleanliness { left: 13px; bottom: max(22px, env(safe-area-inset-bottom, 0px)); }
   .field-cleanliness > span { width: 72px; }
 }
 
 @media (max-height: 650px) {
   .prompt-scroll { min-height: 62px; }
   .prompt-scroll strong { font-size: 1.6rem; }
-  .writing-circle { width: min(390px, 62vh, calc(100vw - 32px)); }
+  .writing-circle { top: 48%; width: min(390px, 52vh, calc(100% - 32px)); }
   .weed-core { top: 14%; scale: .68; }
   .stroke-feedback {
     left: 12px;
     right: 12px;
-    bottom: 58px;
+    bottom: max(52px, calc(env(safe-area-inset-bottom, 0px) + 46px));
     min-width: 0;
     width: auto;
     padding: 6px 10px;
@@ -643,12 +686,12 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   }
   .hint-button {
     right: 12px;
-    bottom: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
     left: 12px;
     justify-content: center;
   }
   .field-cleanliness {
-    top: 92px;
+    top: max(92px, calc(env(safe-area-inset-top, 0px) + 78px));
     bottom: auto;
     left: 13px;
   }

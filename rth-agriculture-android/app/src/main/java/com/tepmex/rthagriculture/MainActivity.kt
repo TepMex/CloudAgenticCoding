@@ -119,15 +119,29 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             cacheMode = WebSettings.LOAD_DEFAULT
+            // Honor <meta name="viewport" width=device-width> so mobile CSS matches Chrome.
+            // loadWithOverviewMode scales a wide layout viewport down and breaks max-width media queries.
             useWideViewPort = true
-            loadWithOverviewMode = true
+            loadWithOverviewMode = false
             builtInZoomControls = false
             displayZoomControls = false
             setSupportZoom(false)
+            textZoom = 100
         }
+        // Pin CSS pixel scale to 100% (overview mode off is not enough on some WebView builds).
+        webView.setInitialScale(100)
 
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                // Re-assert layout after first paint — immersive insets can change WebView size.
+                view?.evaluateJavascript(
+                    "(function(){window.dispatchEvent(new Event('resize'));})();",
+                    null,
+                )
+            }
+
             override fun onReceivedError(
                 view: WebView,
                 request: WebResourceRequest,

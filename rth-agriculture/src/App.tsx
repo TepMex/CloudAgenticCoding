@@ -201,8 +201,8 @@ function BattleScreen({
     writerTarget.current.replaceChildren()
 
     const writer = HanziWriter.create(writerTarget.current, activeCharacter.hanzi, {
-      width: 430,
-      height: 430,
+      width: Math.round(writerTarget.current.clientWidth) || 300,
+      height: Math.round(writerTarget.current.clientWidth) || 300,
       padding: 18,
       showCharacter: false,
       showOutline: false,
@@ -244,14 +244,34 @@ function BattleScreen({
       onComplete: (summary) => finishCharacter(activeCharacter, summary.totalMistakes),
     })
 
-    const onResize = () => {
-      const size = Math.min(430, Math.max(250, writerTarget.current?.clientWidth ?? 430))
+    const syncWriterSize = () => {
+      const target = writerTarget.current
+      if (!target) return
+      const raw = target.clientWidth
+      if (raw < 32) return
+      const size = Math.min(430, Math.max(180, Math.round(raw)))
       writer.updateDimensions({ width: size, height: size })
+      const svg = target.querySelector('svg')
+      if (svg) {
+        // Keep pixel width/height for Hanzi Writer hit-testing; CSS scales the paint box.
+        svg.style.maxWidth = '100%'
+        svg.style.maxHeight = '100%'
+        svg.style.overflow = 'hidden'
+      }
     }
-    onResize()
-    window.addEventListener('resize', onResize)
+    // Layout can settle after first paint in Android WebView (immersive bars / insets).
+    const frame = window.requestAnimationFrame(syncWriterSize)
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => syncWriterSize())
+      : null
+    resizeObserver?.observe(writerTarget.current)
+    window.addEventListener('resize', syncWriterSize)
+    window.visualViewport?.addEventListener('resize', syncWriterSize)
     return () => {
-      window.removeEventListener('resize', onResize)
+      window.cancelAnimationFrame(frame)
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', syncWriterSize)
+      window.visualViewport?.removeEventListener('resize', syncWriterSize)
       writer.cancelQuiz()
       writerTarget.current?.replaceChildren()
       writerRef.current = null

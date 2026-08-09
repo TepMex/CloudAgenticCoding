@@ -44,6 +44,7 @@ No deep links, no native plugins, no Play Store listing in v1.
 2. Orientation follows the device sensor; the upstream UI adapts to portrait and landscape.
 3. System back: if the WebView history stack has an entry, go back; otherwise finish the activity.
 4. Landing page: brand **Memory Garden**, short tagline, APK download link, update note (same pattern as other APK landings).
+5. WebView must honor the game’s `width=device-width` viewport at 100% scale (no overview zoom) so mobile battle layout matches Chrome on phones — writer canvas clipped, no stroke SVG bleed over chrome.
 
 ## Out of scope
 
@@ -61,3 +62,4 @@ No deep links, no native plugins, no Play Store listing in v1.
 4. Completing a battle persists card/field state across process death (WebView IndexedDB).
 5. Deploy workflow includes `rth-agriculture-android` in `ANDROID_APPS` and rebuilds when the wrapper or `rth-agriculture` changes.
 6. Root `README.md` lists the app with its Pages path.
+7. On a phone-sized WebView, battle chrome does not overlap a clipped circular writer; layout matches mobile web (no overview-scaled desktop CSS).
