@@ -651,7 +651,7 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   .weed-core { top: 16%; scale: .74; }
   .battle-progress { right: 11px; max-height: 36vh; }
   .hint-button {
-    left: 56px;
+    left: 12px;
     right: 12px;
     bottom: max(16px, env(safe-area-inset-bottom, 0px));
     justify-content: center;
@@ -666,7 +666,12 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
     padding: 7px 16px;
     transform: none;
   }
-  .field-cleanliness { left: 13px; bottom: max(22px, env(safe-area-inset-bottom, 0px)); }
+  /* Keep leaf meter out of the hint row (Android screenshot showed them colliding). */
+  .field-cleanliness {
+    top: max(92px, calc(env(safe-area-inset-top, 0px) + 78px));
+    bottom: auto;
+    left: 13px;
+  }
   .field-cleanliness > span { width: 72px; }
 }
 
