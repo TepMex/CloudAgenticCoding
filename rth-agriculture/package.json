@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "test": "\"$npm_execpath\" test",
     "preview": "vite preview",
-    "test:battle-background": "sh scripts/check-battle-background.sh"
+    "test:battle-background": "sh scripts/check-battle-background.sh",
+    "test:battle-canvas": "bun scripts/check-battle-canvas.mjs",
+    "test:unit": "bun test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -31,6 +33,7 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
+    "playwright": "^1.62.1",
     "typescript": "^6.0.0",
     "typescript-eslint": "latest"
   }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { assetUrl } from './assetUrl'
 import { fields } from './data/model'
 import type { SaveGame } from './db'
 import { fieldInfection } from './garden'
@@ -163,7 +164,7 @@ export function GardenMap({ mapRootRef, save }: GardenMapProps) {
     const resizeObserver = new ResizeObserver(repaintWhileLayoutMoves)
     resizeObserver.observe(mapRoot)
     overgrownMap.addEventListener('load', repaintWhileLayoutMoves)
-    overgrownMap.src = `${import.meta.env.BASE_URL}assets/garden-map_negative.png`
+    overgrownMap.src = assetUrl('assets/garden-map_negative.png')
     if (overgrownMap.complete) repaintWhileLayoutMoves()
 
     return () => {

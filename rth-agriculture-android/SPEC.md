@@ -63,3 +63,4 @@ No deep links, no native plugins, no Play Store listing in v1.
 5. Deploy workflow includes `rth-agriculture-android` in `ANDROID_APPS` and rebuilds when the wrapper or `rth-agriculture` changes.
 6. Root `README.md` lists the app with its Pages path.
 7. On a phone-sized WebView, battle chrome does not overlap a clipped circular writer; layout matches mobile web (no overview-scaled desktop CSS).
+8. Battle parchment backdrop and garden map image load under bundled `file:///android_asset/` (`base: './'`) — writing field is visibly light, not a blank dark void.
