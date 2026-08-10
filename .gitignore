@@ -72,6 +72,11 @@ running-log/.gradle/
 running-log/**/build/
 running-log/local.properties
 
+# Android (ideal-timing)
+ideal-timing/.gradle/
+ideal-timing/**/build/
+ideal-timing/local.properties
+
 # Android (han-count-android)
 han-count-android/.gradle/
 han-count-android/**/build/

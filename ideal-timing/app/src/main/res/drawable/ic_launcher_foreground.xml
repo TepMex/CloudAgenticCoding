@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- outer gold ring -->
+    <path
+        android:fillColor="#C9A227"
+        android:pathData="M54,10c24.3,0 44,19.7 44,44s-19.7,44 -44,44 -44,-19.7 -44,-44 19.7,-44 44,-44zM54,18c-19.9,0 -36,16.1 -36,36s16.1,36 36,36 36,-16.1 36,-36 -16.1,-36 -36,-36z" />
+    <!-- quadrant wedges (simplified) -->
+    <path
+        android:fillColor="#3F6B4A"
+        android:pathData="M54,54 L54,22 A32,32 0 0,1 86,54 Z" />
+    <path
+        android:fillColor="#5C4033"
+        android:pathData="M54,54 L86,54 A32,32 0 0,1 54,86 Z" />
+    <path
+        android:fillColor="#6B2E2E"
+        android:pathData="M54,54 L54,86 A32,32 0 0,1 22,54 Z" />
+    <path
+        android:fillColor="#2F3A5C"
+        android:pathData="M54,54 L22,54 A32,32 0 0,1 54,22 Z" />
+    <!-- center jewel -->
+    <path
+        android:fillColor="#C9A227"
+        android:pathData="M54,42c6.6,0 12,5.4 12,12s-5.4,12 -12,12 -12,-5.4 -12,-12 5.4,-12 12,-12z" />
+    <path
+        android:fillColor="#3A6EA5"
+        android:pathData="M54,48c3.3,0 6,2.7 6,6s-2.7,6 -6,6 -6,-2.7 -6,-6 2.7,-6 6,-6z" />
+</vector>
