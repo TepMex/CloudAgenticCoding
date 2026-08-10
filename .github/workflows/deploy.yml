@@ -16,7 +16,7 @@ permissions:
 
 env:
   WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou rth-agriculture
-  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android
+  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android ideal-timing
 
 jobs:
   detect:
@@ -45,6 +45,7 @@ jobs:
       build_zou_lu_shang_2: ${{ steps.plan.outputs.build_zou_lu_shang_2 }}
       build_pair_comp_elo: ${{ steps.plan.outputs.build_pair_comp_elo }}
       build_running_log: ${{ steps.plan.outputs.build_running_log }}
+      build_ideal_timing: ${{ steps.plan.outputs.build_ideal_timing }}
       build_han_count_android: ${{ steps.plan.outputs.build_han_count_android }}
       build_rth_agriculture_android: ${{ steps.plan.outputs.build_rth_agriculture_android }}
       refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
@@ -105,6 +106,8 @@ jobs:
               - 'pair-comp-elo/**'
             running-log:
               - 'running-log/**'
+            ideal-timing:
+              - 'ideal-timing/**'
             han-count-android:
               - 'han-count-android/**'
             rth-agriculture-android:
@@ -155,6 +158,7 @@ jobs:
           CHANGED_ZOU_LU_SHANG_2: ${{ steps.changes.outputs.zou-lu-shang-2 }}
           CHANGED_PAIR_COMP_ELO: ${{ steps.changes.outputs.pair-comp-elo }}
           CHANGED_RUNNING_LOG: ${{ steps.changes.outputs.running-log }}
+          CHANGED_IDEAL_TIMING: ${{ steps.changes.outputs.ideal-timing }}
           CHANGED_HAN_COUNT_ANDROID: ${{ steps.changes.outputs.han-count-android }}
           CHANGED_RTH_AGRICULTURE_ANDROID: ${{ steps.changes.outputs.rth-agriculture-android }}
           CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
@@ -198,6 +202,7 @@ jobs:
           build_zou_lu_shang_2=false
           build_pair_comp_elo=false
           build_running_log=false
+          build_ideal_timing=false
           build_han_count_android=false
           build_rth_agriculture_android=false
           refresh_android_landings=false
@@ -224,6 +229,7 @@ jobs:
             build_zou_lu_shang_2=true
             build_pair_comp_elo=true
             build_running_log=true
+            build_ideal_timing=true
             build_han_count_android=true
             build_rth_agriculture_android=true
           else
@@ -248,6 +254,7 @@ jobs:
             is_true "$CHANGED_ZOU_LU_SHANG_2" && build_zou_lu_shang_2=true
             is_true "$CHANGED_PAIR_COMP_ELO" && build_pair_comp_elo=true
             is_true "$CHANGED_RUNNING_LOG" && build_running_log=true
+            is_true "$CHANGED_IDEAL_TIMING" && build_ideal_timing=true
             is_true "$CHANGED_HAN_COUNT_ANDROID" && build_han_count_android=true
             is_true "$CHANGED_RTH_AGRICULTURE_ANDROID" && build_rth_agriculture_android=true
             # Bundled assets must track the web game.
@@ -267,6 +274,7 @@ jobs:
               build_zou_lu_shang_2=true
               build_pair_comp_elo=true
               build_running_log=true
+              build_ideal_timing=true
               build_han_count_android=true
               build_rth_agriculture_android=true
             fi
@@ -280,7 +288,7 @@ jobs:
           $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou || $build_rth_agriculture && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_han_count_android || $build_rth_agriculture_android && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_ideal_timing || $build_han_count_android || $build_rth_agriculture_android && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -309,6 +317,7 @@ jobs:
             echo "build_zou_lu_shang_2=$build_zou_lu_shang_2"
             echo "build_pair_comp_elo=$build_pair_comp_elo"
             echo "build_running_log=$build_running_log"
+            echo "build_ideal_timing=$build_ideal_timing"
             echo "build_han_count_android=$build_han_count_android"
             echo "build_rth_agriculture_android=$build_rth_agriculture_android"
             echo "refresh_android_landings=$refresh_android_landings"
@@ -543,6 +552,11 @@ jobs:
         working-directory: running-log
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build ideal-timing APK
+        if: needs.detect.outputs.build_ideal_timing == 'true'
+        working-directory: ideal-timing
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Sync han-count-me into Android assets
         if: needs.detect.outputs.build_han_count_android == 'true'
         run: chmod +x han-count-android/scripts/sync-web-assets.sh && han-count-android/scripts/sync-web-assets.sh
@@ -576,6 +590,7 @@ jobs:
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
+          BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
         run: |
@@ -597,6 +612,7 @@ jobs:
           if is_true "$BUILD_ZOU_LU_SHANG_2"; then verify zou-lu-shang-2; fi
           if is_true "$BUILD_PAIR_COMP_ELO"; then verify pair-comp-elo; fi
           if is_true "$BUILD_RUNNING_LOG"; then verify running-log; fi
+          if is_true "$BUILD_IDEAL_TIMING"; then verify ideal-timing; fi
           if is_true "$BUILD_HAN_COUNT_ANDROID"; then verify han-count-android; fi
           if is_true "$BUILD_RTH_AGRICULTURE_ANDROID"; then verify rth-agriculture-android; fi
 
@@ -624,6 +640,7 @@ jobs:
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
+          BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
@@ -691,13 +708,14 @@ jobs:
               zou-lu-shang-2) is_true "$BUILD_ZOU_LU_SHANG_2" ;;
               pair-comp-elo) is_true "$BUILD_PAIR_COMP_ELO" ;;
               running-log) is_true "$BUILD_RUNNING_LOG" ;;
+              ideal-timing) is_true "$BUILD_IDEAL_TIMING" ;;
               han-count-android) is_true "$BUILD_HAN_COUNT_ANDROID" ;;
               rth-agriculture-android) is_true "$BUILD_RTH_AGRICULTURE_ANDROID" ;;
               *) return 1 ;;
             esac
           }
 
-          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android; do
+          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log ideal-timing han-count-android rth-agriculture-android; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -733,6 +751,7 @@ jobs:
           BUILD_ZOU_LU_SHANG_2: ${{ needs.detect.outputs.build_zou_lu_shang_2 }}
           BUILD_PAIR_COMP_ELO: ${{ needs.detect.outputs.build_pair_comp_elo }}
           BUILD_RUNNING_LOG: ${{ needs.detect.outputs.build_running_log }}
+          BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
@@ -755,6 +774,7 @@ jobs:
           should_inject zou-lu-shang-2 "$BUILD_ZOU_LU_SHANG_2" && pages+=(deploy/zou-lu-shang-2/index.html)
           should_inject pair-comp-elo "$BUILD_PAIR_COMP_ELO" && pages+=(deploy/pair-comp-elo/index.html)
           should_inject running-log "$BUILD_RUNNING_LOG" && pages+=(deploy/running-log/index.html)
+          should_inject ideal-timing "$BUILD_IDEAL_TIMING" && pages+=(deploy/ideal-timing/index.html)
           should_inject han-count-android "$BUILD_HAN_COUNT_ANDROID" && pages+=(deploy/han-count-android/index.html)
           should_inject rth-agriculture-android "$BUILD_RTH_AGRICULTURE_ANDROID" && pages+=(deploy/rth-agriculture-android/index.html)
           if [[ ${#pages[@]} -eq 0 ]]; then
