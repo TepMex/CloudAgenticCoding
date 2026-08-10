@@ -23,6 +23,17 @@ The root workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.y
 
 CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefix. For local/`file://` (and the Android wrapper), unset that variable so `base` stays `./`.
 
+Background images are assigned via absolute URLs from `document.baseURI` (`src/assetUrl.ts`) so CSS `url(var(--bg-*))` does not re-resolve `./assets/...` against the hashed stylesheet path (which would 404 as `assets/assets/...` in the Android WebView).
+
+## Tests
+
+```bash
+bun test
+bun run test:battle-background
+# After `vite build --outDir /tmp/rth-www` + static server on :8765:
+bun run test:battle-canvas
+```
+
 ## Что реализовано
 
 - непрерывная карта из 110 полей по 110 уникальным спискам RSH;
