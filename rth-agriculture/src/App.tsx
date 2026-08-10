@@ -5,6 +5,7 @@ import { fieldById, fields, type CharacterDefinition, type FieldDefinition } fro
 import { initialSave, loadSave, persistSave, type SaveGame } from './db'
 import { GardenMap } from './GardenMap'
 import { fieldInfection } from './garden'
+import { loadHanziCharData } from './hanziData'
 import { isCardDue, reviewCard, type ReviewEvent } from './learning'
 
 type Screen = 'map' | 'battle'
@@ -214,14 +215,9 @@ function BattleScreen({
       highlightColor: '#6d5269',
       highlightCompleteColor: '#4e6c56',
       acceptBackwardsStrokes: false,
-      charDataLoader: (char, onComplete) => {
-        fetch(`./hanzi/${encodeURIComponent(char)}.json`)
-          .then((response) => {
-            if (!response.ok) throw new Error(`Нет данных для ${char}`)
-            return response.json()
-          })
-          .then(onComplete)
-          .catch((error) => console.error(error))
+      // XHR: Fetch is blocked for file:// in Android WebView / Chromium.
+      charDataLoader: (char, onComplete, onError) => {
+        loadHanziCharData(char).then(onComplete).catch(onError)
       },
     })
     writerRef.current = writer
