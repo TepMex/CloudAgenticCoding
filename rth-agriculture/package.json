@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test:battle-background": "sh scripts/check-battle-background.sh",
     "test:battle-canvas": "bun scripts/check-battle-canvas.mjs",
+    "test:battle-input": "bun scripts/check-battle-input.mjs",
     "test:unit": "bun test"
   },
   "dependencies": {

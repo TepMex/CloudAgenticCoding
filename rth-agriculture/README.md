@@ -25,6 +25,8 @@ CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefi
 
 Background images are assigned via absolute URLs from `document.baseURI` (`src/assetUrl.ts`) so CSS `url(var(--bg-*))` does not re-resolve `./assets/...` against the hashed stylesheet path (which would 404 as `assets/assets/...` in the Android WebView).
 
+Hanzi stroke JSON is loaded with **XHR** (`src/hanziData.ts`), not `fetch` — Chromium/Android WebView reject Fetch against `file://`, which left quiz/hint dead in the APK.
+
 ## Tests
 
 ```bash
@@ -32,6 +34,8 @@ bun test
 bun run test:battle-background
 # After `vite build --outDir /tmp/rth-www` + static server on :8765:
 bun run test:battle-canvas
+# file:// input (Android-shaped):
+bun run test:battle-input
 ```
 
 ## Что реализовано
