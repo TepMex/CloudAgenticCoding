@@ -4,7 +4,7 @@ Thin Android (Kotlin) WebView wrapper around the sibling [`rth-agriculture`](../
 
 - **Requirements:** Android 14 or newer (min SDK 34), compile SDK 35.
 - **Orientation:** sensor (portrait and landscape).
-- **Upstream:** same garden map, stroke battles, FSRS, and IndexedDB progress as the web MVP.
+- **Upstream:** same V2 garden map, four-stage field-cleaning stroke battles, FSRS, and IndexedDB progress as the web app.
 
 See [SPEC.md](./SPEC.md) for requirements and acceptance criteria.
 

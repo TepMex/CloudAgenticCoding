@@ -63,5 +63,5 @@ No deep links, no native plugins, no Play Store listing in v1.
 5. Deploy workflow includes `rth-agriculture-android` in `ANDROID_APPS` and rebuilds when the wrapper or `rth-agriculture` changes.
 6. Root `README.md` lists the app with its Pages path.
 7. On a phone-sized WebView, battle chrome does not overlap a clipped circular writer; layout matches mobile web (no overview-scaled desktop CSS).
-8. Battle parchment backdrop and garden map image load under bundled `file:///android_asset/` (`base: './'`) — writing field is visibly light, not a blank dark void.
+8. The V2 garden map (including its negative map layer) and all 60 field-cleaning backdrops load under bundled `file:///android_asset/` (`base: './'`) — writing field stays visibly rendered through dirty, half-clean, quarter-clean, and clean states rather than becoming a blank dark void.
 9. Battle quiz works offline: Hanzi stroke JSON loads via XHR (Fetch is blocked on `file://`), so drawing and «Показать следующий штрих» animate.
