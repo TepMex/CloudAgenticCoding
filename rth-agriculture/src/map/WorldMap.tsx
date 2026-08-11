@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { LockKeyhole } from 'lucide-react'
 import { assetUrl } from '../assetUrl'
 import { plots, type PlotDefinition } from '../data/model'
-import { cellRect, ENTER_ZOOM_THRESHOLD, plotBounds, WORLD_HEIGHT, WORLD_WIDTH } from '../data/mapLayout'
+import { cellRect, plotBounds, WORLD_HEIGHT, WORLD_WIDTH } from '../data/mapLayout'
 import type { SaveGame } from '../db'
 import { plotInfection } from '../garden'
 import {
@@ -10,7 +10,6 @@ import {
   cameraForWorldPoint,
   clampCamera,
   clampZoom,
-  focusWorldPoint,
   type CameraState,
   type Point,
   type Viewport,
@@ -263,15 +262,6 @@ export function WorldMap({ save, camera, onCameraChange, onEnterPlot }: WorldMap
   }
 
   const activatePlot = (plot: PlotDefinition) => {
-    const viewport = getViewport()
-    if (!viewport) return
-    if (cameraRef.current.zoom < ENTER_ZOOM_THRESHOLD) {
-      const bounds = rectToWorld(plotBounds(plot.cells))
-      const next = focusWorldPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }, Math.max(ENTER_ZOOM_THRESHOLD, cameraRef.current.zoom * 1.75), viewport)
-      paintCamera(next, true)
-      commitCamera()
-      return
-    }
     if (save.unlockedPlotIds.includes(plot.id)) {
       onEnterPlot(plot)
       return
