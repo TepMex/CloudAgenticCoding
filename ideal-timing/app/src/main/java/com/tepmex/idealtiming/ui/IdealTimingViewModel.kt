@@ -12,6 +12,7 @@ import com.tepmex.idealtiming.mi.BrowserLoginTimeoutException
 import com.tepmex.idealtiming.mi.CaptchaRequiredException
 import com.tepmex.idealtiming.mi.DeviceUntrustedException
 import com.tepmex.idealtiming.mi.NotificationUrlRequiredException
+import com.tepmex.idealtiming.notification.SectionNotificationScheduler
 import com.tepmex.idealtiming.ui.clock.ClockUiState
 import com.tepmex.idealtiming.ui.login.LoginStep
 import com.tepmex.idealtiming.ui.login.LoginUiState
@@ -33,6 +34,7 @@ sealed interface LoginNavEvent {
 
 class IdealTimingViewModel(
     private val repository: IdealTimingRepository,
+    private val sectionNotifications: SectionNotificationScheduler,
 ) : ViewModel() {
     private val _signedIn = MutableStateFlow(repository.isSignedIn())
     val signedIn = _signedIn.asStateFlow()
@@ -52,8 +54,20 @@ class IdealTimingViewModel(
 
     init {
         startTicker()
-        if (_signedIn.value && repository.currentWake() == null) {
-            sync()
+        if (_signedIn.value) {
+            onSignedInSessionStart()
+        }
+    }
+
+    /**
+     * First open of the local day: sync Mi Fitness so wake appears, then schedule
+     * same-day section notifications. Later opens the same day skip auto-sync.
+     */
+    private fun onSignedInSessionStart() {
+        if (sectionNotifications.needsDailySchedule()) {
+            sync(scheduleAfter = true)
+        } else if (repository.currentWake() == null) {
+            sync(scheduleAfter = true)
         }
     }
 
@@ -91,6 +105,11 @@ class IdealTimingViewModel(
                 delay(30_000)
             }
         }
+    }
+
+    private fun scheduleSectionNotifications() {
+        val wake = repository.currentWake()?.wakeEpochSec ?: return
+        sectionNotifications.scheduleForDay(wakeEpochSec = wake)
     }
 
     fun onUsernameChange(v: String) = _login.update { it.copy(username = v, error = null) }
@@ -139,7 +158,7 @@ class IdealTimingViewModel(
                 repository.loginWithPassToken(passToken, userId, region, deviceId)
                 _signedIn.value = true
                 _login.update { LoginUiState(region = region) }
-                sync()
+                sync(scheduleAfter = true)
             } catch (e: Exception) {
                 _login.update {
                     it.copy(busy = false, error = e.message ?: "Token exchange failed")
@@ -189,7 +208,7 @@ class IdealTimingViewModel(
                 _signedIn.value = true
                 activeSession = null
                 _login.update { LoginUiState(region = region) }
-                sync()
+                sync(scheduleAfter = true)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (_: BrowserLoginCancelledException) {
@@ -231,7 +250,7 @@ class IdealTimingViewModel(
                 repository.login(s.username.trim(), s.password, s.region)
                 _signedIn.value = true
                 _login.update { LoginUiState(region = s.region, username = s.username) }
-                sync()
+                sync(scheduleAfter = true)
             } catch (e: NotificationUrlRequiredException) {
                 _login.update {
                     it.copy(
@@ -278,14 +297,14 @@ class IdealTimingViewModel(
                 repository.confirmSms(code)
                 _signedIn.value = true
                 _login.update { LoginUiState() }
-                sync()
+                sync(scheduleAfter = true)
             } catch (e: Exception) {
                 _login.update { it.copy(busy = false, error = e.message ?: "Verification failed") }
             }
         }
     }
 
-    fun sync() {
+    fun sync(scheduleAfter: Boolean = true) {
         viewModelScope.launch {
             _clock.update { it.copy(syncing = true, error = null, statusMessage = null) }
             try {
@@ -294,13 +313,23 @@ class IdealTimingViewModel(
                     syncing = false,
                     statusMessage = result.message,
                 )
+                if (scheduleAfter) {
+                    scheduleSectionNotifications()
+                }
             } catch (e: AuthException) {
                 _clock.update { it.copy(syncing = false, error = e.message) }
                 if (e.message?.contains("Not signed in", ignoreCase = true) == true) {
                     _signedIn.value = false
                 }
+                // First open of day with a prior wake: still schedule from stored wake.
+                if (scheduleAfter && repository.currentWake() != null) {
+                    scheduleSectionNotifications()
+                }
             } catch (e: Exception) {
                 _clock.update { it.copy(syncing = false, error = e.message ?: "Sync failed") }
+                if (scheduleAfter && repository.currentWake() != null) {
+                    scheduleSectionNotifications()
+                }
             }
         }
     }
@@ -312,6 +341,7 @@ class IdealTimingViewModel(
     fun signOut() {
         cancelBrowserSignIn()
         repository.signOut()
+        sectionNotifications.cancelAll()
         _signedIn.value = false
         _clock.value = buildClockState()
         _login.value = LoginUiState()
@@ -320,11 +350,12 @@ class IdealTimingViewModel(
 
 class IdealTimingViewModelFactory(
     private val repository: IdealTimingRepository,
+    private val sectionNotifications: SectionNotificationScheduler,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(IdealTimingViewModel::class.java)) {
-            return IdealTimingViewModel(repository) as T
+            return IdealTimingViewModel(repository, sectionNotifications) as T
         }
         throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
     }
