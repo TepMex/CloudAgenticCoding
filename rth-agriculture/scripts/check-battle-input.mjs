@@ -73,7 +73,7 @@ const afterHint = await page.evaluate(() => ({
   pathCount: document.querySelectorAll('.writing-circle svg path').length,
 }))
 
-if (afterHint.feedback !== 'Запомните движение кисти') {
+if (afterHint.feedback !== 'Подсказка использована — streak сброшен') {
   console.error('FAIL: hint feedback missing', afterHint)
   process.exit(1)
 }

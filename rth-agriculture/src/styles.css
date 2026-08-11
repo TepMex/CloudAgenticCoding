@@ -537,6 +537,12 @@ button:focus-visible { outline: 2px solid #f0d59a; outline-offset: 3px; }
   overflow: hidden;
   touch-action: none;
 }
+
+/* The regular hint remains muted purple; a flawless stroke gets this jade-and-antique-gold ink sweep. */
+.writing-circle .streak-highlight path {
+  stroke: url("#streak-jade-highlight") !important;
+  stroke-opacity: var(--streak-ink-opacity) !important;
+}
 .weed-core { position: absolute; z-index: 7; top: 17%; left: 50%; width: 130px; height: 90px; transform: translateX(-50%) scale(calc(1 - var(--damage) * .28)); filter: opacity(calc(1 - var(--damage) * .68)) drop-shadow(0 0 12px #765272); transition: transform .25s, filter .25s; pointer-events: none; }
 .weed-core::before,
 .weed-core::after,
