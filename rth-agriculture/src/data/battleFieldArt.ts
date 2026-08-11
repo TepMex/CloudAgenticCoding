@@ -9,10 +9,10 @@ export type BattleFieldArtwork = {
 }
 
 const stageFileNames: Record<BattleBackdropStage, string> = {
-  fullDirty: 'full_dirty.png',
-  halfDirty: 'half_dirty.png',
-  quarterDirty: 'quorter_dirty.png',
-  clean: 'clean.png',
+  fullDirty: 'full_dirty.webp',
+  halfDirty: 'half_dirty.webp',
+  quarterDirty: 'quorter_dirty.webp',
+  clean: 'clean.webp',
 }
 
 function artworkForField(fieldNumber: number): BattleFieldArtwork {

@@ -12,14 +12,17 @@ describe('battle field artwork', () => {
     expect(battleArtworkForGarden('garden-01')).toEqual({
       fieldId: 'field1',
       backgrounds: {
-        fullDirty: 'assets/battle-fields/field1/full_dirty.png',
-        halfDirty: 'assets/battle-fields/field1/half_dirty.png',
-        quarterDirty: 'assets/battle-fields/field1/quorter_dirty.png',
-        clean: 'assets/battle-fields/field1/clean.png',
+        fullDirty: 'assets/battle-fields/field1/full_dirty.webp',
+        halfDirty: 'assets/battle-fields/field1/half_dirty.webp',
+        quarterDirty: 'assets/battle-fields/field1/quorter_dirty.webp',
+        clean: 'assets/battle-fields/field1/clean.webp',
       },
     })
     expect(battleArtworkForGarden('garden-06').fieldId).toBe('field6')
     expect(battleArtworkForGarden('garden-15').fieldId).toBe('field15')
+    expect(battleArtworkForGarden('garden-06').backgrounds.clean).toBe(
+      'assets/battle-fields/field6/clean.webp',
+    )
     for (const artwork of battleArtworkByGardenId.values()) {
       Object.values(artwork.backgrounds).forEach((path) => {
         expect(existsSync(`public/${path}`)).toBe(true)
