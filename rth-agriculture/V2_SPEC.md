@@ -269,8 +269,8 @@ Use a single clean map image and a single overgrown version.
 
 Expected assets:
 
-    public/assets/garden-map.png
-    public/assets/garden-map_negative.png
+    public/assets/garden-map.webp
+    public/assets/garden-map_negative.webp
 
 They are two states of the SAME map and must use the same
 coordinate system/aspect ratio.
