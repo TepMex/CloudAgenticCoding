@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # Build rth-agriculture with relative base and copy into Android assets/www.
+# Heavy map/battle PNGs are omitted from the APK and downloaded at runtime from
+# the monorepo on GitHub (see VITE_REMOTE_ASSET_BASE / src/assetUrl.ts).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WEB="$(cd "$ROOT/../rth-agriculture" && pwd)"
 OUT="$ROOT/app/src/main/assets/www"
+
+# Raw GitHub tree for public/ — keeps full-resolution PNG art out of the APK
+# while still letting WebView fetch + cache it after first launch.
+DEFAULT_REMOTE_ASSET_BASE="https://raw.githubusercontent.com/TepMex/CloudAgenticCoding/master/rth-agriculture/public/"
+REMOTE_ASSET_BASE="${RTH_REMOTE_ASSET_BASE:-$DEFAULT_REMOTE_ASSET_BASE}"
+# Ensure trailing slash for URL joins.
+[[ "$REMOTE_ASSET_BASE" == */ ]] || REMOTE_ASSET_BASE="${REMOTE_ASSET_BASE}/"
 
 if [[ ! -f "$WEB/package.json" ]]; then
   echo "rth-agriculture not found at $WEB" >&2
@@ -20,35 +29,39 @@ if [[ ! -d node_modules ]]; then
 fi
 
 echo "Building rth-agriculture → $OUT"
+echo "Remote heavy art base: $REMOTE_ASSET_BASE"
 # Unset Pages base so Vite emits relative URLs suitable for file:///android_asset/
+# Bake the GitHub raw base into the bundle for map/battle PNGs.
 env -u GH_PAGES_PUBLIC_PATH bunx tsc -b
-env -u GH_PAGES_PUBLIC_PATH bunx vite build --outDir "$OUT" --emptyOutDir
+env -u GH_PAGES_PUBLIC_PATH \
+  VITE_REMOTE_ASSET_BASE="$REMOTE_ASSET_BASE" \
+  bunx vite build --outDir "$OUT" --emptyOutDir
 
-required_assets=(
-  "$OUT/index.html"
-  "$OUT/assets/garden-map.webp"
-  "$OUT/assets/garden-map_negative.webp"
-)
+if [[ ! -s "$OUT/index.html" ]]; then
+  echo "sync failed: missing $OUT/index.html" >&2
+  exit 1
+fi
 
-# Battle backdrops: only field1 ships unique art today; other gardens reuse it
-# (see battleFieldArt.ts). Checking all 15 directories would force 180MB+ of duplicate
-# placeholders back into the APK and break gh-pages (GitHub 100MB file limit).
-for stage in full_dirty half_dirty quorter_dirty clean; do
-  required_assets+=("$OUT/assets/battle-fields/field1/${stage}.webp")
-done
+# Drop heavy art that Vite copied from public/ — the APK must stay under GitHub's
+# 100 MB blob limit. Runtime loads these from REMOTE_ASSET_BASE instead.
+rm -f \
+  "$OUT/assets/garden-map.png" \
+  "$OUT/assets/garden-map_negative.png" \
+  "$OUT/assets/cleaning-court.png" \
+  "$OUT/assets/cleaning-court-clear.png"
+rm -rf "$OUT/assets/battle-fields"
 
-for asset in "${required_assets[@]}"; do
-  if [[ ! -s "$asset" ]]; then
-    echo "sync failed: missing or empty bundled asset $asset" >&2
-    exit 1
-  fi
-done
+# Hanzi stroke JSON + JS/CSS must remain bundled for offline battles.
+if [[ ! -d "$OUT/hanzi" ]]; then
+  echo "sync failed: missing bundled hanzi stroke data under $OUT/hanzi" >&2
+  exit 1
+fi
 
 # GitHub rejects single blobs over 100MB on push; fail fast before assembleRelease.
 max_bytes=$((95 * 1024 * 1024))
 www_bytes="$(du -sb "$OUT" | awk '{print $1}')"
 if (( www_bytes > max_bytes )); then
-  echo "sync failed: bundled www is ${www_bytes} bytes (limit ${max_bytes}) — compress or dedupe assets" >&2
+  echo "sync failed: bundled www is ${www_bytes} bytes (limit ${max_bytes})" >&2
   exit 1
 fi
 
@@ -61,4 +74,4 @@ cat > "$OUT/.gitignore" <<'EOF'
 EOF
 touch "$OUT/.gitkeep"
 
-echo "Synced web assets ($(du -sh "$OUT" | awk '{print $1}'))"
+echo "Synced web assets ($(du -sh "$OUT" | awk '{print $1}')); heavy art → $REMOTE_ASSET_BASE"

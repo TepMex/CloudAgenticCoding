@@ -1,8 +1,8 @@
 # Memory Garden · Android
 
-Thin Android (Kotlin) WebView wrapper around the sibling [`rth-agriculture`](../rth-agriculture/) React game. The production web build is bundled into `app/src/main/assets/www/` so the APK plays offline.
+Thin Android (Kotlin) WebView wrapper around the sibling [`rth-agriculture`](../rth-agriculture/) React game. The JS/CSS shell and Hanzi stroke JSON are bundled into `app/src/main/assets/www/`. Large garden/battle PNGs download from the monorepo on GitHub after first launch (then cache in the WebView).
 
-- **Requirements:** Android 14 or newer (min SDK 34), compile SDK 35.
+- **Requirements:** Android 14 or newer (min SDK 34), compile SDK 35; network on first launch for map art.
 - **Orientation:** sensor (portrait and landscape).
 - **Upstream:** same V2 garden map, four-stage field-cleaning stroke battles, FSRS, and IndexedDB progress as the web app.
 

@@ -11,7 +11,7 @@ import { WorldMap } from './map/WorldMap'
 import { initialCamera, type CameraState } from './map/cameraMath'
 import { StatisticsScreen } from './stats/StatisticsScreen'
 import { streakHighlightColor, streakHighlightOpacity, streakIntensity } from './streak'
-import { assetUrl } from './assetUrl'
+import { assetUrl, ensureHeavyArtAsset, prepareCriticalHeavyArt, usesRemoteHeavyArt } from './assetUrl'
 import { writingInkForBackdrop } from './battleInk'
 
 type Screen = 'map' | 'battle' | 'stats'
@@ -336,22 +336,39 @@ function BattleScreen({
   const backdropStage = activeCharacter
     ? battleBackdropStage(activeCharacter.strokeCount, correctStrokes)
     : 'clean'
-  const backdropUrl = assetUrl(artwork.backgrounds[backdropStage])
+  const [battleArtReady, setBattleArtReady] = useState(() => !usesRemoteHeavyArt())
 
   useEffect(() => {
     // All four variants are ready before the first successful stroke, avoiding
     // a network flash when the battlefield changes cleanliness state.
-    Object.values(artwork.backgrounds).forEach((path) => {
-      const image = new Image()
-      image.src = assetUrl(path)
-    })
+    let cancelled = false
+    setBattleArtReady(!usesRemoteHeavyArt())
+    void (async () => {
+      const paths = Object.values(artwork.backgrounds)
+      if (usesRemoteHeavyArt()) {
+        await Promise.all(paths.map((path) => ensureHeavyArtAsset(path)))
+      }
+      if (cancelled) return
+      setBattleArtReady(true)
+      paths.forEach((path) => {
+        const image = new Image()
+        image.src = assetUrl(path)
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [artwork])
+
+  const backdropUrl = assetUrl(artwork.backgrounds[backdropStage])
 
   return (
     <main className={`battle-screen ${destroyed ? 'is-destroyed' : ''}`}>
       <div
         className="battle-backdrop"
-        style={{ backgroundImage: `url(${JSON.stringify(backdropUrl)})` }}
+        style={{
+          backgroundImage: battleArtReady ? `url(${JSON.stringify(backdropUrl)})` : undefined,
+        }}
         aria-hidden="true"
       />
       <button className="back-button" onClick={onExit} aria-label="Вернуться к карте"><ArrowLeft /></button>
@@ -424,10 +441,26 @@ export default function App() {
   const [camera, setCamera] = useState<CameraState>(initialCamera)
 
   useEffect(() => {
-    loadSave().then((stored) => {
-      setSave(stored)
-      setLoaded(true)
-    })
+    let cancelled = false
+    void (async () => {
+      try {
+        const [stored] = await Promise.all([loadSave(), prepareCriticalHeavyArt()])
+        if (cancelled) return
+        setSave(stored)
+        setLoaded(true)
+      } catch (error) {
+        console.error(error)
+        if (cancelled) return
+        // Still open the shell; map art may stay empty until network recovers.
+        const stored = await loadSave()
+        if (cancelled) return
+        setSave(stored)
+        setLoaded(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const updateSave = useCallback((nextSave: SaveGame) => {
@@ -457,7 +490,14 @@ export default function App() {
     setScreen('battle')
   }
 
-  if (!loaded) return <div className="loading-screen"><Leaf /> Сад пробуждается…</div>
+  if (!loaded) {
+    return (
+      <div className="loading-screen">
+        <Leaf />
+        {usesRemoteHeavyArt() ? 'Загрузка карты сада…' : 'Сад пробуждается…'}
+      </div>
+    )
+  }
   if (!welcomed) return <Welcome onEnter={() => {
     sessionStorage.setItem('memory-garden-welcomed', 'yes')
     setWelcomed(true)

@@ -9,27 +9,15 @@ export type BattleFieldArtwork = {
 }
 
 const stageFileNames: Record<BattleBackdropStage, string> = {
-  fullDirty: 'full_dirty.webp',
-  halfDirty: 'half_dirty.webp',
-  quarterDirty: 'quorter_dirty.webp',
-  clean: 'clean.webp',
-}
-
-/**
- * Only fields listed here ship unique art under `public/assets/battle-fields/fieldN/`.
- * All other gardens reuse field1 as a compact placeholder so the Android APK stays
- * under GitHub’s 100 MB push limit (duplicate PNG placeholders were ~180 MB alone).
- */
-const fieldsWithUniqueArt = new Set([1])
-
-function artworkDirectory(fieldNumber: number): string {
-  const artField = fieldsWithUniqueArt.has(fieldNumber) ? fieldNumber : 1
-  return `assets/battle-fields/field${artField}`
+  fullDirty: 'full_dirty.png',
+  halfDirty: 'half_dirty.png',
+  quarterDirty: 'quorter_dirty.png',
+  clean: 'clean.png',
 }
 
 function artworkForField(fieldNumber: number): BattleFieldArtwork {
   const fieldId = `field${fieldNumber}`
-  const directory = artworkDirectory(fieldNumber)
+  const directory = `assets/battle-fields/${fieldId}`
   return {
     fieldId,
     backgrounds: {
@@ -44,8 +32,7 @@ function artworkForField(fieldNumber: number): BattleFieldArtwork {
 /**
  * `gardenRegions` is already ordered left-to-right, then top-to-bottom, so
  * field1 is the upper-left field and field15 is the lower-right field.
- * Add a field number to `fieldsWithUniqueArt` and drop files under its directory
- * when bespoke artwork is ready.
+ * Replace only the files under a field directory when its bespoke artwork is ready.
  */
 export const battleArtworkByGardenId = new Map(
   gardenRegions.map((garden) => [garden.id, artworkForField(garden.index + 1)]),

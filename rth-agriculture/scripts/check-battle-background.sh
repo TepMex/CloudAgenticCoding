@@ -2,7 +2,7 @@
 
 set -eu
 
-battle_background_asset="${1:-public/assets/cleaning-court-clear.webp}"
+battle_background_asset="${1:-public/assets/cleaning-court-clear.png}"
 
 if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "ffmpeg is required to verify the battle background" >&2
