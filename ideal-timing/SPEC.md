@@ -22,6 +22,10 @@ Open the app → sync wake time from Mi Fitness → read which of the four 4-hou
 5. If elapsed time since wake-up is **greater than 16 hours**, **freeze** the pointer at the 16-hour mark (no overflow / wrap).
 6. Manual **Sync** action on the clock screen; optional **Sign out**.
 7. Persist last known wake-up time locally so the clock still works offline after a prior sync.
+8. **Section-change push notifications** (exact alarms), scheduled on the **first app open of each local calendar day** after Mi Fitness sync yields a wake time:
+   - At wake+4h / +8h / +12h: `Наступило время для ${SECTION_DESCRIPTION}` (RU sector labels).
+   - At wake+16h: `Пора спать`.
+   - Only schedule fires that are still in the future and **before the end of the current local day** (no next-day schedule — wake for later days is unknown).
 
 ### Sector map (relative to wake = 0h, clockwise from 12 o’clock)
 
@@ -57,6 +61,17 @@ Mi Band → Xiaomi Fitness cloud sleep → ideal-timing → wake epoch → 16h c
 | Pointer angle | progress × 360°, clockwise from 12 o’clock |
 | Sector index | `floor(elapsedHours / 4)` clamped to `0…3` (freeze at sector 4 when at 16h) |
 
+### Section notifications
+
+| Fire time | Message |
+|-----------|---------|
+| wake + 4h | `Наступило время для Тактика и работа руками` |
+| wake + 8h | `Наступило время для Тактика и работа руками` |
+| wake + 12h | `Наступило время для Отдых, декомпрессия и подготовка ко сну` |
+| wake + 16h | `Пора спать` |
+
+Scheduling: first signed-in open of the local day triggers Mi Fitness sync; on wake (new or cached after failed sync), `AlarmManager.setExactAndAllowWhileIdle` schedules only future fires with `fire < startOfNextLocalDay`. Later opens the same day do not re-auto-sync; manual Sync reschedules.
+
 ## Data model
 
 ### AuthToken (encrypted prefs)
@@ -84,7 +99,8 @@ Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, 
 
 - Live BLE to the band
 - Editing wake time manually
-- Background / scheduled sync
+- Background / scheduled Mi Fitness sync (aside from first-open-of-day sync for notifications)
+- Rescheduling after device reboot without opening the app
 - Sleep stage charts or health dashboards
 - Multi-account / family relative browsing
 - Play Store distribution (sideload APK via GitHub Pages)
@@ -94,8 +110,9 @@ Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, 
 1. With a valid Xiaomi Fitness account that has recent sleep with `wake_up_time`, Sync stores wake and the clock advances from that instant.
 2. At elapsed ≥ 16h the pointer stays at the 16h / 12-o’clock freeze point.
 3. Four sectors are visually distinct and labeled; active sector is highlighted.
-4. Unit tests cover clock clamping, sector selection, and sleep JSON wake extraction.
+4. Unit tests cover clock clamping, sector selection, sleep JSON wake extraction, and same-day section notification planning (messages, skip past / after day-end).
 5. Release APK builds with the monorepo sideload keystore.
+6. After first open + sync of the day with a known wake, remaining sector boundaries that fall before local midnight are scheduled; wake+16h uses `Пора спать`.
 
 ## Attribution / risk
 

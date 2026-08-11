@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".IdealTimingApp"
@@ -28,5 +32,13 @@
             android:label="@string/xiaomi_sign_in"
             android:theme="@style/Theme.IdealTiming"
             android:windowSoftInputMode="adjustResize" />
+
+        <receiver
+            android:name=".notification.SectionChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tepmex.idealtiming.action.SECTION_CHANGE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
