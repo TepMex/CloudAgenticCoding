@@ -46,6 +46,64 @@ function rectToWorld(rect: { x: number; y: number; width: number; height: number
   return { x: rect.x * WORLD_WIDTH, y: rect.y * WORLD_HEIGHT, width: rect.width * WORLD_WIDTH, height: rect.height * WORLD_HEIGHT }
 }
 
+function seededUnit(seed: number, salt: number): number {
+  let value = (seed + Math.imul(salt, 0x9e3779b9)) >>> 0
+  value = Math.imul(value ^ (value >>> 16), 0x45d9f3b)
+  value = Math.imul(value ^ (value >>> 16), 0x45d9f3b)
+  return ((value ^ (value >>> 16)) >>> 0) / 4294967295
+}
+
+type RevealEllipse = {
+  centerX: number
+  centerY: number
+  radiusX: number
+  radiusY: number
+  rotation: number
+}
+
+/**
+ * Recreate the former soft canvas reveal in fixed world coordinates. Its
+ * seeded position means a plot's light patch grows naturally without jumping
+ * when the card state changes, and the camera never needs to recalculate it.
+ */
+function revealEllipses(plot: PlotDefinition, infection: number): RevealEllipse[] {
+  const cleared = Math.max(0, Math.min(1, 1 - infection))
+  if (cleared === 0) return []
+
+  const bounds = rectToWorld(plotBounds(plot.cells))
+  const growth = cleared ** 0.68
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+  const rotation = (seededUnit(plot.seed, 1) - 0.5) * 0.34
+  const drift = 1 - cleared
+  const offsetX = (seededUnit(plot.seed, 2) - 0.5) * bounds.width * 0.18 * drift
+  const offsetY = (seededUnit(plot.seed, 3) - 0.5) * bounds.height * 0.18 * drift
+  // The opaque center covers a clean plot; the feathered fringe can extend
+  // into the surrounding garden, avoiding the previous hard cell rectangle.
+  const completePlotReach = 0.76 + 0.29 * cleared ** 4
+  const radiusX = bounds.width * completePlotReach * growth
+  const radiusY = bounds.height * completePlotReach * growth
+  const lobeRadius = 0.44 + cleared * 0.12
+
+  return [
+    { centerX: centerX + offsetX, centerY: centerY + offsetY, radiusX, radiusY, rotation },
+    {
+      centerX: centerX + offsetX + (seededUnit(plot.seed, 4) - 0.5) * radiusX * 0.78,
+      centerY: centerY + offsetY + (seededUnit(plot.seed, 5) - 0.5) * radiusY * 0.68,
+      radiusX: radiusX * lobeRadius,
+      radiusY: radiusY * lobeRadius,
+      rotation: rotation - 0.38,
+    },
+    {
+      centerX: centerX + offsetX + (seededUnit(plot.seed, 6) - 0.5) * radiusX * 0.78,
+      centerY: centerY + offsetY + (seededUnit(plot.seed, 7) - 0.5) * radiusY * 0.68,
+      radiusX: radiusX * lobeRadius,
+      radiusY: radiusY * lobeRadius,
+      rotation: rotation + 0.42,
+    },
+  ]
+}
+
 function MapDebugOverlay() {
   return (
     <svg className="map-debug-overlay" viewBox={`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`} aria-hidden="true">
@@ -237,13 +295,30 @@ export function WorldMap({ save, camera, onCameraChange, onEnterPlot }: WorldMap
         <img className="world-map-clean" src={assetUrl('assets/garden-map.png')} alt="" draggable={false} />
         <svg className="world-map-weed" viewBox={`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`} aria-hidden="true">
           <defs>
-            <mask id="world-weed-mask" maskUnits="userSpaceOnUse">
+            <radialGradient id="world-weed-reveal" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="black" />
+              <stop offset="68%" stopColor="black" />
+              <stop offset="86%" stopColor="black" stopOpacity=".55" />
+              <stop offset="100%" stopColor="black" stopOpacity="0" />
+            </radialGradient>
+            <mask id="world-weed-mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse">
               <rect width={WORLD_WIDTH} height={WORLD_HEIGHT} fill="white" />
-              {plots.map((plot) => plot.cells.map((cell) => {
-                const rect = rectToWorld(cellRect(cell))
-                const infection = save.unlockedPlotIds.includes(plot.id) ? plotInfection(plot, save.cards) : 1
-                return <rect key={`${plot.id}:${cell.x}:${cell.y}`} {...rect} fill="black" fillOpacity={1 - infection} />
-              }))}
+              <g style={{ mixBlendMode: 'multiply' }}>
+                {plots.flatMap((plot) => {
+                  const infection = save.unlockedPlotIds.includes(plot.id) ? plotInfection(plot, save.cards) : 1
+                  return revealEllipses(plot, infection).map((ellipse, index) => (
+                    <ellipse
+                      key={`${plot.id}:${index}`}
+                      cx="0"
+                      cy="0"
+                      rx="1"
+                      ry="1"
+                      fill="url(#world-weed-reveal)"
+                      transform={`translate(${ellipse.centerX} ${ellipse.centerY}) rotate(${ellipse.rotation * 180 / Math.PI}) scale(${ellipse.radiusX} ${ellipse.radiusY})`}
+                    />
+                  ))
+                })}
+              </g>
             </mask>
           </defs>
           <image href={assetUrl('assets/garden-map_negative.png')} width={WORLD_WIDTH} height={WORLD_HEIGHT} preserveAspectRatio="none" mask="url(#world-weed-mask)" />
