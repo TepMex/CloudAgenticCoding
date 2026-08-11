@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import HanziWriter from 'hanzi-writer'
 import { ArrowLeft, BarChart3, Flower2, HelpCircle, Leaf, Sparkles } from 'lucide-react'
 import { plots, type CharacterDefinition, type PlotDefinition } from './data/model'
+import { battleArtworkForGarden, battleBackdropStage } from './data/battleFieldArt'
 import { initialSave, loadSave, persistSave, type SaveGame } from './db'
 import { plotInfection } from './garden'
 import { loadHanziCharData } from './hanziData'
@@ -10,12 +11,12 @@ import { WorldMap } from './map/WorldMap'
 import { initialCamera, type CameraState } from './map/cameraMath'
 import { StatisticsScreen } from './stats/StatisticsScreen'
 import { streakHighlightColor, streakHighlightOpacity, streakIntensity } from './streak'
+import { assetUrl } from './assetUrl'
+import { writingInkForBackdrop } from './battleInk'
 
 type Screen = 'map' | 'battle' | 'stats'
 
 const NORMAL_HINT_COLOR = '#6d5269'
-const INK_COLOR = '#25201c'
-const GHOST_INK_COLOR = 'rgba(70, 54, 46, .18)'
 const STREAK_GRADIENT_ID = 'streak-jade-highlight'
 
 function setStreakGradient(target: HTMLDivElement, intensity: number): () => void {
@@ -190,6 +191,7 @@ function BattleScreen({
 
   useEffect(() => {
     if (!writerTarget.current || !activeCharacter) return
+    const initialInk = writingInkForBackdrop('fullDirty')
     mistakesRef.current = 0
     hintMistakesRef.current = 0
     hintUsedRef.current = false
@@ -212,10 +214,10 @@ function BattleScreen({
       showCharacter: false,
       showOutline: false,
       renderer: 'svg',
-      drawingColor: INK_COLOR,
+      drawingColor: initialInk.drawingColor,
       drawingWidth: 7,
-      strokeColor: GHOST_INK_COLOR,
-      radicalColor: GHOST_INK_COLOR,
+      strokeColor: initialInk.completedStrokeColor,
+      radicalColor: initialInk.completedStrokeColor,
       highlightColor: NORMAL_HINT_COLOR,
       highlightCompleteColor: '#4e6c56',
       acceptBackwardsStrokes: false,
@@ -231,11 +233,19 @@ function BattleScreen({
       showHintAfterMisses: 3,
       highlightOnComplete: false,
       onCorrectStroke: (data) => {
-        correctStrokesRef.current = data.strokeNum + 1
-        setCorrectStrokes(data.strokeNum + 1)
+        const completedStrokes = data.strokeNum + 1
+        const nextBackdropStage = battleBackdropStage(activeCharacter.strokeCount, completedStrokes)
+        const nextInk = writingInkForBackdrop(nextBackdropStage)
+        correctStrokesRef.current = completedStrokes
+        setCorrectStrokes(completedStrokes)
+        // Hanzi Writer keeps completed paths in strokeColor. Update it at the
+        // same time as the backdrop so existing and newly drawn ink retain contrast.
+        writer.updateColor('drawingColor', nextInk.drawingColor, { duration: 0 })
+        writer.updateColor('strokeColor', nextInk.completedStrokeColor, { duration: 0 })
+        writer.updateColor('radicalColor', nextInk.completedStrokeColor, { duration: 0 })
         if (mistakesRef.current === 0) {
           const highlightId = ++streakHighlightRef.current
-          const intensity = streakIntensity(activeCharacter.strokeCount, data.strokeNum + 1)
+          const intensity = streakIntensity(activeCharacter.strokeCount, completedStrokes)
           clearStreakGradientRef.current?.()
           const clearStreakGradient = setStreakGradient(writerTarget.current!, intensity)
           clearStreakGradientRef.current = clearStreakGradient
@@ -263,8 +273,9 @@ function BattleScreen({
         const totalMistakes = summary.totalMistakes + hintMistakesRef.current
         if (totalMistakes === 0) {
           // The completed perfect character remains as opaque ink until the next one appears.
-          writer.updateColor('strokeColor', INK_COLOR, { duration: 120 })
-          writer.updateColor('radicalColor', INK_COLOR, { duration: 120 })
+          const cleanInk = writingInkForBackdrop('clean')
+          writer.updateColor('strokeColor', cleanInk.completedStrokeColor, { duration: 120 })
+          writer.updateColor('radicalColor', cleanInk.completedStrokeColor, { duration: 120 })
         }
         finishCharacter(activeCharacter, totalMistakes)
       },
@@ -321,10 +332,28 @@ function BattleScreen({
   const infection = plotInfection(plot, save.cards)
   const remaining = activeCharacter ? Math.max(0, activeCharacter.strokeCount - correctStrokes) : 0
   const weedDamage = activeCharacter ? correctStrokes / activeCharacter.strokeCount : 1
+  const artwork = battleArtworkForGarden(plot.gardenId)
+  const backdropStage = activeCharacter
+    ? battleBackdropStage(activeCharacter.strokeCount, correctStrokes)
+    : 'clean'
+  const backdropUrl = assetUrl(artwork.backgrounds[backdropStage])
+
+  useEffect(() => {
+    // All four variants are ready before the first successful stroke, avoiding
+    // a network flash when the battlefield changes cleanliness state.
+    Object.values(artwork.backgrounds).forEach((path) => {
+      const image = new Image()
+      image.src = assetUrl(path)
+    })
+  }, [artwork])
 
   return (
     <main className={`battle-screen ${destroyed ? 'is-destroyed' : ''}`}>
-      <div className="battle-backdrop" aria-hidden="true" />
+      <div
+        className="battle-backdrop"
+        style={{ backgroundImage: `url(${JSON.stringify(backdropUrl)})` }}
+        aria-hidden="true"
+      />
       <button className="back-button" onClick={onExit} aria-label="Вернуться к карте"><ArrowLeft /></button>
 
       <header className="prompt-scroll">
