@@ -282,7 +282,7 @@ export function WorldMap({ save, camera, onCameraChange, onEnterPlot }: WorldMap
       onWheel={onWheel}
     >
       <div className="world-map-world" ref={worldRef}>
-        <img className="world-map-clean" src={assetUrl('assets/garden-map.png')} alt="" draggable={false} />
+        <img className="world-map-clean" src={assetUrl('assets/garden-map.webp')} alt="" draggable={false} />
         <svg className="world-map-weed" viewBox={`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`} aria-hidden="true">
           <defs>
             <radialGradient id="world-weed-reveal" cx="50%" cy="50%" r="50%">
@@ -311,7 +311,7 @@ export function WorldMap({ save, camera, onCameraChange, onEnterPlot }: WorldMap
               </g>
             </mask>
           </defs>
-          <image href={assetUrl('assets/garden-map_negative.png')} width={WORLD_WIDTH} height={WORLD_HEIGHT} preserveAspectRatio="none" mask="url(#world-weed-mask)" />
+          <image href={assetUrl('assets/garden-map_negative.webp')} width={WORLD_WIDTH} height={WORLD_HEIGHT} preserveAspectRatio="none" mask="url(#world-weed-mask)" />
         </svg>
         <div className="world-map-hotspots">
           {plots.map((plot) => {

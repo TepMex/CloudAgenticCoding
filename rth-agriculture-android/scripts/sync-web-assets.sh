@@ -26,17 +26,15 @@ env -u GH_PAGES_PUBLIC_PATH bunx vite build --outDir "$OUT" --emptyOutDir
 
 required_assets=(
   "$OUT/index.html"
-  "$OUT/assets/garden-map.png"
-  "$OUT/assets/garden-map_negative.png"
+  "$OUT/assets/garden-map.webp"
+  "$OUT/assets/garden-map_negative.webp"
 )
 
-# The V2 map renders the cleaning progress with four backdrops per field.
-# Verify them here: a partial copy still opens in WebView but leaves the battle
-# scene dark after the player starts writing.
-for field in {1..15}; do
-  for stage in full_dirty half_dirty quorter_dirty clean; do
-    required_assets+=("$OUT/assets/battle-fields/field${field}/${stage}.png")
-  done
+# Battle backdrops: only field1 ships unique art today; other gardens reuse it
+# (see battleFieldArt.ts). Checking all 15 directories would force 180MB+ of duplicate
+# placeholders back into the APK and break gh-pages (GitHub 100MB file limit).
+for stage in full_dirty half_dirty quorter_dirty clean; do
+  required_assets+=("$OUT/assets/battle-fields/field1/${stage}.webp")
 done
 
 for asset in "${required_assets[@]}"; do
@@ -45,6 +43,14 @@ for asset in "${required_assets[@]}"; do
     exit 1
   fi
 done
+
+# GitHub rejects single blobs over 100MB on push; fail fast before assembleRelease.
+max_bytes=$((95 * 1024 * 1024))
+www_bytes="$(du -sb "$OUT" | awk '{print $1}')"
+if (( www_bytes > max_bytes )); then
+  echo "sync failed: bundled www is ${www_bytes} bytes (limit ${max_bytes}) — compress or dedupe assets" >&2
+  exit 1
+fi
 
 # Keep the assets directory trackable without committing the web build.
 cat > "$OUT/.gitignore" <<'EOF'
