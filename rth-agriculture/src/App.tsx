@@ -340,7 +340,7 @@ function BattleScreen({
 
   useEffect(() => {
     // All four variants are ready before the first successful stroke, avoiding
-    // a network flash when the battlefield changes cleanliness state.
+    // a flash when the battlefield changes cleanliness state.
     Object.values(artwork.backgrounds).forEach((path) => {
       const image = new Image()
       image.src = assetUrl(path)

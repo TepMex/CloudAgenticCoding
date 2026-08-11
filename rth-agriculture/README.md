@@ -25,6 +25,8 @@ CI sets `GH_PAGES_PUBLIC_PATH` so Vite emits correct asset URLs under that prefi
 
 Background images are assigned via absolute URLs from `document.baseURI` (`src/assetUrl.ts`) so CSS `url(var(--bg-*))` does not re-resolve `./assets/...` against the hashed stylesheet path (which would 404 as `assets/assets/...` in the Android WebView).
 
+Map and battle art ship as **WebP** (one backdrop set per garden field) so the Android APK stays under GitHub’s 100 MB push limit while remaining fully offline.
+
 Hanzi stroke JSON is loaded with **XHR** (`src/hanziData.ts`), not `fetch` — Chromium/Android WebView reject Fetch against `file://`, which left quiz/hint dead in the APK.
 
 ## Tests

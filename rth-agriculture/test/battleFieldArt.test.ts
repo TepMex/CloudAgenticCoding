@@ -20,9 +20,8 @@ describe('battle field artwork', () => {
     })
     expect(battleArtworkForGarden('garden-06').fieldId).toBe('field6')
     expect(battleArtworkForGarden('garden-15').fieldId).toBe('field15')
-    // Gardens without unique art yet reuse the field1 placeholder files.
     expect(battleArtworkForGarden('garden-06').backgrounds.clean).toBe(
-      'assets/battle-fields/field1/clean.webp',
+      'assets/battle-fields/field6/clean.webp',
     )
     for (const artwork of battleArtworkByGardenId.values()) {
       Object.values(artwork.backgrounds).forEach((path) => {

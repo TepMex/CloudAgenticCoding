@@ -18,6 +18,7 @@ Audience: Mandarin learners who already use the web game and want a home-screen 
 8. Publish a GitHub Pages landing at `/rth-agriculture-android/` with `rth-agriculture-android.apk` download, using the shared `android/landing` styles.
 9. CI rebuilds the APK when `rth-agriculture-android/**` or `rth-agriculture/**` changes (bundled assets must stay in sync with the web game).
 10. Provide a local/CI script to build `rth-agriculture` with relative `base: ./` and sync `dist` into `app/src/main/assets/www/`.
+11. Ship map/battle art as **WebP** (including a distinct backdrop set for each of the 15 gardens) so the release APK stays under GitHub’s 100 MB push limit without remote asset downloads or shared-placeholder dedupe.
 
 ## Interfaces
 
@@ -52,17 +53,18 @@ No deep links, no native plugins, no Play Store listing in v1.
 - Online multiplayer / cloud sync of progress
 - Play Store / App Bundle distribution
 - Loading the live GitHub Pages URL instead of bundled assets
+- Remote download of map/battle art after install
 - Push notifications, accounts, ads
 
 ## Acceptance criteria
 
-1. `./scripts/sync-web-assets.sh` produces a non-empty `app/src/main/assets/www/index.html` with relative asset URLs.
-2. `./gradlew assembleRelease` produces a sideload-signed APK that verifies with `android/verify-apk-sideload-cert.sh`.
+1. `./scripts/sync-web-assets.sh` produces a non-empty `app/src/main/assets/www/index.html` with relative asset URLs and bundled WebP map/battle art for all 15 fields.
+2. `./gradlew assembleRelease` produces a sideload-signed APK under 100 MB that verifies with `android/verify-apk-sideload-cert.sh`.
 3. Installing the APK on API 34+ opens the welcome screen without a network connection.
 4. Completing a battle persists card/field state across process death (WebView IndexedDB).
 5. Deploy workflow includes `rth-agriculture-android` in `ANDROID_APPS` and rebuilds when the wrapper or `rth-agriculture` changes.
 6. Root `README.md` lists the app with its Pages path.
 7. On a phone-sized WebView, battle chrome does not overlap a clipped circular writer; layout matches mobile web (no overview-scaled desktop CSS).
-8. The V2 garden map (including its negative map layer) and battle cleaning backdrops load under bundled `file:///android_asset/` (`base: './'`) — writing field stays visibly rendered through dirty, half-clean, quarter-clean, and clean states rather than becoming a blank dark void. Gardens without unique art reuse the field1 WebP placeholders so the release APK stays under GitHub’s 100 MB push limit.
+8. The V2 garden map (including its negative map layer) and all 60 field-cleaning backdrops load under bundled `file:///android_asset/` (`base: './'`) — writing field stays visibly rendered through dirty, half-clean, quarter-clean, and clean states rather than becoming a blank dark void.
 9. Battle quiz works offline: Hanzi stroke JSON loads via XHR (Fetch is blocked on `file://`), so drawing and «Показать следующий штрих» animate.
-10. `scripts/sync-web-assets.sh` fails if the bundled `www/` tree exceeds 95 MB, catching oversized map/battle art before `gh-pages` reject.
+10. `scripts/sync-web-assets.sh` fails if the bundled `www/` tree exceeds 95 MB.

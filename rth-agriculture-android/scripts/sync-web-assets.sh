@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Build rth-agriculture with relative base and copy into Android assets/www.
+# Map/battle art is shipped as WebP so all 15 field backdrop sets fit under
+# GitHub’s 100 MB APK push limit without remote downloads or art dedupe.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,11 +32,11 @@ required_assets=(
   "$OUT/assets/garden-map_negative.webp"
 )
 
-# Battle backdrops: only field1 ships unique art today; other gardens reuse it
-# (see battleFieldArt.ts). Checking all 15 directories would force 180MB+ of duplicate
-# placeholders back into the APK and break gh-pages (GitHub 100MB file limit).
-for stage in full_dirty half_dirty quorter_dirty clean; do
-  required_assets+=("$OUT/assets/battle-fields/field1/${stage}.webp")
+# V2 ships four cleaning backdrops per garden field (all bundled as WebP).
+for field in {1..15}; do
+  for stage in full_dirty half_dirty quorter_dirty clean; do
+    required_assets+=("$OUT/assets/battle-fields/field${field}/${stage}.webp")
+  done
 done
 
 for asset in "${required_assets[@]}"; do
@@ -48,7 +50,7 @@ done
 max_bytes=$((95 * 1024 * 1024))
 www_bytes="$(du -sb "$OUT" | awk '{print $1}')"
 if (( www_bytes > max_bytes )); then
-  echo "sync failed: bundled www is ${www_bytes} bytes (limit ${max_bytes}) — compress or dedupe assets" >&2
+  echo "sync failed: bundled www is ${www_bytes} bytes (limit ${max_bytes}) — compress art further" >&2
   exit 1
 fi
 
