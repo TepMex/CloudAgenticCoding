@@ -18,6 +18,16 @@ The central metaphor is:
 
 Learning progress, spaced repetition, world state, and visual restoration are therefore one system rather than separate game and study modes.
 
+## Version 2 World Update
+
+Version 2 replaces the original 110-field presentation with a single zoomable estate. The 110 stable RTH/RSH source lists are still the learning source, but each is split in original frame order into two contiguous halves, creating **220 gameplay plots** while retaining the same character IDs and FSRS cards.
+
+The estate has 15 visually distinct `GardenRegion`s in a 5×3 layout: bamboo, rice, lotus, tea, blossom, peony, chrysanthemum, pine, persimmon, orchid, berries, rapeseed, wheat, wisteria, and medicinal herbs. Its logical geometry is a 15×15 base-cell grid. The first garden uses five double-width early plots plus five normal plots; all other gardens hold 15 normal plots.
+
+There is no intermediate garden-selection screen. The player pans and zooms the continuous clean/overgrown map, then enters a close, unlocked plot directly into the existing handwriting battle. Plot unlocking is permanent and propagates through base-cell adjacency; infection remains a live, stroke-weighted projection of due/new FSRS cards.
+
+The main map also links to a statistics screen. It renders every Hanzi in original frame order as a dense colored tile wall. The colors are a human-readable SRS-stage projection derived from each card's scheduled interval; they never alter FSRS scheduling or due dates.
+
 ## 2. Core Design Principles
 
 1. **Production recall is primary.** The player is shown a meaning/keyword and must independently write the Hanzi.

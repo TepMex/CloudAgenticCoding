@@ -1,25 +1,23 @@
-import type { FieldDefinition } from './data/model'
+import type { PlotDefinition } from './data/model'
 import type { CardState } from './learning'
 import { isCardDue } from './learning'
 
-type InfectionField = Pick<FieldDefinition, 'characters'>
+type InfectionPlot = Pick<PlotDefinition, 'characters'>
 
 /**
- * Infection reflects unfinished memory work only. Field access deliberately
- * does not participate in this calculation: a locked field is still full of
- * new characters, so it remains visibly overgrown until it is opened and
- * cleared.
+ * Infection is a live projection of unfinished memory work.  Progression
+ * access deliberately has no role here: a locked plot still contains new
+ * characters and therefore remains visually overgrown.
  */
-export function fieldInfection(
-  field: InfectionField,
+export function plotInfection(
+  plot: InfectionPlot,
   cards: Readonly<Record<string, CardState>>,
   now = new Date(),
 ): number {
-  const totalWeight = field.characters.reduce((sum, character) => sum + character.strokeCount, 0)
-  const weedWeight = field.characters.reduce(
+  const totalWeight = plot.characters.reduce((sum, character) => sum + character.strokeCount, 0)
+  const weedWeight = plot.characters.reduce(
     (sum, character) => sum + (isCardDue(cards[character.id], now) ? character.strokeCount : 0),
     0,
   )
-
   return totalWeight ? weedWeight / totalWeight : 0
 }

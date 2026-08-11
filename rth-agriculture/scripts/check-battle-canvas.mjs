@@ -27,7 +27,10 @@ page.on('requestfailed', (request) => failed.push(request.url()))
 
 await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: /Войти в сад/i }).click()
-await page.locator('button.primary-button').first().click()
+// V2: the first tap focuses a distant plot; the second enters its battle.
+await page.locator('[data-plot-id="plot-001"]').click()
+await page.waitForTimeout(450)
+await page.locator('[data-plot-id="plot-001"]').click()
 await page.waitForSelector('.battle-screen .writing-circle')
 await page.waitForTimeout(400)
 
@@ -76,26 +79,14 @@ if (!metrics.rect) {
   process.exit(1)
 }
 
-const py = `
-from PIL import Image
-img = Image.open(${JSON.stringify(OUT)})
-w, h = img.size
-dpr = ${metrics.dpr}
-r = ${JSON.stringify(metrics.rect)}
-cx = int((r['x'] + r['w']/2) * dpr)
-cy = int((r['y'] + r['h']/2) * dpr)
-samples = []
-for y in range(cy-24, cy+24, 2):
-  for x in range(cx-24, cx+24, 2):
-    if 0 <= x < w and 0 <= y < h:
-      p = img.getpixel((x, y))
-      samples.append(0.299*p[0] + 0.587*p[1] + 0.114*p[2])
-avg = sum(samples)/len(samples)
-print(avg)
-if avg < 120:
-  raise SystemExit(f'writing field too dark (Y={avg:.1f}); backdrop not painting')
-`
-const result = spawnSync('python3', ['-c', py], { encoding: 'utf8' })
+const cropSize = 48
+const cropX = Math.max(0, Math.round((metrics.rect.x + metrics.rect.w / 2) * metrics.dpr - cropSize / 2))
+const cropY = Math.max(0, Math.round((metrics.rect.y + metrics.rect.h / 2) * metrics.dpr - cropSize / 2))
+const result = spawnSync('ffmpeg', [
+  '-hide_banner', '-loglevel', 'error', '-i', OUT,
+  '-vf', `crop=${cropSize}:${cropSize}:${cropX}:${cropY},signalstats,metadata=print:file=-`,
+  '-frames:v', '1', '-f', 'null', '-',
+], { encoding: 'utf8' })
 if (result.status !== 0) {
   console.error(result.stdout)
   console.error(result.stderr)
@@ -103,7 +94,12 @@ if (result.status !== 0) {
   process.exit(1)
 }
 
-const avg = Number(result.stdout.trim())
+const averageMatch = /^lavfi\.signalstats\.YAVG=(.+)$/m.exec(result.stdout)
+const avg = Number(averageMatch?.[1])
+if (!Number.isFinite(avg) || avg < 120) {
+  console.error(`FAIL: writing field too dark (Y=${avg.toFixed(1)}); backdrop not painting`)
+  process.exit(1)
+}
 console.log(`OK: battle backdrop ${metrics.url}`)
 console.log(`OK: writing field brightness Y=${avg.toFixed(1)}`)
 if (failed.some((url) => url.includes('cleaning-court') || url.includes('garden-map'))) {
