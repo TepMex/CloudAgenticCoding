@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.DS_Store
+*.local
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+public/speech/model.int8.onnx
+public/speech/tokens.txt
+public/speech/sherpa-onnx-wasm.js
+public/speech/sherpa-onnx-wasm.wasm
+public/speech/sherpa-onnx-asr.js
+public/speech/sherpa-paraformer-bridge.js
