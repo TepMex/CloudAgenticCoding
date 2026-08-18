@@ -1,0 +1,31 @@
+{
+  "anki": {
+    "url": "http://127.0.0.1:8765",
+    "query": "deck:\"Mandarin HSK 1000-5000\"",
+    "sample_size": 3
+  },
+  "fields": {
+    "word": "Simplified",
+    "meaning_en": "Meaning",
+    "sentence_en": "SentenceMeaning",
+    "part_of_speech_en": "Part of speech",
+    "meaning_ru": "MeaningRu",
+    "sentence_meaning_ru": "SentenceMeaningRu",
+    "part_of_speech_ru": "PartOfSpeechRu"
+  },
+  "llm": {
+    "base_url": "https://ollama.com/v1",
+    "model": "glm-5.2",
+    "api_key_env": "OLLAMA_API_KEY",
+    "json_response_format": true,
+    "timeout_seconds": 60,
+    "max_retries": 3
+  },
+  "processing": {
+    "enrichment_version": 1,
+    "overwrite_existing": false,
+    "verify_scheduling": true,
+    "cache_dir": "cache",
+    "log_dir": "logs"
+  }
+}
