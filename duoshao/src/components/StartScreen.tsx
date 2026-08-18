@@ -17,7 +17,9 @@ export function StartScreen({ progress, progressLabel, ready, error, mode, onSta
         <p className="eyebrow">Chinese number reflexes</p>
         <h1>DuoShaoGame</h1>
         <div className="chinese-title">多少</div>
-        <p className="intro">Say the falling price in Chinese before it reaches the bottom.</p>
+        <p className="intro">{mode === "mock"
+          ? "Enter the falling price in Chinese before it reaches the bottom."
+          : "Hold the talk button, say the falling price in Chinese, then release."}</p>
 
         <div className="model-status" role="status">
           <div className="model-status__row">

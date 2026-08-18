@@ -18,6 +18,7 @@ export class ParaformerSpeechRecognizer implements SpeechRecognizer {
   private microphone?: MicrophoneCapture;
   private progress?: (progress: number, label: string) => void;
   private pending = new Map<string, { speechStartedAt: number; speechEndedAt: number }>();
+  private activeUtteranceId?: string;
   private sequence = 0;
   private readyPromise?: Promise<void>;
 
@@ -50,14 +51,16 @@ export class ParaformerSpeechRecognizer implements SpeechRecognizer {
     this.microphone = new MicrophoneCapture({
       onSpeechStart: (speechStartedAt) => {
         const utteranceId = `speech-${++this.sequence}`;
+        this.activeUtteranceId = utteranceId;
         this.pending.set(utteranceId, { speechStartedAt, speechEndedAt: 0 });
-        this.onStatusChange?.("speech-detected");
+        this.onStatusChange?.("recording");
         this.onSpeechStart?.({ utteranceId, speechStartedAt });
       },
       onSpeechEnd: (samples, speechStartedAt, speechEndedAt, sampleRate) => {
-        const entry = [...this.pending.entries()].find(([, item]) => item.speechStartedAt === speechStartedAt);
-        if (!entry || !this.worker) return;
-        const [id, timing] = entry;
+        const id = this.activeUtteranceId;
+        const timing = id ? this.pending.get(id) : undefined;
+        this.activeUtteranceId = undefined;
+        if (!id || !timing || !this.worker) return;
         timing.speechEndedAt = speechEndedAt;
         this.onSpeechEnd?.({ utteranceId: id, speechStartedAt, speechEndedAt });
         this.onStatusChange?.("recognizing");
@@ -67,7 +70,7 @@ export class ParaformerSpeechRecognizer implements SpeechRecognizer {
     });
     try {
       await this.microphone.start();
-      this.onStatusChange?.("listening");
+      this.onStatusChange?.("idle");
     } catch (reason) {
       const error = reason instanceof Error ? reason : new Error("The microphone could not be started.");
       this.fail(error);
@@ -75,9 +78,19 @@ export class ParaformerSpeechRecognizer implements SpeechRecognizer {
     }
   }
 
+  beginUtterance(): void {
+    if (this.pending.size > 0) return;
+    this.microphone?.beginUtterance();
+  }
+
+  endUtterance(): void {
+    this.microphone?.endUtterance();
+  }
+
   async stop(): Promise<void> {
     await this.microphone?.stop();
     this.microphone = undefined;
+    this.activeUtteranceId = undefined;
     this.pending.clear();
     this.onStatusChange?.("ready");
   }
@@ -107,7 +120,7 @@ export class ParaformerSpeechRecognizer implements SpeechRecognizer {
       };
       this.pending.delete(message.id);
       this.onResult?.(result);
-      this.onStatusChange?.("listening");
+      this.onStatusChange?.("idle");
       if (import.meta.env.DEV) console.debug("[speech metrics]", result);
     }
     if (message.type === "error") this.fail(new Error(message.message));

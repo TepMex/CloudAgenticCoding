@@ -109,7 +109,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .game-screen {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
   min-height: 480px;
   overflow: hidden;
@@ -135,8 +135,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .hud__metric strong { display: block; margin-top: 1px; font-size: 18px; line-height: 1.1; }
 .mic { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 22px; color: #53625d; border-radius: 10px; background: #eeeede; font-size: 10px; font-weight: 600; }
 .mic__dot { width: 7px; height: 7px; border-radius: 50%; background: #98a09b; }
-.mic--listening .mic__dot { background: var(--jade); box-shadow: 0 0 0 4px rgba(8, 127, 105, .12); }
-.mic--speech-detected .mic__dot { background: var(--coral); animation: pulse .55s infinite alternate; }
+.mic--idle .mic__dot { background: var(--jade); box-shadow: 0 0 0 4px rgba(8, 127, 105, .12); }
+.mic--recording .mic__dot { background: var(--coral); animation: pulse .55s infinite alternate; }
 .mic--recognizing .mic__dot, .mic--loading .mic__dot { background: var(--gold); animation: pulse .55s infinite alternate; }
 .mic--error { color: #9d3124; background: #ffe9e1; }
 .mic--error .mic__dot { background: var(--coral); }
@@ -179,6 +179,55 @@ button { -webkit-tap-highlight-color: transparent; }
 .transcript { position: absolute; z-index: 15; right: 14px; bottom: 71px; left: 14px; max-width: 390px; margin: auto; overflow: hidden; padding: 10px 14px; color: var(--ink); border: 1px solid rgba(24, 50, 45, .12); border-radius: 12px; background: rgba(255, 253, 244, .92); box-shadow: 0 7px 25px rgba(24,50,45,.12); font-family: "Noto Sans SC", sans-serif; font-size: 13px; text-align: center; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(8px); }
 .transcript--hit { color: var(--jade-dark); border-color: rgba(8, 127, 105, .35); }
 .transcript--miss { color: #9d3124; border-color: rgba(232, 95, 69, .35); }
+
+.push-to-talk-bar {
+  position: relative;
+  z-index: 25;
+  display: grid;
+  min-height: 78px;
+  place-items: center;
+  padding: 9px 16px max(11px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(24, 50, 45, .15);
+  background: rgba(255, 253, 244, .97);
+  box-shadow: 0 -5px 22px rgba(24, 50, 45, .08);
+}
+.push-to-talk {
+  display: flex;
+  width: min(100%, 260px);
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff;
+  border: 0;
+  border-radius: 18px;
+  outline: 0;
+  background: var(--jade);
+  box-shadow: 0 5px 0 var(--jade-dark);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  touch-action: none;
+  user-select: none;
+  transition: transform .1s, box-shadow .1s, background .1s, opacity .15s;
+}
+.push-to-talk__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 2px solid rgba(255,255,255,.75);
+  border-radius: 50%;
+  font-size: 10px;
+}
+.push-to-talk--recording {
+  background: var(--coral);
+  box-shadow: 0 2px 0 #a73f2d;
+  transform: translateY(3px);
+}
+.push-to-talk--recording .push-to-talk__icon { animation: pulse .55s infinite alternate; }
+.push-to-talk:focus-visible { box-shadow: 0 5px 0 var(--jade-dark), 0 0 0 4px rgba(8,127,105,.22); }
+.push-to-talk:disabled { cursor: wait; opacity: .48; box-shadow: none; }
 
 .mock-console { position: absolute; z-index: 30; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); left: 10px; padding: 8px 10px 10px; border: 1px solid rgba(24,50,45,.2); border-radius: 14px; background: rgba(255,253,244,.96); box-shadow: 0 8px 30px rgba(24,50,45,.18); }
 .mock-console label { display: block; margin: 0 0 5px 2px; color: #6c7772; font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }

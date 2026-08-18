@@ -19,8 +19,12 @@ export class MockSpeechRecognizer implements SpeechRecognizer {
 
   async start(): Promise<void> {
     this.started = true;
-    this.onStatusChange?.("listening");
+    this.onStatusChange?.("idle");
   }
+
+  beginUtterance(): void {}
+
+  endUtterance(): void {}
 
   async stop(): Promise<void> {
     this.started = false;
@@ -37,7 +41,7 @@ export class MockSpeechRecognizer implements SpeechRecognizer {
     const speechStartedAt = performance.now();
     const speechEndedAt = speechStartedAt + 80;
     const timing: SpeechTimingEvent = { utteranceId, speechStartedAt, speechEndedAt };
-    this.onStatusChange?.("speech-detected");
+    this.onStatusChange?.("recording");
     this.onSpeechStart?.(timing);
     this.onSpeechEnd?.(timing);
     this.onStatusChange?.("recognizing");
@@ -53,7 +57,7 @@ export class MockSpeechRecognizer implements SpeechRecognizer {
         resultLatencyMs: Math.max(0, recognitionCompletedAt - speechEndedAt),
       };
       this.onResult?.(result);
-      this.onStatusChange?.("listening");
+      this.onStatusChange?.("idle");
     }, this.latencyMs);
   }
 }

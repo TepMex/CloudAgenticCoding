@@ -1,4 +1,4 @@
-export type MicrophoneStatus = "loading" | "ready" | "listening" | "speech-detected" | "recognizing" | "error";
+export type MicrophoneStatus = "loading" | "ready" | "idle" | "recording" | "recognizing" | "error";
 
 export interface SpeechTimingEvent {
   utteranceId: string;
@@ -17,6 +17,8 @@ export interface SpeechRecognitionResult extends SpeechTimingEvent {
 export interface SpeechRecognizer {
   initialize(onProgress?: (progress: number, label: string) => void): Promise<void>;
   start(): Promise<void>;
+  beginUtterance(): void;
+  endUtterance(): void;
   stop(): Promise<void>;
   dispose(): Promise<void>;
   onSpeechStart?: (event: SpeechTimingEvent) => void;

@@ -1,5 +1,3 @@
-import { VoiceActivityDetector } from "./vad";
-
 interface MicrophoneCallbacks {
   onSpeechStart(at: number): void;
   onSpeechEnd(samples: Float32Array, startedAt: number, endedAt: number, sampleRate: number): void;
@@ -13,7 +11,7 @@ export class MicrophoneCapture {
   private processor?: ScriptProcessorNode;
   private chunks: Float32Array[] = [];
   private speechStartedAt = 0;
-  private readonly vad = new VoiceActivityDetector();
+  private recording = false;
 
   constructor(private readonly callbacks: MicrophoneCallbacks) {}
 
@@ -45,29 +43,35 @@ export class MicrophoneCapture {
     this.stream = undefined;
     this.context = undefined;
     this.chunks = [];
-    this.vad.reset();
+    this.recording = false;
+  }
+
+  beginUtterance(): void {
+    if (!this.context || this.recording) return;
+    this.recording = true;
+    this.chunks = [];
+    this.speechStartedAt = performance.now();
+    this.callbacks.onSpeechStart(this.speechStartedAt);
+  }
+
+  endUtterance(): void {
+    if (!this.recording) return;
+    this.recording = false;
+    const endedAt = performance.now();
+    const sampleCount = this.chunks.reduce((total, chunk) => total + chunk.length, 0);
+    // A very quick tap can end before the first Web Audio callback. A single
+    // silent sample keeps that attempt valid and lets ASR return an empty result.
+    const merged = new Float32Array(Math.max(1, sampleCount));
+    let offset = 0;
+    for (const chunk of this.chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    this.callbacks.onSpeechEnd(merged, this.speechStartedAt, endedAt, this.context?.sampleRate ?? 16_000);
+    this.chunks = [];
   }
 
   private process(input: Float32Array): void {
-    const samples = new Float32Array(input);
-    const now = performance.now();
-    const state = this.vad.process(samples, now);
-    if (state === "start") {
-      this.chunks = [samples];
-      this.speechStartedAt = now;
-      this.callbacks.onSpeechStart(now);
-    } else if (state === "continue") {
-      this.chunks.push(samples);
-    } else if (state === "end") {
-      this.chunks.push(samples);
-      const merged = new Float32Array(this.chunks.reduce((total, chunk) => total + chunk.length, 0));
-      let offset = 0;
-      for (const chunk of this.chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.length;
-      }
-      this.callbacks.onSpeechEnd(merged, this.speechStartedAt, now, this.context?.sampleRate ?? 16_000);
-      this.chunks = [];
-    }
+    if (this.recording) this.chunks.push(new Float32Array(input));
   }
 }

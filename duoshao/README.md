@@ -1,6 +1,6 @@
 # DuoShaoGame · 多少
 
-A mobile-first browser game for turning Arabic prices into spoken Chinese quickly. A price falls down the screen; say the amount in Chinese before it reaches the bottom. The MVP supports whole amounts from 1 through 9999, sudden-death rounds, six learning stages, a local microphone/VAD pipeline, and an entirely local Paraformer integration boundary.
+A mobile-first browser game for turning Arabic prices into spoken Chinese quickly. A price falls down the screen; hold the talk button, say the amount in Chinese, and release before it reaches the bottom. The MVP supports whole amounts from 1 through 9999, sudden-death rounds, six learning stages, push-to-talk capture, and an entirely local Paraformer integration boundary.
 
 No backend is required. Speech audio stays in the browser.
 
@@ -45,16 +45,16 @@ bun run preview --host
 The layers are deliberately independent:
 
 ```text
-MicrophoneCapture → VAD → short Float32 utterance
-                              ↓ transferable buffer
-                    speech.worker.ts / Paraformer
-                              ↓ transcript + timing
-                normalize → parse Chinese money
-                              ↓ numeric amount
-                         GameEngine
+push-to-talk button → MicrophoneCapture → short Float32 utterance
+                                             ↓ transferable buffer
+                                   speech.worker.ts / Paraformer
+                                             ↓ transcript + timing
+                               normalize → parse Chinese money
+                                             ↓ numeric amount
+                                        GameEngine
 ```
 
-React components only use `SpeechRecognizer`; they never import sherpa-onnx. `MockSpeechRecognizer` and `ParaformerSpeechRecognizer` both produce the same timing/result events. The worker owns model initialization and inference, so animation and React stay on the main thread. `MicrophoneCapture` uses Web Audio and local energy-based utterance segmentation. Audio is never uploaded or persisted.
+React components only use `SpeechRecognizer`; they never import sherpa-onnx. `MockSpeechRecognizer` and `ParaformerSpeechRecognizer` both produce the same timing/result events. The worker owns model initialization and inference, so animation and React stay on the main thread. `MicrophoneCapture` uses Web Audio and records only between button press and release. Audio is never uploaded or persisted.
 
 Every attempt carries `speechStartedAt`, `speechEndedAt`, and `recognitionCompletedAt`. If speech began before a target's `boundaryAt`, that target becomes `pending-game-over`. A correct late result hits it; a wrong result ends the game; a stuck request ends it after 2500 ms. In development, utterance/inference/result latency is logged in the console.
 
@@ -156,7 +156,7 @@ Canonical answers use `元`, for example `101 → 一百零一元` and `2010 →
 - `src/game/` — time-based engine and staged difficulty
 - `src/chinese/` — pure canonical number generation, normalization, and strict parser
 - `src/speech/` — recognizer interface, mock and Paraformer adapters, worker
-- `src/audio/` — microphone lifecycle and VAD
+- `src/audio/` — microphone lifecycle and push-to-talk capture
 - `src/components/` — responsive DOM UI
 - `tests/` — number/parser, difficulty, scoring, spawning, loss, fairness, timeout, and reset tests
 

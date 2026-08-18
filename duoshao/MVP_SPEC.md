@@ -102,17 +102,14 @@ MockSpeechRecognizer
 
 После нажатия Start запросить microphone permission.
 
-Во время игры микрофон работает постоянно.
+Во время игры microphone stream открыт, но звук записывается только по явному push-to-talk.
 
-Игрок не должен нажимать кнопку перед каждым ответом.
-
-Используй VAD / utterance segmentation:
+Игрок удерживает кнопку во время каждого ответа. Не используй VAD, пороги громкости, интервалы тишины или автоматическое ограничение длительности utterance.
 
 ```text
-silence
-→ player starts speaking
-→ collect short utterance
-→ speech ends
+player presses and holds the talk button
+→ collect utterance while the button is held
+→ player releases the button
 → send utterance to ASR
 → get transcript
 → try to hit target
@@ -125,8 +122,8 @@ silence
 На экране должен быть небольшой ненавязчивый microphone status:
 
 * loading
-* listening
-* speech detected
+* ready / hold to talk
+* recording
 * recognizing
 * error
 
@@ -640,7 +637,6 @@ src/
 
   audio/
     microphone.ts
-    vad.ts
 
   components/
     StartScreen.tsx
@@ -812,7 +808,7 @@ start
 → restart works
 ```
 
-После этого подключай microphone/VAD/Paraformer к уже существующему `SpeechRecognizer`.
+После этого подключай microphone/push-to-talk/Paraformer к уже существующему `SpeechRecognizer`.
 
 Не пытайся одновременно писать game engine и debugging низкоуровневого WASM.
 

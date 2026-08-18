@@ -120,6 +120,8 @@ export function App() {
       transcript={transcript}
       isMock={speech.mode === "mock"}
       onMockSubmit={(value) => speech.mock?.submit(value)}
+      onTalkStart={() => speech.recognizer.beginUtterance()}
+      onTalkEnd={() => speech.recognizer.endUtterance()}
       onPlayAgain={playAgain}
     />
   );
