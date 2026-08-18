@@ -18,6 +18,7 @@ export interface GameOverState {
 
 export interface GameSnapshot {
   phase: "idle" | "running" | "game-over";
+  pausedAt: number | null;
   score: number;
   hits: number;
   level: number;
@@ -28,6 +29,7 @@ export interface GameSnapshot {
 export interface SpeechAttempt {
   id: string;
   speechStartedAt: number;
+  gameplayStartedAt: number;
   speechEndedAt?: number;
   recognitionCompletedAt?: number;
   resolved: boolean;

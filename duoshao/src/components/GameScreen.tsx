@@ -25,7 +25,14 @@ export function GameScreen({ snapshot, now, micStatus, transcript, isMock, onMoc
       <section className="game-board" aria-label="Falling prices game board">
         <div className="game-board__grid" />
         <div className="level-chip">LEVEL {snapshot.level}</div>
-        {snapshot.targets.map((target) => <FallingMoney key={target.id} target={target} now={now} />)}
+        {snapshot.targets.map((target) => (
+          <FallingMoney
+            key={target.id}
+            target={target}
+            now={snapshot.pausedAt ?? now}
+            paused={snapshot.pausedAt !== null}
+          />
+        ))}
         <div className="danger-line"><span>TOO LATE</span></div>
         {transcript && <div className={`transcript transcript--${transcript.kind}`}>{transcript.kind === "hit" ? "✓" : transcript.kind === "miss" ? "×" : "…"} {transcript.text}</div>}
       </section>

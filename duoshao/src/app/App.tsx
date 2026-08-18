@@ -31,8 +31,19 @@ export function App() {
     setProgress(0);
     speech.recognizer.onStatusChange = (status) => active && setMicStatus(status);
     speech.recognizer.onError = (reason) => active && setError(reason.message);
-    speech.recognizer.onSpeechStart = (event) => engine.current.speechStarted(event.utteranceId, event.speechStartedAt);
-    speech.recognizer.onSpeechEnd = (event) => engine.current.speechEnded(event.utteranceId, event.speechEndedAt ?? performance.now());
+    speech.recognizer.onSpeechStart = (event) => {
+      engine.current.pause(event.speechStartedAt);
+      engine.current.speechStarted(event.utteranceId, event.speechStartedAt);
+      setSnapshot(engine.current.snapshot());
+      setNow(event.speechStartedAt);
+    };
+    speech.recognizer.onSpeechEnd = (event) => {
+      const speechEndedAt = event.speechEndedAt ?? performance.now();
+      engine.current.speechEnded(event.utteranceId, speechEndedAt);
+      engine.current.resume(speechEndedAt);
+      setSnapshot(engine.current.snapshot());
+      setNow(speechEndedAt);
+    };
     speech.recognizer.onResult = (result) => {
       const answer = parseChineseMoney(result.transcript);
       const outcome = engine.current.recognitionResult(result.utteranceId, answer?.amount ?? null, result.recognitionCompletedAt);

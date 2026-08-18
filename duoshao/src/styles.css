@@ -172,6 +172,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .money strong { position: relative; z-index: 1; text-align: center; font-size: clamp(22px, 6vw, 29px); letter-spacing: -.045em; }
 .money__shine { position: absolute; top: -20px; left: -30px; width: 24px; height: 110px; background: rgba(255,255,255,.13); transform: rotate(27deg); animation: shine 3s ease-in-out infinite; }
 .money--pending-game-over { border-color: var(--gold); animation-play-state: paused; box-shadow: 0 0 0 5px rgba(243, 184, 53, .25), 0 8px 0 #064b41; }
+.money--paused { animation-play-state: paused; }
 .money--hit { animation: hit .36s ease-out both; }
 
 .danger-line { position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; height: 60px; border-top: 2px dashed rgba(232, 95, 69, .75); background: linear-gradient(rgba(232, 95, 69, .02), rgba(232, 95, 69, .16)); }

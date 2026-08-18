@@ -20,6 +20,11 @@ describe("DifficultyManager", () => {
     expect(last.maxConcurrentTargets).toBeGreaterThan(first.maxConcurrentTargets);
   });
 
+  test("uses fall durations that are twice as long as the original speed", () => {
+    expect(manager.settingsForHits(0).fallDurationMs).toBe(24_000);
+    expect(manager.settingsForHits(50).fallDurationMs).toBe(15_000);
+  });
+
   test("generates amounts inside each stage domain", () => {
     for (let level = 1; level <= 6; level += 1) {
       for (const random of [0, 0.25, 0.5, 0.99]) {
@@ -28,5 +33,9 @@ describe("DifficultyManager", () => {
         expect(amount).toBeLessThanOrEqual(level === 1 ? 10 : level === 2 ? 99 : level <= 4 ? 999 : 9999);
       }
     }
+  });
+
+  test("falls back to an unused amount when random keeps repeating", () => {
+    expect(manager.generateUnusedAmount(1, () => 0, new Set([1]))).toBe(2);
   });
 });

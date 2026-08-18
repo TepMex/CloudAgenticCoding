@@ -1,6 +1,6 @@
 # DuoShaoGame · 多少
 
-A mobile-first browser game for turning Arabic prices into spoken Chinese quickly. A price falls down the screen; hold the talk button, say the amount in Chinese, and release before it reaches the bottom. The MVP supports whole amounts from 1 through 9999, sudden-death rounds, six learning stages, push-to-talk capture, and an entirely local Paraformer integration boundary.
+A mobile-first browser game for turning Arabic prices into spoken Chinese quickly. A price falls down the screen; hold the talk button, say the amount in Chinese, and release when you finish. Falling and spawn timers pause while push-to-talk is held, and recognition latency remains protected after release. The MVP supports whole amounts from 1 through 9999, non-repeating amounts within a run, sudden-death rounds, six learning stages, push-to-talk capture, and an entirely local Paraformer integration boundary.
 
 No backend is required. Speech audio stays in the browser.
 

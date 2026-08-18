@@ -1,6 +1,6 @@
 import type { FallingTarget } from "../game/types";
 
-export function FallingMoney({ target, now }: { target: FallingTarget; now: number }) {
+export function FallingMoney({ target, now, paused }: { target: FallingTarget; now: number; paused: boolean }) {
   const sequence = Number(target.id.split("-")[1]) || 0;
   const lane = (sequence * 37 + target.amount * 13) % 72 + 8;
   const elapsed = Math.max(0, now - target.spawnedAt);
@@ -10,7 +10,7 @@ export function FallingMoney({ target, now }: { target: FallingTarget; now: numb
     left: `${lane}%`,
   } as React.CSSProperties;
   return (
-    <div className={`money money--${target.state}`} style={style} aria-label={`${target.amount} yuan`}>
+    <div className={`money money--${target.state}${paused ? " money--paused" : ""}`} style={style} aria-label={`${target.amount} yuan`}>
       <span className="money__symbol">¥</span>
       <strong>{target.amount}</strong>
       <span className="money__shine" />
