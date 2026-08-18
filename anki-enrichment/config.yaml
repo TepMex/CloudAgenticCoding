@@ -27,5 +27,17 @@
     "verify_scheduling": true,
     "cache_dir": "cache",
     "log_dir": "logs"
+  },
+  "related": {
+    "history_query": "(deck:\"Refold Mandarin 1k Simplified\" OR deck:\"Mandarin HSK 1000-5000\")",
+    "key_field": "Key",
+    "hanzi_field": "Simplified",
+    "pinyin_field": "Pinyin",
+    "pinyin_fields": {
+      "HSK": "Pinyin.1"
+    },
+    "same_hanzi_field": "SameHanzi",
+    "matrix_field": "SamePinyinMatrix",
+    "overwrite_existing": true
   }
 }

@@ -1,86 +1,139 @@
 # Anki Enrichment
 
-Инструмент добавляет в **существующие** Anki notes три поля и заполняет только
-недостающие значения через OpenAI-compatible Chat Completions API:
+В проекте два AnkiConnect-инструмента, которые обновляют существующие notes и не
+пересоздают cards:
 
-- `MeaningRu` — перевод значения в контексте карточки;
-- `SentenceMeaningRu` — перевод примера;
-- `PartOfSpeechRu` — часть речи по-русски.
+- `ru_translation.py` добавляет русские переводы;
+- `same_hanzi_pinyin.py` добавляет `SameHanzi` и `SamePinyinMatrix`.
 
-Notes и cards не пересоздаются. Запись выполняется только через AnkiConnect
-`modelFieldAdd` и `updateNoteFields`; после каждого обновления проверяются note ID,
-card IDs и scheduling (`type`, `queue`, `due`, `interval`, ease factor, `reps`,
-`lapses`, `left`).
+Оба используют `config.yaml`, требуют запущенный Anki с AnkiConnect и перед
+записью требуют подтверждение резервной копии.
 
-## Подготовка
+## SameHanzi и SamePinyinMatrix
 
-1. Установите и запустите Anki с дополнением AnkiConnect (порт по умолчанию `8765`).
-2. Проверьте mapping и query в `config.yaml`. По умолчанию они уже настроены по
-   аудиту текущей коллекции: `Mandarin HSK 1000-5000`, `Simplified`, `Meaning`,
-   `SentenceMeaning`, `Part of speech`. Файл использует
-   JSON-compatible YAML, поэтому внешние Python-зависимости не нужны.
-3. Скопируйте `.env.example` в `.env` и задайте ключ:
+Для карточки `Key=N`:
 
-   ```dotenv
-   OPENAI_API_KEY=...
-   OPENAI_BASE_URL=https://api.openai.com/v1
-   OPENAI_MODEL=gpt-4.1-mini
-   ```
+- `SameHanzi` содержит через запятую слова из предыдущих notes (`Key<N`), у
+  которых есть хотя бы один общий иероглиф с текущим `Simplified`;
+- `SamePinyinMatrix` содержит готовый HTML карты 3×3 первого слога. Центр —
+  текущее слово, окружение — только ранее изученные слова.
 
-`OPENAI_BASE_URL` может указывать на любой совместимый endpoint; клиент добавляет
-`/chat/completions`. Секрет не попадает в кеш или логи. Для локального endpoint
-без авторизации задайте `api_key_env` пустой строкой. Если провайдер не принимает
-OpenAI `response_format`, установите `json_response_format: false`; строгая
-проверка JSON-ответа всё равно останется включённой.
+Порядок initials/finals соответствует проекту `map-of-chinese`. Поддерживаются
+тоны, `ü/u:/v`, zero-initial `y/w`, `j/q/x + ü` и `apical-i`.
 
-## Безопасный порядок запуска
+### Конфигурация
 
-Сначала исследуйте коллекцию. Команда выводит колоды, все Note Types в выборке,
-поля, templates, несколько реальных notes и предлагаемый mapping:
+`anki.query` выбирает notes, в которые будут записаны новые поля. Отдельный
+`related.history_query` задаёт полную глобальную историю для расчёта `Key<N`.
+По умолчанию это обе китайские колоды, поэтому `Key=1001` видит `Key=1..1000`,
+хотя обновляется только колода из `anki.query`.
 
-```bash
-python3 main.py --audit --query 'deck:"Mandarin HSK 1000-5000"'
+```json
+{
+  "anki": {
+    "url": "http://127.0.0.1:8765",
+    "query": "deck:\"Mandarin HSK 1000-5000\""
+  },
+  "related": {
+    "history_query": "(deck:\"Refold Mandarin 1k Simplified\" OR deck:\"Mandarin HSK 1000-5000\")",
+    "key_field": "Key",
+    "hanzi_field": "Simplified",
+    "pinyin_field": "Pinyin",
+    "pinyin_fields": {
+      "HSK": "Pinyin.1"
+    },
+    "same_hanzi_field": "SameHanzi",
+    "matrix_field": "SamePinyinMatrix",
+    "overwrite_existing": true
+  }
+}
 ```
 
-Затем сделайте dry run. Он не добавляет поля, не вызывает LLM и ничего не пишет:
+`pinyin_fields` переопределяет имя поля для конкретного Note Type. Это нужно для
+текущей коллекции: у `HSK` поле называется `Pinyin.1`, а у Refold — `Pinyin`.
+
+`overwrite_existing=true` полностью пересчитывает оба производных поля при
+повторном запуске. При `false` уже заполненные значения сохраняются.
+
+### Безопасный запуск
+
+Аудит по умолчанию показывает выборку, отсутствующие поля и будущие значения,
+но ничего не меняет:
 
 ```bash
-python3 main.py --dry-run --query 'deck:"Mandarin HSK 1000-5000"' --limit 10
+python3 same_hanzi_pinyin.py
+python3 same_hanzi_pinyin.py --audit --limit 3
 ```
 
-Перед первой записью экспортируйте **полную коллекцию** из Anki с scheduling
-information. Первый запуск ограничьте несколькими notes:
+Dry run рассчитывает данные для выбранных notes без `modelFieldAdd` и
+`updateNoteFields`:
 
 ```bash
-python3 main.py --enrich --query 'deck:"Mandarin HSK 1000-5000"' --limit 10 --backup-confirmed
+python3 same_hanzi_pinyin.py --dry-run --limit 10
 ```
 
-Вместо ручного подтверждения можно попросить AnkiConnect экспортировать отдельную
-колоду (путь относится к компьютеру, где запущен Anki):
+После полной резервной копии коллекции:
 
 ```bash
-python3 main.py --enrich --limit 10 \
-  --backup-deck 'Mandarin HSK 1000-5000' --backup-path '/absolute/path/HSK.apkg'
+python3 same_hanzi_pinyin.py --enrich --limit 10 --backup-confirmed
 ```
 
-После проверки полей и scheduling команда для всей колоды:
+После проверки первых notes можно обработать всю выбранную колоду:
 
 ```bash
-python3 main.py --enrich --query 'deck:"Mandarin HSK 1000-5000"' --backup-confirmed
+python3 same_hanzi_pinyin.py --enrich --backup-confirmed
 ```
 
-## Повторные запуски
+Вместо ручного подтверждения скрипт может сначала экспортировать колоду с
+scheduling information:
 
-По умолчанию `overwrite_existing` равен `false`: заполненные, в том числе вручную
-исправленные, поля не меняются. Ответы LLM кешируются по endpoint, модели, prompt,
-версии и исходным данным. Повышение `enrichment_version` создаёт новую генерацию
-кеша, но само по себе не перезаписывает пользовательские данные. Для осознанной
-перегенерации задайте `overwrite_existing: true`, предварительно сделав backup и
-ограничив выборку.
+```bash
+python3 same_hanzi_pinyin.py --enrich \
+  --backup-deck "Mandarin HSK 1000-5000" \
+  --backup-path "/absolute/path/Mandarin-HSK.apkg"
+```
 
-Каждая note обрабатывается независимо; ошибки пишутся в `logs/enrichment.jsonl`,
-после чего работа продолжается. Недоступность AnkiConnect проверяется до начала
-обработки. Кеш пишется атомарно в `cache/`.
+Если полей нет, они добавляются в Note Type через `modelFieldAdd`. Затем каждое
+значение записывается в тот же note ID через `updateNoteFields`. После обновления
+проверяются note ID, card IDs и scheduling. События пишутся в
+`logs/same_hanzi_pinyin.jsonl`.
+
+Чтобы показать матрицу, добавьте `{{SamePinyinMatrix}}` в Back Template и CSS из
+`assets/same_pinyin_matrix.css` в Styling. `{{SameHanzi}}` можно разместить там же.
+
+### Диагностика
+
+```bash
+python3 same_hanzi_pinyin.py --parse "zhǎng"
+python3 same_hanzi_pinyin.py --dump-layout
+python3 same_hanzi_pinyin.py --audit --debug-key 1001
+```
+
+Неразбираемый pinyin не прерывает расчёт всей истории: матрица этой note остаётся
+пустой, а предупреждение выводится в stderr.
+
+## Русские переводы
+
+`ru_translation.py` добавляет в существующие notes только нужные значения:
+
+- `MeaningRu`;
+- `SentenceMeaningRu`;
+- `PartOfSpeechRu`.
+
+Сначала аудит и dry run:
+
+```bash
+python3 ru_translation.py --audit --query 'deck:"Mandarin HSK 1000-5000"'
+python3 ru_translation.py --dry-run --query 'deck:"Mandarin HSK 1000-5000"' --limit 10
+```
+
+После резервной копии:
+
+```bash
+python3 ru_translation.py --enrich \
+  --query 'deck:"Mandarin HSK 1000-5000"' \
+  --limit 10 --backup-confirmed
+```
 
 ## Проверки
 

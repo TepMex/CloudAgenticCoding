@@ -114,7 +114,7 @@
 ```text
 anki-enricher/
     config.yaml
-    main.py
+    ru_translation.py
 
     anki.py
     enrichment.py
@@ -376,7 +376,7 @@ skipped
 Обязательно реализуй режим:
 
 ```bash
-python main.py --dry-run
+python ru_translation.py --dry-run
 ```
 
 Он должен:
@@ -394,13 +394,13 @@ python main.py --dry-run
 Добавь возможность:
 
 ```bash
-python main.py --limit 10
+python ru_translation.py --limit 10
 ```
 
 и/или:
 
 ```bash
-python main.py --query 'deck:"My Deck"'
+python ru_translation.py --query 'deck:"My Deck"'
 ```
 
 Первый реальный запуск должен выполняться максимум на 10–20 notes.
@@ -563,7 +563,7 @@ New TTS requests: 434
 Задача считается выполненной, когда существует инструмент, который можно безопасно запускать повторно примерно так:
 
 ```bash
-python main.py --query 'deck:"English"' --enrich
+python ru_translation.py --query 'deck:"English"' --enrich
 ```
 
 и он:

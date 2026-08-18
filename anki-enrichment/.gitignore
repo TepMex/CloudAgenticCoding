@@ -1,7 +1,7 @@
 .env
 cache/
 logs/
+output/
 *.pyc
 __pycache__/
 .pytest_cache/
-

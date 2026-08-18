@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -53,11 +53,28 @@ class ProcessingConfig:
 
 
 @dataclass(frozen=True)
+class RelatedConfig:
+    history_query: str | None = None
+    key_field: str = "Key"
+    hanzi_field: str = "Simplified"
+    pinyin_field: str = "Pinyin"
+    pinyin_fields: dict[str, str] = field(default_factory=dict)
+    same_hanzi_field: str = "SameHanzi"
+    matrix_field: str = "SamePinyinMatrix"
+    overwrite_existing: bool = True
+
+    @property
+    def target_fields(self) -> tuple[str, str]:
+        return self.same_hanzi_field, self.matrix_field
+
+
+@dataclass(frozen=True)
 class Config:
     anki: AnkiConfig
     fields: FieldMapping
     llm: LLMConfig
     processing: ProcessingConfig
+    related: RelatedConfig = RelatedConfig()
 
 
 def load_dotenv(path: Path) -> None:
@@ -97,6 +114,12 @@ def load_config(path: Path) -> Config:
     fields = _section(data, "fields")
     llm = _section(data, "llm")
     processing = _section(data, "processing")
+    related_value = data.get("related", {})
+    if not isinstance(related_value, dict):
+        raise ConfigError("Config object 'related' must be an object")
+    pinyin_fields_value = related_value.get("pinyin_fields", {})
+    if not isinstance(pinyin_fields_value, dict):
+        raise ConfigError("Config value 'related.pinyin_fields' must be an object")
     root = path.resolve().parent
 
     try:
@@ -123,6 +146,31 @@ def load_config(path: Path) -> Config:
                 verify_scheduling=bool(processing.get("verify_scheduling", True)),
                 cache_dir=root / str(processing.get("cache_dir", "cache")),
                 log_dir=root / str(processing.get("log_dir", "logs")),
+            ),
+            related=RelatedConfig(
+                history_query=(
+                    str(related_value["history_query"]).strip() or None
+                    if "history_query" in related_value
+                    else None
+                ),
+                key_field=str(related_value.get("key_field", "Key")),
+                hanzi_field=str(
+                    related_value.get("hanzi_field", fields.get("word", "Simplified"))
+                ),
+                pinyin_field=str(related_value.get("pinyin_field", "Pinyin")),
+                pinyin_fields={
+                    str(model): str(field_name)
+                    for model, field_name in pinyin_fields_value.items()
+                },
+                same_hanzi_field=str(
+                    related_value.get("same_hanzi_field", "SameHanzi")
+                ),
+                matrix_field=str(
+                    related_value.get("matrix_field", "SamePinyinMatrix")
+                ),
+                overwrite_existing=bool(
+                    related_value.get("overwrite_existing", True)
+                ),
             ),
         )
     except (KeyError, TypeError, ValueError) as exc:

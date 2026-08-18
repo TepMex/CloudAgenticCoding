@@ -20,7 +20,7 @@ from anki_enricher.config import (
 )
 from anki_enricher.enrichment import required_outputs, run_pipeline
 from anki_enricher.translation import LLMError, Translation, validate_translation
-from main import main
+from ru_translation import main
 
 
 FIELDS = FieldMapping(
