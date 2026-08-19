@@ -1,6 +1,6 @@
 # ideal-timing
 
-Android **16-hour day clock** relative to wake-up time from Xiaomi Fitness / Mi Band sleep data. Sign in with a Xiaomi account (browser / in-app WebView), sync wake time, and read which of the four 4-hour sectors you are in. Past 16 hours after wake, the pointer freezes (no overflow). On the first open of each day, after sync, the app schedules same-day section-change notifications (`Наступило время для …` / `Пора спать` at 16h).
+Android **16-hour day clock** relative to wake-up time from Xiaomi Fitness / Mi Band sleep data. Sign in with a Xiaomi account (browser / in-app WebView), sync wake time, and read which of the four 4-hour sectors you are in. Past 16 hours after wake, the pointer freezes (no overflow). On the first open of each day, after sync, the app schedules same-day section-change notifications (`Наступило время для …` / `Пора спать` at 16h). Sunrise and sunset (solar altitude −0.833°) are computed offline from the device location and `ZoneId`, and shown as sun / moon pictograms outside the dial rim.
 
 See [SPEC.md](./SPEC.md).
 

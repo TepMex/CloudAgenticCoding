@@ -26,6 +26,12 @@ Open the app → sync wake time from Mi Fitness → read which of the four 4-hou
    - At wake+4h / +8h / +12h: `Наступило время для ${SECTION_DESCRIPTION}` (RU sector labels).
    - At wake+16h: `Пора спать`.
    - Only schedule fires that are still in the future and **before the end of the current local day** (no next-day schedule — wake for later days is unknown).
+9. Show **sunrise** and **sunset** markers on the dial, calculated **offline** from the user’s geographic coordinates:
+   - Official rise/set = sun center altitude **−0.833°** (NOAA / USNO refraction + solar-disk zenith `90.833°`).
+   - Convert civil-day events with the device **`ZoneId`** (`ZoneId.systemDefault()`).
+   - Map each event onto the 16-hour dial relative to wake; only events inside `[wake, wake+16h]` are drawn. If sunrise or sunset falls outside that window, **omit that icon entirely** (do not clamp or place it at the rim).
+   - Pictograms sit **outside** the gold rim at the angle the pointer would reach: bright sun for sunrise, moon crescent for sunset.
+   - Coarse/fine location permission; last fix cached for offline use. No markers when coords are unavailable or polar day/night omits the event.
 
 ### Sector map (relative to wake = 0h, clockwise from 12 o’clock)
 
@@ -61,6 +67,16 @@ Mi Band → Xiaomi Fitness cloud sleep → ideal-timing → wake epoch → 16h c
 | Pointer angle | progress × 360°, clockwise from 12 o’clock |
 | Sector index | `floor(elapsedHours / 4)` clamped to `0…3` (freeze at sector 4 when at 16h) |
 
+### Sunrise / sunset (offline)
+
+| Concept | Rule |
+|---------|------|
+| Zenith | `90.833°` (altitude `−0.833°`) |
+| Algorithm | Jean Meeus / NOAA spreadsheet approximations (`SunCalculator`) |
+| Time zone | Device `ZoneId` for which local calendar days overlap the wake window |
+| Dial progress | `(eventEpoch − wakeEpoch) / (16 × 3600)` when in range; else omit marker |
+| Location | `LocationManager` last-known + `GeoLocationStore` cache |
+
 ### Section notifications
 
 | Fire time | Message |
@@ -87,10 +103,18 @@ Same fields as running-log: `userId`, `cUserId`, `serviceToken`, `ssecurity`, `p
 | sourceDateEpochSec | LONG | Sleep record `time` used, if any |
 | rawHint | TEXT | Optional debug / display (e.g. score) |
 
+### Geo cache (plain prefs)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| latitude_deg | FLOAT | Last known WGS84 latitude |
+| longitude_deg | FLOAT | Last known WGS84 longitude (east+) |
+| updated_at_epoch_sec | LONG | When the cache was written |
+
 ## UI / UX
 
 1. **Login** — region; Sign in with browser / in-app browser; optional password + SMS (parity with running-log).
-2. **Clock** — dominant circular four-sector dial; pointer; current sector title; wake time + elapsed; Sync + Sign out.
+2. **Clock** — dominant circular four-sector dial; pointer; sunrise (sun) / sunset (moon) pictograms outside the rim when in range; current sector title; wake time + elapsed; Sync + Sign out.
 3. Empty / error: not signed in → login; signed in but no wake yet → prompt to sync; sync failure message.
 
 Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, jewel tones per sector). Not Material purple defaults; not a marketing landing.
@@ -110,9 +134,10 @@ Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, 
 1. With a valid Xiaomi Fitness account that has recent sleep with `wake_up_time`, Sync stores wake and the clock advances from that instant.
 2. At elapsed ≥ 16h the pointer stays at the 16h / 12-o’clock freeze point.
 3. Four sectors are visually distinct and labeled; active sector is highlighted.
-4. Unit tests cover clock clamping, sector selection, sleep JSON wake extraction, and same-day section notification planning (messages, skip past / after day-end).
+4. Unit tests cover clock clamping, sector selection, sleep JSON wake extraction, same-day section notification planning (messages, skip past / after day-end), and offline sunrise/sunset (±1 min vs known civil times) plus dial mapping via `ZoneId`.
 5. Release APK builds with the monorepo sideload keystore.
 6. After first open + sync of the day with a known wake, remaining sector boundaries that fall before local midnight are scheduled; wake+16h uses `Пора спать`.
+7. With cached/user coordinates and a wake inside daylight hours, sunset (and sunrise if after wake) markers appear outside the dial at the matching pointer angles.
 
 ## Attribution / risk
 

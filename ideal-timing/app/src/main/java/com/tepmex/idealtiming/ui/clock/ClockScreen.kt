@@ -43,12 +43,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tepmex.idealtiming.domain.ClockReading
+import com.tepmex.idealtiming.domain.DialSunMarkers
 import com.tepmex.idealtiming.domain.IdealClock
 import com.tepmex.idealtiming.ui.theme.Gold
 import com.tepmex.idealtiming.ui.theme.GoldBright
@@ -74,6 +76,7 @@ data class ClockUiState(
     val syncing: Boolean = false,
     val statusMessage: String? = null,
     val error: String? = null,
+    val sunMarkers: DialSunMarkers? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -185,6 +188,7 @@ fun ClockScreen(
                     Spacer(Modifier.height(8.dp))
                     IdealDayDial(
                         reading = reading,
+                        sunMarkers = state.sunMarkers,
                         modifier = Modifier
                             .fillMaxWidth(0.92f)
                             .aspectRatio(1f),
@@ -258,6 +262,7 @@ private fun formatElapsed(sec: Long): String {
 @Composable
 fun IdealDayDial(
     reading: ClockReading,
+    sunMarkers: DialSunMarkers? = null,
     modifier: Modifier = Modifier,
 ) {
     val pointer = remember { Animatable(IdealClock.pointerDegrees(reading.progress)) }
@@ -286,13 +291,24 @@ fun IdealDayDial(
         ),
         label = "activeGlow",
     )
+    val sunRayPulse by shimmer.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "sunRayPulse",
+    )
 
     Canvas(modifier = modifier) {
         val side = min(size.width, size.height)
         val cx = size.width / 2f
         val cy = size.height / 2f
-        val outer = side * 0.46f
+        // Leave rim room for sun / moon pictograms outside the gold circle.
+        val outer = side * 0.40f
         val ring = side * 0.035f
+        val markerRadius = outer + ring * 2.35f
         val sectorColors = listOf(Sector1, Sector2, Sector3, Sector4)
 
         // Outer parchment disc
@@ -368,7 +384,6 @@ fun IdealDayDial(
         }
 
         // Sector numbers near mid-arc
-        // (drawn as small gold discs with implied positions)
         for (i in 0 until 4) {
             val mid = -90.0 + i * 90.0 + 45.0
             val rad = Math.toRadians(mid)
@@ -391,6 +406,18 @@ fun IdealDayDial(
             center = Offset(cx - outer * 0.02f, cy - outer * 0.025f),
         )
 
+        // Sunrise / sunset pictograms outside the rim at dial angles the hand reaches.
+        sunMarkers?.sunriseProgress?.let { progress ->
+            val deg = IdealClock.pointerDegrees(progress)
+            val center = polarOffset(cx, cy, markerRadius, deg)
+            drawSunrisePictogram(center, outer * 0.085f, sunRayPulse)
+        }
+        sunMarkers?.sunsetProgress?.let { progress ->
+            val deg = IdealClock.pointerDegrees(progress)
+            val center = polarOffset(cx, cy, markerRadius, deg)
+            drawSunsetPictogram(center, outer * 0.085f)
+        }
+
         // Pointer (from center toward rim), 0 progress = 12 o’clock
         rotate(degrees = pointer.value, pivot = Offset(cx, cy)) {
             val tip = Offset(cx, cy - outer * 0.88f)
@@ -399,4 +426,84 @@ fun IdealDayDial(
             drawCircle(JewelBlue, radius = outer * 0.028f, center = tip)
         }
     }
+}
+
+/** Dial degrees clockwise from 12 o’clock → canvas offset. */
+private fun polarOffset(cx: Float, cy: Float, radius: Float, dialDegrees: Float): Offset {
+    val rad = Math.toRadians(dialDegrees.toDouble() - 90.0)
+    return Offset(
+        cx + cos(rad).toFloat() * radius,
+        cy + sin(rad).toFloat() * radius,
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSunrisePictogram(
+    center: Offset,
+    disk: Float,
+    rayPulse: Float,
+) {
+    val sunCore = Color(0xFFFFC107)
+    val sunHot = Color(0xFFFFF176)
+    val rayLen = disk * (1.35f + 0.25f * rayPulse)
+    for (i in 0 until 8) {
+        val rad = Math.toRadians(i * 45.0)
+        val inner = disk * 1.15f
+        val x1 = center.x + cos(rad).toFloat() * inner
+        val y1 = center.y + sin(rad).toFloat() * inner
+        val x2 = center.x + cos(rad).toFloat() * rayLen
+        val y2 = center.y + sin(rad).toFloat() * rayLen
+        drawLine(
+            color = sunCore.copy(alpha = 0.85f),
+            start = Offset(x1, y1),
+            end = Offset(x2, y2),
+            strokeWidth = disk * 0.22f,
+            cap = StrokeCap.Round,
+        )
+    }
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(sunHot, sunCore, Color(0xFFFF8F00)),
+            center = center,
+            radius = disk,
+        ),
+        radius = disk,
+        center = center,
+    )
+    drawCircle(Color.White.copy(alpha = 0.45f), radius = disk * 0.35f, center = Offset(center.x - disk * 0.25f, center.y - disk * 0.28f))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSunsetPictogram(
+    center: Offset,
+    disk: Float,
+) {
+    val moonFill = Color(0xFFE8EEF8)
+    val moonShade = Color(0xFF9AA8BC)
+    // Crescent via even-odd: full disk minus offset disk.
+    val crescent = Path().apply {
+        addOval(
+            androidx.compose.ui.geometry.Rect(
+                center.x - disk,
+                center.y - disk,
+                center.x + disk,
+                center.y + disk,
+            ),
+        )
+        addOval(
+            androidx.compose.ui.geometry.Rect(
+                center.x - disk * 0.35f,
+                center.y - disk * 1.05f,
+                center.x + disk * 1.45f,
+                center.y + disk * 0.95f,
+            ),
+        )
+        fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
+    }
+    drawPath(
+        path = crescent,
+        brush = Brush.radialGradient(
+            colors = listOf(Color.White, moonFill, moonShade),
+            center = Offset(center.x - disk * 0.2f, center.y - disk * 0.15f),
+            radius = disk * 1.2f,
+        ),
+    )
 }

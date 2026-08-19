@@ -9,7 +9,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tepmex.idealtiming.ui.clock.ClockScreen
 import com.tepmex.idealtiming.ui.login.LoginScreen
@@ -27,6 +30,13 @@ fun IdealTimingAppShell(
     val login by vm.login.collectAsStateWithLifecycle()
     val clock by vm.clock.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(vm, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            vm.onLocationPermissionChanged()
+        }
+    }
 
     val webLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -90,7 +100,7 @@ fun IdealTimingAppShell(
     } else {
         ClockScreen(
             state = clock,
-            onSync = vm::sync,
+            onSync = { vm.sync() },
             onSignOut = vm::signOut,
             onMessageConsumed = vm::consumeClockMessage,
             modifier = modifier.fillMaxSize(),
