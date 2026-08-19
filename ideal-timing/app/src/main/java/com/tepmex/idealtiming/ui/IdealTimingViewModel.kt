@@ -3,8 +3,12 @@ package com.tepmex.idealtiming.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.tepmex.idealtiming.data.DeviceLocationSource
 import com.tepmex.idealtiming.data.IdealTimingRepository
+import com.tepmex.idealtiming.domain.DialSunMarkers
+import com.tepmex.idealtiming.domain.GeoPoint
 import com.tepmex.idealtiming.domain.IdealClock
+import com.tepmex.idealtiming.domain.SunCalculator
 import com.tepmex.idealtiming.mi.AuthException
 import com.tepmex.idealtiming.mi.BrowserLoginCancelledException
 import com.tepmex.idealtiming.mi.BrowserLoginSession
@@ -16,6 +20,7 @@ import com.tepmex.idealtiming.notification.SectionNotificationScheduler
 import com.tepmex.idealtiming.ui.clock.ClockUiState
 import com.tepmex.idealtiming.ui.login.LoginStep
 import com.tepmex.idealtiming.ui.login.LoginUiState
+import java.time.ZoneId
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,6 +40,8 @@ sealed interface LoginNavEvent {
 class IdealTimingViewModel(
     private val repository: IdealTimingRepository,
     private val sectionNotifications: SectionNotificationScheduler,
+    private val locationSource: DeviceLocationSource,
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private val _signedIn = MutableStateFlow(repository.isSignedIn())
     val signedIn = _signedIn.asStateFlow()
@@ -45,6 +52,8 @@ class IdealTimingViewModel(
     private val _nav = MutableSharedFlow<LoginNavEvent>(extraBufferCapacity = 4)
     val navEvents = _nav.asSharedFlow()
 
+    private var location: GeoPoint? = locationSource.cached()
+
     private val _clock = MutableStateFlow(buildClockState())
     val clock = _clock.asStateFlow()
 
@@ -54,6 +63,7 @@ class IdealTimingViewModel(
 
     init {
         startTicker()
+        refreshLocation()
         if (_signedIn.value) {
             onSignedInSessionStart()
         }
@@ -71,6 +81,26 @@ class IdealTimingViewModel(
         }
     }
 
+    private fun refreshLocation() {
+        viewModelScope.launch {
+            location = locationSource.resolve() ?: location
+            _clock.update { cur ->
+                cur.copy(sunMarkers = computeSunMarkers())
+            }
+        }
+    }
+
+    /** Call after the user grants location permission so markers can appear. */
+    fun onLocationPermissionChanged() {
+        refreshLocation()
+    }
+
+    private fun computeSunMarkers(): DialSunMarkers? {
+        val wake = repository.currentWake()?.wakeEpochSec ?: return null
+        val point = location ?: return null
+        return SunCalculator.dialMarkers(wake, point, zoneId)
+    }
+
     private fun buildClockState(
         syncing: Boolean = false,
         statusMessage: String? = null,
@@ -86,6 +116,7 @@ class IdealTimingViewModel(
             syncing = syncing,
             statusMessage = statusMessage,
             error = error,
+            sunMarkers = computeSunMarkers(),
         )
     }
 
@@ -100,6 +131,7 @@ class IdealTimingViewModel(
                         reading = snap?.let { IdealClock.reading(it.wakeEpochSec, now) },
                         syncedAtEpochSec = snap?.syncedAtEpochSec ?: cur.syncedAtEpochSec,
                         sleepScore = snap?.sleepScore ?: cur.sleepScore,
+                        sunMarkers = computeSunMarkers(),
                     )
                 }
                 delay(30_000)
@@ -307,6 +339,7 @@ class IdealTimingViewModel(
     fun sync(scheduleAfter: Boolean = true) {
         viewModelScope.launch {
             _clock.update { it.copy(syncing = true, error = null, statusMessage = null) }
+            location = locationSource.resolve() ?: location
             try {
                 val result = repository.syncWake()
                 _clock.value = buildClockState(
@@ -317,7 +350,13 @@ class IdealTimingViewModel(
                     scheduleSectionNotifications()
                 }
             } catch (e: AuthException) {
-                _clock.update { it.copy(syncing = false, error = e.message) }
+                _clock.update {
+                    it.copy(
+                        syncing = false,
+                        error = e.message,
+                        sunMarkers = computeSunMarkers(),
+                    )
+                }
                 if (e.message?.contains("Not signed in", ignoreCase = true) == true) {
                     _signedIn.value = false
                 }
@@ -326,7 +365,13 @@ class IdealTimingViewModel(
                     scheduleSectionNotifications()
                 }
             } catch (e: Exception) {
-                _clock.update { it.copy(syncing = false, error = e.message ?: "Sync failed") }
+                _clock.update {
+                    it.copy(
+                        syncing = false,
+                        error = e.message ?: "Sync failed",
+                        sunMarkers = computeSunMarkers(),
+                    )
+                }
                 if (scheduleAfter && repository.currentWake() != null) {
                     scheduleSectionNotifications()
                 }
@@ -351,11 +396,12 @@ class IdealTimingViewModel(
 class IdealTimingViewModelFactory(
     private val repository: IdealTimingRepository,
     private val sectionNotifications: SectionNotificationScheduler,
+    private val locationSource: DeviceLocationSource,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(IdealTimingViewModel::class.java)) {
-            return IdealTimingViewModel(repository, sectionNotifications) as T
+            return IdealTimingViewModel(repository, sectionNotifications, locationSource) as T
         }
         throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
     }
