@@ -29,7 +29,7 @@ Open the app → sync wake time from Mi Fitness → read which of the four 4-hou
 9. Show **sunrise** and **sunset** markers on the dial, calculated **offline** from the user’s geographic coordinates:
    - Official rise/set = sun center altitude **−0.833°** (NOAA / USNO refraction + solar-disk zenith `90.833°`).
    - Convert civil-day events with the device **`ZoneId`** (`ZoneId.systemDefault()`).
-   - Map each event onto the 16-hour dial relative to wake; only events inside `[wake, wake+16h]` are drawn.
+   - Map each event onto the 16-hour dial relative to wake; only events inside `[wake, wake+16h]` are drawn. If sunrise or sunset falls outside that window, **omit that icon entirely** (do not clamp or place it at the rim).
    - Pictograms sit **outside** the gold rim at the angle the pointer would reach: bright sun for sunrise, moon crescent for sunset.
    - Coarse/fine location permission; last fix cached for offline use. No markers when coords are unavailable or polar day/night omits the event.
 

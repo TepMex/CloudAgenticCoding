@@ -57,6 +57,26 @@ class SunCalculatorTest {
     }
 
     @Test
+    fun dialMarkersOmitSunriseBeforeWake() {
+        // Wake 07:00 MSK — sunrise ~03:44 is outside the dial → no sun icon
+        val wake = ZonedDateTime.of(2024, 6, 21, 7, 0, 0, 0, moscowZone).toEpochSecond()
+        val markers = SunCalculator.dialMarkers(wake, moscow, moscowZone)
+        assertNull(markers.sunriseProgress)
+        assertNull(markers.sunriseEpochSec)
+        assertNotNull(markers.sunsetProgress)
+    }
+
+    @Test
+    fun dialMarkersOmitSunsetAfterSixteenHours() {
+        // Wake 03:00 MSK — dial ends 19:00; sunset ~21:18 is past wake+16h → no moon icon
+        val wake = ZonedDateTime.of(2024, 6, 21, 3, 0, 0, 0, moscowZone).toEpochSecond()
+        val markers = SunCalculator.dialMarkers(wake, moscow, moscowZone)
+        assertNotNull(markers.sunriseProgress)
+        assertNull(markers.sunsetProgress)
+        assertNull(markers.sunsetEpochSec)
+    }
+
+    @Test
     fun dialMarkersMapSunsetOntoSixteenHourDay() {
         // Wake 07:00 MSK → sunset ~21:18 is ~14h18m → progress ≈ 14.3/16
         val wake = ZonedDateTime.of(2024, 6, 21, 7, 0, 0, 0, moscowZone).toEpochSecond()

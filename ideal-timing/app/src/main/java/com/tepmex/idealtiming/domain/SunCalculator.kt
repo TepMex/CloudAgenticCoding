@@ -87,6 +87,7 @@ object SunCalculator {
 
     /**
      * Collect official rise/set instants that fall on the 16-hour dial starting at [wakeEpochSec].
+     * Events **before wake** or **after wake+16h** are omitted entirely (no icon).
      * Considers local calendar days that overlap the wake window (via [zoneId]).
      */
     fun dialMarkers(
