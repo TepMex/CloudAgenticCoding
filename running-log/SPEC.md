@@ -31,6 +31,12 @@
    - Compute arithmetic means over runs started in the **last 365 days** (valid values only: metric > 0).
    - On each journal row, color those two metric values **green** when better than the trailing-year average, **red** when worse (equal / missing → default color).
    - Better direction: **cadence higher** is better; **heartbits/km lower** is better (efficiency).
+9. **Copy prompt** action on the journal screen copies a paste-ready AI running-trainer consultation prompt to the clipboard:
+   - Includes the **newest 10** runs as human-readable **aggregates only** (no GPS track / HR time series / raw JSON).
+   - Per run: date, sport (Outdoor/Treadmill), distance, duration, pace (temp), avg/max HR, heartbits/km, cadence, VO₂ max, calories.
+   - Across those runs: total distance/duration/calories and average pace, HR, cadence, heartbits/km, VO₂ max.
+   - Also includes trailing 365-day cadence and heartbits/km averages for context.
+   - Snackbar confirms “Trainer prompt copied”.
 
 ## Interfaces
 
@@ -93,8 +99,9 @@ Mi Band → Xiaomi Fitness cloud → running-log → Room → Journal UI
 ## UI / UX
 
 1. **Login** — region; primary **Sign in with browser** / **Sign in with in-app browser**; optional password form; SMS sub-step when required.
-2. **Journal** — newest-first list of runs with the seven metrics (incl. VO₂ max); cadence and heartbits/km colored vs trailing-year averages; top bar Sync + overflow Sign out.
+2. **Journal** — newest-first list of runs with the seven metrics (incl. VO₂ max); cadence and heartbits/km colored vs trailing-year averages; top bar **Copy prompt** + Sync + overflow (Copy prompt, Sign out).
 3. Empty states: not signed in → login; signed in with no runs → prompt to sync.
+4. **Copy prompt** — clipboard text suitable for pasting into ChatGPT / similar for running-coach consultation (last 10 run aggregates + trailing-year context).
 
 Visual direction: trail/forest light theme (deep green + warm stone), not Material purple defaults. Utility journal (not a marketing landing).
 
@@ -113,8 +120,9 @@ Visual direction: trail/forest light theme (deep green + warm stone), not Materi
 2. Journal rows show date, distance, temp, avg bpm, heartbits/km, cadence, and VO₂ max with the formulas above.
 3. Cadence and heartbits/km values are green when better than the last-365-day mean, red when worse (cadence ↑ better; heartbits/km ↓ better).
 4. Non-running sport types are not listed.
-5. Unit tests cover crypto round-trip, sport JSON parsing, running filter, metric formulas (incl. VO₂ max prefer-cloud / ACSM-HR fallback), and trailing-year average / comparison.
-6. Release APK builds with the monorepo sideload keystore.
+5. Copy prompt places a human-readable trainer consultation prompt (last ≤10 run aggregates + trailing-year averages) on the clipboard.
+6. Unit tests cover crypto round-trip, sport JSON parsing, running filter, metric formulas (incl. VO₂ max prefer-cloud / ACSM-HR fallback), trailing-year average / comparison, and trainer-prompt formatting (limit 10, aggregates only).
+7. Release APK builds with the monorepo sideload keystore.
 
 ## Attribution / risk
 
