@@ -32,6 +32,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `pair-comp-elo` | [pair-comp-elo](https://tepmex.github.io/CloudAgenticCoding/pair-comp-elo/) | Pair Comp Elo · pairwise ranking with Elo + decay (APK) |
 | `running-log` | [running-log](https://tepmex.github.io/CloudAgenticCoding/running-log/) | running-log · Mi Band running journal (APK) |
 | `ideal-timing` | [ideal-timing](https://tepmex.github.io/CloudAgenticCoding/ideal-timing/) | ideal-timing · 16h day clock from Mi Fitness wake-up (APK) |
+| `china-railways-map` | [china-railways-map](https://tepmex.github.io/CloudAgenticCoding/china_rail_interactive_map.html) | Chinese Railways map with pinyin and hanzi |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
