@@ -1,5 +1,6 @@
 package com.tepmex.runninglog.ui.journal
 
+import android.content.ClipData
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,20 +38,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 import com.tepmex.runninglog.data.RunningActivityEntity
 import com.tepmex.runninglog.domain.MetricVsAverage
+import com.tepmex.runninglog.domain.RunSummaryForPrompt
 import com.tepmex.runninglog.domain.RunningMetrics
+import com.tepmex.runninglog.domain.TrainerConsultationPrompt
 import com.tepmex.runninglog.domain.TrailingYearAverages
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 private val BetterGreen = Color(0xFF1B7A4A)
 private val WorseRed = Color(0xFFB53A2E)
@@ -76,6 +84,21 @@ fun JournalScreen(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+
+    fun copyTrainerPrompt() {
+        val prompt = TrainerConsultationPrompt.build(
+            runsNewestFirst = state.activities.map { it.toPromptSummary() },
+            trailingYearAverages = state.trailingYearAverages,
+        )
+        scope.launch {
+            clipboard.setClipEntry(
+                ClipEntry(ClipData.newPlainText("running trainer prompt", prompt)),
+            )
+            snackbarHostState.showSnackbar("Trainer prompt copied")
+        }
+    }
 
     LaunchedEffect(state.statusMessage, state.error) {
         val message = state.error ?: state.statusMessage
@@ -111,6 +134,9 @@ fun JournalScreen(
                             strokeWidth = 2.dp,
                         )
                     }
+                    IconButton(onClick = ::copyTrainerPrompt) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy prompt")
+                    }
                     IconButton(onClick = onSync, enabled = !state.syncing) {
                         Icon(Icons.Default.Sync, contentDescription = "Sync")
                     }
@@ -118,6 +144,16 @@ fun JournalScreen(
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Copy prompt") },
+                            leadingIcon = {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            },
+                            onClick = {
+                                menuOpen = false
+                                copyTrainerPrompt()
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("Sign out") },
                             leadingIcon = {
@@ -242,6 +278,20 @@ private fun RunRow(run: RunningActivityEntity, averages: TrailingYearAverages) {
         )
     }
 }
+
+private fun RunningActivityEntity.toPromptSummary() = RunSummaryForPrompt(
+    startTimeEpochSec = startTimeEpochSec,
+    sportType = sportType,
+    durationSec = durationSec,
+    distanceMeters = distanceMeters,
+    paceSecPerKm = paceSecPerKm,
+    avgBpm = avgBpm,
+    maxBpm = maxBpm,
+    heartbitsPerKm = heartbitsPerKm,
+    cadenceSpm = cadenceSpm,
+    vo2MaxMlKgMin = vo2MaxMlKgMin,
+    calories = calories,
+)
 
 @Composable
 private fun MetricLine(
