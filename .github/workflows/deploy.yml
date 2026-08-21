@@ -658,6 +658,9 @@ jobs:
             shopt -u dotglob
           fi
 
+          # Static single-file pages at site root (README live URL)
+          cp china_rail_interactive_map.html deploy/china_rail_interactive_map.html
+
           require_dir() {
             local name="$1"
             if [[ ! -d "deploy/$name" ]] || [[ -z "$(ls -A "deploy/$name" 2>/dev/null || true)" ]]; then
