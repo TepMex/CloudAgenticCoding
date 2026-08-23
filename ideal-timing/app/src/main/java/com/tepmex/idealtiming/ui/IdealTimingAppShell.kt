@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tepmex.idealtiming.nfc.NfcForegroundCheckIn
 import com.tepmex.idealtiming.ui.clock.ClockScreen
 import com.tepmex.idealtiming.ui.login.LoginScreen
 import com.tepmex.idealtiming.ui.login.XiaomiAuthWebActivity
@@ -98,6 +99,7 @@ fun IdealTimingAppShell(
             modifier = modifier.fillMaxSize(),
         )
     } else {
+        NfcForegroundCheckIn(onTag = vm::onPhysicalCheckIn)
         ClockScreen(
             state = clock,
             onSync = { vm.sync() },

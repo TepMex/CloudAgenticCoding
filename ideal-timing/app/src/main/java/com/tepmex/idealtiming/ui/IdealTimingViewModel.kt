@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.idealtiming.data.DeviceLocationSource
 import com.tepmex.idealtiming.data.IdealTimingRepository
+import com.tepmex.idealtiming.data.NfcCheckInStore
 import com.tepmex.idealtiming.domain.DailyCues
 import com.tepmex.idealtiming.domain.DialCueMarkers
 import com.tepmex.idealtiming.domain.DialSunMarkers
 import com.tepmex.idealtiming.domain.GeoPoint
 import com.tepmex.idealtiming.domain.IdealClock
+import com.tepmex.idealtiming.domain.NfcCheckInStamp
 import com.tepmex.idealtiming.domain.SunCalculator
 import com.tepmex.idealtiming.mi.AuthException
 import com.tepmex.idealtiming.mi.BrowserLoginCancelledException
@@ -43,6 +45,7 @@ class IdealTimingViewModel(
     private val repository: IdealTimingRepository,
     private val sectionNotifications: SectionNotificationScheduler,
     private val locationSource: DeviceLocationSource,
+    private val nfcCheckInStore: NfcCheckInStore,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private val _signedIn = MutableStateFlow(repository.isSignedIn())
@@ -108,6 +111,34 @@ class IdealTimingViewModel(
         return DailyCues.markers(wake, zoneId)
     }
 
+    private fun nfcCheckInProgress(nowEpochSec: Long): Float? =
+        NfcCheckInStamp.progressForToday(nfcCheckInStore.load(), nowEpochSec, zoneId)
+
+    /**
+     * Physical check-in: any NFC tag while the clock is on screen stamps the
+     * current pointer angle for the rest of the local calendar day.
+     *
+     * @return true when this tap created today's stamp (for haptic feedback).
+     */
+    fun onPhysicalCheckIn(): Boolean {
+        val wake = repository.currentWake()?.wakeEpochSec ?: return false
+        val now = System.currentTimeMillis() / 1000L
+        val existing = nfcCheckInStore.load()
+        val stamped = NfcCheckInStamp.apply(existing, wake, now, zoneId)
+        if (existing != null && stamped === existing) {
+            return false
+        }
+        nfcCheckInStore.save(stamped)
+        _clock.update {
+            it.copy(
+                nfcCheckInProgress = stamped.progress,
+                statusMessage = "Check-in",
+                error = null,
+            )
+        }
+        return true
+    }
+
     private fun buildClockState(
         syncing: Boolean = false,
         statusMessage: String? = null,
@@ -125,6 +156,7 @@ class IdealTimingViewModel(
             error = error,
             sunMarkers = computeSunMarkers(),
             cueMarkers = computeCueMarkers(),
+            nfcCheckInProgress = nfcCheckInProgress(now),
         )
     }
 
@@ -141,6 +173,7 @@ class IdealTimingViewModel(
                         sleepScore = snap?.sleepScore ?: cur.sleepScore,
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
+                        nfcCheckInProgress = nfcCheckInProgress(now),
                     )
                 }
                 delay(30_000)
@@ -365,6 +398,7 @@ class IdealTimingViewModel(
                         error = e.message,
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
+                        nfcCheckInProgress = nfcCheckInProgress(System.currentTimeMillis() / 1000L),
                     )
                 }
                 if (e.message?.contains("Not signed in", ignoreCase = true) == true) {
@@ -381,6 +415,7 @@ class IdealTimingViewModel(
                         error = e.message ?: "Sync failed",
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
+                        nfcCheckInProgress = nfcCheckInProgress(System.currentTimeMillis() / 1000L),
                     )
                 }
                 if (scheduleAfter && repository.currentWake() != null) {
@@ -408,11 +443,17 @@ class IdealTimingViewModelFactory(
     private val repository: IdealTimingRepository,
     private val sectionNotifications: SectionNotificationScheduler,
     private val locationSource: DeviceLocationSource,
+    private val nfcCheckInStore: NfcCheckInStore,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(IdealTimingViewModel::class.java)) {
-            return IdealTimingViewModel(repository, sectionNotifications, locationSource) as T
+            return IdealTimingViewModel(
+                repository,
+                sectionNotifications,
+                locationSource,
+                nfcCheckInStore,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
     }

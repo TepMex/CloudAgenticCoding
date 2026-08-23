@@ -42,6 +42,12 @@ Open the app → sync wake time from Mi Fitness → read which of the four 4-hou
     - wake+11h: `пора ужинать`
 12. **Dog-walk pictogram** (pet dog — floppy ears and collar, not an `@` glyph) at **19:00 local wall-clock**, mapped onto the 16-hour dial the same way as sunrise/sunset. Omit the icon when 19:00 falls outside `[wake, wake+16h]`.
 13. **Dog-walk notification** at 19:00 local time on the current calendar day (if still in the future and before local midnight): `время погулять с собакой`.
+14. **NFC physical check-in** while the clock screen is in the foreground:
+    - Scanning **any** NFC tag (payload ignored) stamps a **running-person** pictogram at the **current pointer angle**.
+    - The pictogram is drawn **behind** the watch face (z-order under the parchment disc) so it peeks out at that angle.
+    - First successful check-in of the **local calendar day** is fixed; later taps the same day do not move it.
+    - Next local date: stamp is no longer drawn until a new tap.
+    - Requires a known wake (so the pointer exists). No check-in when the app is not in the foreground. NFC hardware is optional.
 
 ### Sector map (relative to wake = 0h, clockwise from 12 o’clock)
 
@@ -113,6 +119,16 @@ Dog walk is **not** “19 hours after wake”: it uses `LocalTime.of(19, 0)` in 
 | Dinner | `11h / 16h` |
 | Dog walk | `(19:00 local − wake) / 16h` when in range; else omit |
 
+### NFC physical check-in
+
+| Concept | Rule |
+|---------|------|
+| Trigger | Any NFC tag via `NfcAdapter.enableReaderMode` while the signed-in clock activity is resumed |
+| Stamp | `IdealClock.reading(wake, now).progress` at tap time |
+| Persistence | Local calendar date (`ZoneId.systemDefault()`) + progress; first tap of the day wins |
+| Draw | Running-person pictogram behind the parchment disc at `pointerDegrees(progress)` |
+| Next day | `progressForToday` returns null until a new tap |
+
 ## Data model
 
 ### AuthToken (encrypted prefs)
@@ -136,10 +152,18 @@ Same fields as running-log: `userId`, `cUserId`, `serviceToken`, `ssecurity`, `p
 | longitude_deg | FLOAT | Last known WGS84 longitude (east+) |
 | updated_at_epoch_sec | LONG | When the cache was written |
 
+### NFC check-in (plain prefs)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| local_date | TEXT | ISO local date (`YYYY-MM-DD`) of the stamp |
+| progress | FLOAT | Dial progress `0…1` at the first tap that day |
+| checked_in_epoch_sec | LONG | Unix seconds of that tap |
+
 ## UI / UX
 
 1. **Login** — region; Sign in with browser / in-app browser; optional password + SMS (parity with running-log).
-2. **Clock** — dominant circular four-sector dial; pointer; sunrise (sun) / sunset (moon) pictograms outside the rim when in range; hamburger meal pictograms on the face at wake+30m / +6h / +11h; pet-dog pictogram outside the rim at 19:00 local when that instant is on the dial; current sector title; wake time + elapsed; Sync + Sign out.
+2. **Clock** — dominant circular four-sector dial; pointer; sunrise (sun) / sunset (moon) pictograms outside the rim when in range; hamburger meal pictograms on the face at wake+30m / +6h / +11h; pet-dog pictogram outside the rim at 19:00 local when that instant is on the dial; running-person pictogram peeking from **behind** the face at today’s NFC check-in angle (if any); current sector title; wake time + elapsed; Sync + Sign out.
 3. Empty / error: not signed in → login; signed in but no wake yet → prompt to sync; sync failure message.
 
 Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, jewel tones per sector). Not Material purple defaults; not a marketing landing.
@@ -153,18 +177,20 @@ Visual direction: parchment / RPG map clock (aged paper, gold filigree accents, 
 - Sleep stage charts or health dashboards
 - Multi-account / family relative browsing
 - Play Store distribution (sideload APK via GitHub Pages)
+- NFC check-in when the app is not in the foreground; tag-payload routing; launching the app from a tag
 
 ## Acceptance criteria
 
 1. With a valid Xiaomi Fitness account that has recent sleep with `wake_up_time`, Sync stores wake and the clock advances from that instant.
 2. At elapsed ≥ 16h the pointer stays at the 16h / 12-o’clock freeze point.
 3. Four sectors are visually distinct and labeled; active sector is highlighted.
-4. Unit tests cover clock clamping, sector selection, sleep JSON wake extraction, same-day cue notification planning (sectors, meals, 19:00 dog walk; skip past / after day-end), meal progress on the 16h dial, dog-walk wall-clock mapping (including omit when 19:00 is off the dial), and offline sunrise/sunset (±1 min vs known civil times) plus dial mapping via `ZoneId`.
+4. Unit tests cover clock clamping, sector selection, sleep JSON wake extraction, same-day cue notification planning (sectors, meals, 19:00 dog walk; skip past / after day-end), meal progress on the 16h dial, dog-walk wall-clock mapping (including omit when 19:00 is off the dial), offline sunrise/sunset (±1 min vs known civil times) plus dial mapping via `ZoneId`, and NFC check-in stamping (pointer progress at tap, first-of-day freeze, next local date is a new stamp, yesterday not drawn).
 5. Release APK builds with the monorepo sideload keystore.
 6. After first open + sync of the day with a known wake, remaining sector boundaries that fall before local midnight are scheduled; wake+16h uses `Пора спать`.
 7. With cached/user coordinates and a wake inside daylight hours, sunset (and sunrise if after wake) markers appear outside the dial at the matching pointer angles.
 8. With a known wake, three hamburger meal icons sit at wake+30m / +6h / +11h; a pet-dog icon sits at 19:00 local when that time is inside the 16h window.
 9. Remaining same-day meal and 19:00 dog-walk fires are scheduled with the exact messages `пора завтракать` / `пора обедать` / `пора ужинать` / `время погулять с собакой`.
+10. With the clock screen resumed and a known wake, scanning any NFC tag stamps a running-person icon behind the dial at the current pointer angle; a second tap the same local day leaves that angle unchanged; after local midnight the icon is gone until a new tap.
 
 ## Attribution / risk
 
