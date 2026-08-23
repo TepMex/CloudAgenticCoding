@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
             repository = app.repository,
             sectionNotifications = app.sectionNotifications,
             locationSource = app.locationSource,
+            nfcCheckInStore = app.nfcCheckInStore,
         )
         setContent {
             IdealTimingTheme {

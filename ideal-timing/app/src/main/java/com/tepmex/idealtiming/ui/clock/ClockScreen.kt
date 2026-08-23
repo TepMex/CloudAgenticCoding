@@ -79,6 +79,8 @@ data class ClockUiState(
     val error: String? = null,
     val sunMarkers: DialSunMarkers? = null,
     val cueMarkers: DialCueMarkers? = null,
+    /** Dial progress of today's NFC physical check-in, or null if none yet. */
+    val nfcCheckInProgress: Float? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -192,6 +194,7 @@ fun ClockScreen(
                         reading = reading,
                         sunMarkers = state.sunMarkers,
                         cueMarkers = state.cueMarkers,
+                        nfcCheckInProgress = state.nfcCheckInProgress,
                         modifier = Modifier
                             .fillMaxWidth(0.92f)
                             .aspectRatio(1f),
@@ -267,6 +270,7 @@ fun IdealDayDial(
     reading: ClockReading,
     sunMarkers: DialSunMarkers? = null,
     cueMarkers: DialCueMarkers? = null,
+    nfcCheckInProgress: Float? = null,
     modifier: Modifier = Modifier,
 ) {
     val pointer = remember { Animatable(IdealClock.pointerDegrees(reading.progress)) }
@@ -312,8 +316,18 @@ fun IdealDayDial(
         // Leave rim room for sun / moon pictograms outside the gold circle.
         val outer = side * 0.40f
         val ring = side * 0.035f
+        val parchmentRadius = outer + ring * 1.6f
         val markerRadius = outer + ring * 2.35f
         val sectorColors = listOf(Sector1, Sector2, Sector3, Sector4)
+
+        // NFC check-in runner sits *behind* the parchment disc, at the angle the
+        // pointer held when the tag was scanned. Inner half is covered by the face.
+        nfcCheckInProgress?.let { progress ->
+            val deg = IdealClock.pointerDegrees(progress)
+            val runnerUnit = outer * 0.12f
+            val behindRadius = parchmentRadius + runnerUnit * 0.28f
+            drawRunnerPictogram(polarOffset(cx, cy, behindRadius, deg), runnerUnit)
+        }
 
         // Outer parchment disc
         drawCircle(
@@ -322,7 +336,7 @@ fun IdealDayDial(
                 center = Offset(cx, cy),
                 radius = outer * 1.15f,
             ),
-            radius = outer + ring * 1.6f,
+            radius = parchmentRadius,
             center = Offset(cx, cy),
         )
 
@@ -685,4 +699,107 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDogPictogram(
     drawCircle(nose, radius = unit * 0.045f, center = Offset(x - unit * 0.20f, y - unit * 0.47f))
     drawCircle(nose, radius = unit * 0.08f, center = Offset(x - unit * 0.02f, y - unit * 0.32f))
     drawCircle(Color.White.copy(alpha = 0.45f), radius = unit * 0.03f, center = Offset(x - unit * 0.04f, y - unit * 0.34f))
+}
+
+/**
+ * Side-view running person, drawn upright so the figure stays readable at any dial angle.
+ * Placed behind the parchment disc; the outer half peeks out at the check-in angle.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRunnerPictogram(
+    center: Offset,
+    unit: Float,
+) {
+    val skin = Color(0xFFC68642)
+    val hair = Color(0xFF3E2723)
+    val shirt = JewelBlue
+    val shorts = Color(0xFF2A2118)
+    val shoe = Color(0xFF1A120C)
+    val x = center.x
+    val y = center.y
+
+    drawCircle(Color(0xFFF6EBD2).copy(alpha = 0.62f), radius = unit * 1.7f, center = center)
+
+    // Motion streaks behind the runner (left).
+    drawLine(
+        color = Ink.copy(alpha = 0.28f),
+        start = Offset(x - unit * 1.35f, y - unit * 0.15f),
+        end = Offset(x - unit * 0.75f, y - unit * 0.05f),
+        strokeWidth = unit * 0.08f,
+        cap = StrokeCap.Round,
+    )
+    drawLine(
+        color = Ink.copy(alpha = 0.22f),
+        start = Offset(x - unit * 1.28f, y + unit * 0.12f),
+        end = Offset(x - unit * 0.72f, y + unit * 0.18f),
+        strokeWidth = unit * 0.07f,
+        cap = StrokeCap.Round,
+    )
+
+    val backLeg = Path().apply {
+        moveTo(x - unit * 0.08f, y + unit * 0.18f)
+        quadraticTo(x - unit * 0.55f, y + unit * 0.35f, x - unit * 0.85f, y + unit * 0.85f)
+        lineTo(x - unit * 0.62f, y + unit * 0.90f)
+        quadraticTo(x - unit * 0.32f, y + unit * 0.42f, x + unit * 0.08f, y + unit * 0.22f)
+        close()
+    }
+    drawPath(backLeg, skin)
+    drawOval(
+        color = shoe,
+        topLeft = Offset(x - unit * 1.05f, y + unit * 0.78f),
+        size = Size(unit * 0.42f, unit * 0.18f),
+    )
+
+    val frontLeg = Path().apply {
+        moveTo(x - unit * 0.02f, y + unit * 0.12f)
+        quadraticTo(x + unit * 0.22f, y + unit * 0.55f, x + unit * 0.55f, y + unit * 0.42f)
+        lineTo(x + unit * 0.82f, y + unit * 0.88f)
+        lineTo(x + unit * 0.62f, y + unit * 0.95f)
+        quadraticTo(x + unit * 0.18f, y + unit * 0.52f, x - unit * 0.12f, y + unit * 0.22f)
+        close()
+    }
+    drawPath(frontLeg, skin)
+    drawOval(
+        color = shoe,
+        topLeft = Offset(x + unit * 0.58f, y + unit * 0.82f),
+        size = Size(unit * 0.42f, unit * 0.18f),
+    )
+
+    val backArm = Path().apply {
+        moveTo(x - unit * 0.05f, y - unit * 0.22f)
+        quadraticTo(x - unit * 0.55f, y - unit * 0.05f, x - unit * 0.72f, y + unit * 0.28f)
+        lineTo(x - unit * 0.55f, y + unit * 0.34f)
+        quadraticTo(x - unit * 0.32f, y - unit * 0.02f, x + unit * 0.08f, y - unit * 0.12f)
+        close()
+    }
+    drawPath(backArm, skin)
+
+    drawOval(
+        color = shirt,
+        topLeft = Offset(x - unit * 0.28f, y - unit * 0.42f),
+        size = Size(unit * 0.52f, unit * 0.72f),
+    )
+    drawOval(
+        color = shorts,
+        topLeft = Offset(x - unit * 0.22f, y + unit * 0.12f),
+        size = Size(unit * 0.38f, unit * 0.28f),
+    )
+
+    val frontArm = Path().apply {
+        moveTo(x + unit * 0.12f, y - unit * 0.22f)
+        quadraticTo(x + unit * 0.48f, y - unit * 0.38f, x + unit * 0.78f, y - unit * 0.18f)
+        lineTo(x + unit * 0.70f, y - unit * 0.04f)
+        quadraticTo(x + unit * 0.38f, y - unit * 0.22f, x + unit * 0.05f, y - unit * 0.08f)
+        close()
+    }
+    drawPath(frontArm, skin)
+    drawCircle(skin, radius = unit * 0.09f, center = Offset(x + unit * 0.78f, y - unit * 0.12f))
+    drawCircle(skin, radius = unit * 0.09f, center = Offset(x - unit * 0.70f, y + unit * 0.30f))
+
+    drawCircle(skin, radius = unit * 0.22f, center = Offset(x + unit * 0.08f, y - unit * 0.58f))
+    drawOval(
+        color = hair,
+        topLeft = Offset(x - unit * 0.08f, y - unit * 0.80f),
+        size = Size(unit * 0.38f, unit * 0.28f),
+    )
+    drawCircle(Ink, radius = unit * 0.04f, center = Offset(x + unit * 0.16f, y - unit * 0.58f))
 }
