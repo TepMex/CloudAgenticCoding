@@ -13,13 +13,14 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.tepmex.idealtiming.MainActivity
 import com.tepmex.idealtiming.R
+import com.tepmex.idealtiming.domain.DailyCues
 import com.tepmex.idealtiming.domain.SectionNotification
 import com.tepmex.idealtiming.domain.SectionNotificationPlanner
 import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Schedules exact alarms for remaining section boundaries on the current local day.
+ * Schedules exact alarms for remaining same-day cues (sectors, meals, dog walk).
  */
 class SectionNotificationScheduler(
     private val context: Context,
@@ -32,10 +33,10 @@ class SectionNotificationScheduler(
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Section changes",
+            "Ideal day cues",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Ideal day sector transitions"
+            description = "Sector changes, meals, and dog walk"
         }
         manager.createNotificationChannel(channel)
     }
@@ -52,7 +53,7 @@ class SectionNotificationScheduler(
         ensureChannel()
         cancelAll()
         val dayEnd = localDate.plusDays(1).atStartOfDay(zoneId).toEpochSecond()
-        val plan = SectionNotificationPlanner.plan(wakeEpochSec, nowEpochSec, dayEnd)
+        val plan = SectionNotificationPlanner.plan(wakeEpochSec, nowEpochSec, dayEnd, zoneId)
         for (item in plan) {
             scheduleOne(item)
         }
@@ -72,7 +73,7 @@ class SectionNotificationScheduler(
         scheduledForDate() != today
 
     fun cancelAll() {
-        for (id in 1..ALARM_COUNT) {
+        for (id in 1..DailyCues.ALARM_ID_MAX) {
             val pi = pendingIntent(id, message = "", create = false) ?: continue
             alarmManager?.cancel(pi)
             pi.cancel()
@@ -119,7 +120,6 @@ class SectionNotificationScheduler(
         private const val PREFS = "ideal_timing_section_alarms"
         private const val KEY_SCHEDULED_DATE = "scheduled_local_date"
         private const val KEY_WAKE = "scheduled_wake_epoch"
-        private const val ALARM_COUNT = 4
 
         fun canPostNotifications(context: Context): Boolean =
             ContextCompat.checkSelfPermission(

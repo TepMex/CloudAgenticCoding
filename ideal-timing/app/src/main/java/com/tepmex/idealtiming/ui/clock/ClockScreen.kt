@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tepmex.idealtiming.domain.ClockReading
+import com.tepmex.idealtiming.domain.DialCueMarkers
 import com.tepmex.idealtiming.domain.DialSunMarkers
 import com.tepmex.idealtiming.domain.IdealClock
 import com.tepmex.idealtiming.ui.theme.Gold
@@ -77,6 +78,7 @@ data class ClockUiState(
     val statusMessage: String? = null,
     val error: String? = null,
     val sunMarkers: DialSunMarkers? = null,
+    val cueMarkers: DialCueMarkers? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -189,6 +191,7 @@ fun ClockScreen(
                     IdealDayDial(
                         reading = reading,
                         sunMarkers = state.sunMarkers,
+                        cueMarkers = state.cueMarkers,
                         modifier = Modifier
                             .fillMaxWidth(0.92f)
                             .aspectRatio(1f),
@@ -263,6 +266,7 @@ private fun formatElapsed(sec: Long): String {
 fun IdealDayDial(
     reading: ClockReading,
     sunMarkers: DialSunMarkers? = null,
+    cueMarkers: DialCueMarkers? = null,
     modifier: Modifier = Modifier,
 ) {
     val pointer = remember { Animatable(IdealClock.pointerDegrees(reading.progress)) }
@@ -418,6 +422,20 @@ fun IdealDayDial(
             drawSunsetPictogram(center, outer * 0.085f)
         }
 
+        // Meals sit on the face (wake+30m / +6h / +11h). Dog walk is 19:00 wall-clock
+        // and sits outside the rim so it stays distinct when it shares an angle with dinner.
+        val mealRadius = outer - ring * 1.4f
+        cueMarkers?.let { cues ->
+            val burger = outer * 0.078f
+            drawHamburgerPictogram(polarOffset(cx, cy, mealRadius, IdealClock.pointerDegrees(cues.breakfastProgress)), burger)
+            drawHamburgerPictogram(polarOffset(cx, cy, mealRadius, IdealClock.pointerDegrees(cues.lunchProgress)), burger)
+            drawHamburgerPictogram(polarOffset(cx, cy, mealRadius, IdealClock.pointerDegrees(cues.dinnerProgress)), burger)
+            cues.dogWalkProgress?.let { progress ->
+                val deg = IdealClock.pointerDegrees(progress)
+                drawDogPictogram(polarOffset(cx, cy, markerRadius, deg), outer * 0.10f)
+            }
+        }
+
         // Pointer (from center toward rim), 0 progress = 12 o’clock
         rotate(degrees = pointer.value, pivot = Offset(cx, cy)) {
             val tip = Offset(cx, cy - outer * 0.88f)
@@ -506,4 +524,165 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSunsetPictogram
             radius = disk * 1.2f,
         ),
     )
+}
+
+/** Stacked hamburger: buns, patty, cheese, lettuce — readable at dial-marker size. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHamburgerPictogram(
+    center: Offset,
+    unit: Float,
+) {
+    val bun = Color(0xFFE8A84A)
+    val bunDark = Color(0xFFC4842E)
+    val patty = Color(0xFF4E2A14)
+    val cheese = Color(0xFFFFC107)
+    val lettuce = Color(0xFF7CB342)
+    val sesame = Color(0xFFFFF8E1)
+    val w = unit * 1.15f
+    val x = center.x
+    val y = center.y
+
+    drawCircle(Color(0xFFF6EBD2).copy(alpha = 0.72f), radius = unit * 1.45f, center = center)
+
+    drawOval(
+        color = bunDark,
+        topLeft = Offset(x - w, y + unit * 0.28f),
+        size = Size(w * 2f, unit * 0.55f),
+    )
+    drawOval(
+        color = patty,
+        topLeft = Offset(x - w * 0.95f, y + unit * 0.08f),
+        size = Size(w * 1.9f, unit * 0.32f),
+    )
+    val cheesePath = Path().apply {
+        moveTo(x - w * 0.92f, y + unit * 0.04f)
+        lineTo(x + w * 0.92f, y - unit * 0.02f)
+        lineTo(x + w * 0.55f, y + unit * 0.22f)
+        lineTo(x + w * 0.15f, y + unit * 0.08f)
+        lineTo(x - w * 0.25f, y + unit * 0.24f)
+        close()
+    }
+    drawPath(cheesePath, cheese)
+    val lettucePath = Path().apply {
+        moveTo(x - w * 0.98f, y - unit * 0.02f)
+        quadraticTo(x - w * 0.55f, y - unit * 0.22f, x - w * 0.1f, y - unit * 0.04f)
+        quadraticTo(x + w * 0.35f, y - unit * 0.2f, x + w * 0.98f, y - unit * 0.02f)
+        quadraticTo(x + w * 0.4f, y + unit * 0.12f, x, y + unit * 0.02f)
+        quadraticTo(x - w * 0.45f, y + unit * 0.14f, x - w * 0.98f, y - unit * 0.02f)
+        close()
+    }
+    drawPath(lettucePath, lettuce)
+    drawOval(
+        color = bun,
+        topLeft = Offset(x - w, y - unit * 0.72f),
+        size = Size(w * 2f, unit * 0.95f),
+    )
+    drawOval(
+        color = Color(0xFFF3C36A),
+        topLeft = Offset(x - w * 0.72f, y - unit * 0.68f),
+        size = Size(w * 1.15f, unit * 0.42f),
+    )
+    val seeds = listOf(
+        Offset(x - w * 0.42f, y - unit * 0.38f),
+        Offset(x - w * 0.08f, y - unit * 0.48f),
+        Offset(x + w * 0.28f, y - unit * 0.36f),
+        Offset(x + w * 0.08f, y - unit * 0.22f),
+    )
+    for (seed in seeds) {
+        drawCircle(sesame, radius = unit * 0.07f, center = seed)
+    }
+}
+
+/**
+ * Sitting pet dog (floppy ears + collar) — not an @ glyph.
+ * Drawn upright so the animal stays readable at any dial angle.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDogPictogram(
+    center: Offset,
+    unit: Float,
+) {
+    val fur = Color(0xFFB07A43)
+    val furDark = Color(0xFF6D4C2F)
+    val belly = Color(0xFFE8D2B0)
+    val collar = Color(0xFFC62828)
+    val tag = Color(0xFFFFD54F)
+    val nose = Color(0xFF3E2723)
+    val x = center.x
+    val y = center.y
+
+    drawCircle(Color(0xFFF6EBD2).copy(alpha = 0.78f), radius = unit * 1.55f, center = center)
+
+    val tail = Path().apply {
+        moveTo(x + unit * 0.55f, y + unit * 0.15f)
+        quadraticTo(x + unit * 1.15f, y - unit * 0.05f, x + unit * 1.05f, y - unit * 0.55f)
+        quadraticTo(x + unit * 0.75f, y - unit * 0.15f, x + unit * 0.42f, y + unit * 0.05f)
+        close()
+    }
+    drawPath(tail, furDark)
+
+    drawOval(
+        color = fur,
+        topLeft = Offset(x - unit * 0.55f, y - unit * 0.05f),
+        size = Size(unit * 1.15f, unit * 0.95f),
+    )
+    drawOval(
+        color = belly,
+        topLeft = Offset(x - unit * 0.28f, y + unit * 0.12f),
+        size = Size(unit * 0.55f, unit * 0.62f),
+    )
+
+    drawOval(
+        color = furDark,
+        topLeft = Offset(x - unit * 0.62f, y + unit * 0.55f),
+        size = Size(unit * 0.32f, unit * 0.42f),
+    )
+    drawOval(
+        color = furDark,
+        topLeft = Offset(x + unit * 0.12f, y + unit * 0.55f),
+        size = Size(unit * 0.32f, unit * 0.42f),
+    )
+    drawOval(
+        color = fur,
+        topLeft = Offset(x - unit * 0.58f, y + unit * 0.82f),
+        size = Size(unit * 0.28f, unit * 0.16f),
+    )
+    drawOval(
+        color = fur,
+        topLeft = Offset(x + unit * 0.16f, y + unit * 0.82f),
+        size = Size(unit * 0.28f, unit * 0.16f),
+    )
+
+    drawCircle(fur, radius = unit * 0.42f, center = Offset(x - unit * 0.12f, y - unit * 0.42f))
+    drawOval(
+        color = belly,
+        topLeft = Offset(x - unit * 0.28f, y - unit * 0.38f),
+        size = Size(unit * 0.38f, unit * 0.28f),
+    )
+
+    val leftEar = Path().apply {
+        moveTo(x - unit * 0.48f, y - unit * 0.62f)
+        quadraticTo(x - unit * 0.85f, y - unit * 0.35f, x - unit * 0.42f, y - unit * 0.18f)
+        quadraticTo(x - unit * 0.28f, y - unit * 0.42f, x - unit * 0.48f, y - unit * 0.62f)
+        close()
+    }
+    val rightEar = Path().apply {
+        moveTo(x + unit * 0.18f, y - unit * 0.68f)
+        quadraticTo(x + unit * 0.52f, y - unit * 0.28f, x + unit * 0.12f, y - unit * 0.22f)
+        quadraticTo(x + unit * 0.02f, y - unit * 0.48f, x + unit * 0.18f, y - unit * 0.68f)
+        close()
+    }
+    drawPath(leftEar, furDark)
+    drawPath(rightEar, furDark)
+
+    drawRoundRect(
+        color = collar,
+        topLeft = Offset(x - unit * 0.38f, y - unit * 0.08f),
+        size = Size(unit * 0.62f, unit * 0.14f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(unit * 0.06f, unit * 0.06f),
+    )
+    drawCircle(tag, radius = unit * 0.09f, center = Offset(x - unit * 0.02f, y + unit * 0.08f))
+
+    drawCircle(Color.White, radius = unit * 0.09f, center = Offset(x - unit * 0.22f, y - unit * 0.48f))
+    drawCircle(nose, radius = unit * 0.045f, center = Offset(x - unit * 0.20f, y - unit * 0.47f))
+    drawCircle(nose, radius = unit * 0.08f, center = Offset(x - unit * 0.02f, y - unit * 0.32f))
+    drawCircle(Color.White.copy(alpha = 0.45f), radius = unit * 0.03f, center = Offset(x - unit * 0.04f, y - unit * 0.34f))
 }

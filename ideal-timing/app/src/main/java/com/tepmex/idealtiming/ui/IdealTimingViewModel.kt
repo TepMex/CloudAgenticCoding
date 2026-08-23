@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.idealtiming.data.DeviceLocationSource
 import com.tepmex.idealtiming.data.IdealTimingRepository
+import com.tepmex.idealtiming.domain.DailyCues
+import com.tepmex.idealtiming.domain.DialCueMarkers
 import com.tepmex.idealtiming.domain.DialSunMarkers
 import com.tepmex.idealtiming.domain.GeoPoint
 import com.tepmex.idealtiming.domain.IdealClock
@@ -85,7 +87,7 @@ class IdealTimingViewModel(
         viewModelScope.launch {
             location = locationSource.resolve() ?: location
             _clock.update { cur ->
-                cur.copy(sunMarkers = computeSunMarkers())
+                cur.copy(sunMarkers = computeSunMarkers(), cueMarkers = computeCueMarkers())
             }
         }
     }
@@ -99,6 +101,11 @@ class IdealTimingViewModel(
         val wake = repository.currentWake()?.wakeEpochSec ?: return null
         val point = location ?: return null
         return SunCalculator.dialMarkers(wake, point, zoneId)
+    }
+
+    private fun computeCueMarkers(): DialCueMarkers? {
+        val wake = repository.currentWake()?.wakeEpochSec ?: return null
+        return DailyCues.markers(wake, zoneId)
     }
 
     private fun buildClockState(
@@ -117,6 +124,7 @@ class IdealTimingViewModel(
             statusMessage = statusMessage,
             error = error,
             sunMarkers = computeSunMarkers(),
+            cueMarkers = computeCueMarkers(),
         )
     }
 
@@ -132,6 +140,7 @@ class IdealTimingViewModel(
                         syncedAtEpochSec = snap?.syncedAtEpochSec ?: cur.syncedAtEpochSec,
                         sleepScore = snap?.sleepScore ?: cur.sleepScore,
                         sunMarkers = computeSunMarkers(),
+                        cueMarkers = computeCueMarkers(),
                     )
                 }
                 delay(30_000)
@@ -355,6 +364,7 @@ class IdealTimingViewModel(
                         syncing = false,
                         error = e.message,
                         sunMarkers = computeSunMarkers(),
+                        cueMarkers = computeCueMarkers(),
                     )
                 }
                 if (e.message?.contains("Not signed in", ignoreCase = true) == true) {
@@ -370,6 +380,7 @@ class IdealTimingViewModel(
                         syncing = false,
                         error = e.message ?: "Sync failed",
                         sunMarkers = computeSunMarkers(),
+                        cueMarkers = computeCueMarkers(),
                     )
                 }
                 if (scheduleAfter && repository.currentWake() != null) {
