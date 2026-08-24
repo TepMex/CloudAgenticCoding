@@ -22,14 +22,14 @@ class NfcCheckInTest {
             nowEpochSec = now,
             zoneId = moscowZone,
         )
-        assertEquals(LocalDate.of(2026, 8, 23), stamp.localDate)
+        assertEquals(LocalDate.of(2026, 8, 23), stamp.wakeLocalDate)
         assertEquals(0.5f, stamp.progress, 0.0001f)
         assertEquals(now, stamp.checkedInEpochSec)
         assertEquals(180f, IdealClock.pointerDegrees(stamp.progress), 0.001f)
     }
 
     @Test
-    fun firstCheckInOfTheDayIsFixedAgainstLaterTaps() {
+    fun firstCheckInForThisWakeDayIsFixedAgainstLaterTaps() {
         val wake = ZonedDateTime.of(2026, 8, 23, 7, 0, 0, 0, moscowZone).toEpochSecond()
         val firstAt = wake + 2 * 3600L
         val first = NfcCheckInStamp.apply(null, wake, firstAt, moscowZone)
@@ -39,38 +39,61 @@ class NfcCheckInTest {
     }
 
     @Test
-    fun nextLocalDateCreatesAFreshStamp() {
+    fun resyncOfSameWakeDayKeepsStampEvenIfWakeTimeShifts() {
+        val wake = ZonedDateTime.of(2026, 8, 23, 7, 0, 0, 0, moscowZone).toEpochSecond()
+        val first = NfcCheckInStamp.apply(null, wake, wake + 2 * 3600L, moscowZone)
+        val refinedWake = ZonedDateTime.of(2026, 8, 23, 7, 12, 0, 0, moscowZone).toEpochSecond()
+        val afterResync = NfcCheckInStamp.apply(first, refinedWake, refinedWake + 3 * 3600L, moscowZone)
+        assertSame(first, afterResync)
+        assertEquals(2f / 16f, NfcCheckInStamp.progressForWake(first, refinedWake, moscowZone)!!)
+    }
+
+    @Test
+    fun newWakeDayCreatesAFreshStamp() {
         val wake = ZonedDateTime.of(2026, 8, 23, 7, 0, 0, 0, moscowZone).toEpochSecond()
         val first = NfcCheckInStamp.apply(null, wake, wake + 3600L, moscowZone)
         val nextWake = ZonedDateTime.of(2026, 8, 24, 7, 0, 0, 0, moscowZone).toEpochSecond()
         val nextMorning = ZonedDateTime.of(2026, 8, 24, 8, 0, 0, 0, moscowZone).toEpochSecond()
         val second = NfcCheckInStamp.apply(first, nextWake, nextMorning, moscowZone)
-        assertNotEquals(first.localDate, second.localDate)
-        assertEquals(LocalDate.of(2026, 8, 24), second.localDate)
+        assertNotEquals(first.wakeLocalDate, second.wakeLocalDate)
+        assertEquals(LocalDate.of(2026, 8, 24), second.wakeLocalDate)
         assertEquals(1f / 16f, second.progress, 0.0001f)
     }
 
     @Test
-    fun yesterdayStampIsNotDrawnToday() {
-        val yesterday = NfcCheckIn(
-            localDate = LocalDate.of(2026, 8, 22),
+    fun stampStaysVisibleAfterMidnightIfWakeUnchanged() {
+        val wake = ZonedDateTime.of(2026, 8, 23, 7, 0, 0, 0, moscowZone).toEpochSecond()
+        val stamp = NfcCheckIn(
+            wakeLocalDate = LocalDate.of(2026, 8, 23),
             progress = 0.25f,
-            checkedInEpochSec = 1L,
+            checkedInEpochSec = wake + 4 * 3600L,
         )
-        val now = ZonedDateTime.of(2026, 8, 23, 12, 0, 0, 0, moscowZone).toEpochSecond()
-        assertNull(NfcCheckInStamp.progressForToday(yesterday, now, moscowZone))
-        assertNull(NfcCheckInStamp.progressForToday(null, now, moscowZone))
+        val afterMidnight = ZonedDateTime.of(2026, 8, 24, 0, 30, 0, 0, moscowZone)
+        assertEquals(LocalDate.of(2026, 8, 24), afterMidnight.toLocalDate())
+        assertEquals(0.25f, NfcCheckInStamp.progressForWake(stamp, wake, moscowZone)!!)
     }
 
     @Test
-    fun todayStampKeepsItsProgressEvenAfterPointerMoves() {
+    fun newWakeDayHidesPreviousStamp() {
         val stamp = NfcCheckIn(
-            localDate = LocalDate.of(2026, 8, 23),
+            wakeLocalDate = LocalDate.of(2026, 8, 23),
+            progress = 0.25f,
+            checkedInEpochSec = 1L,
+        )
+        val nextWake = ZonedDateTime.of(2026, 8, 24, 7, 0, 0, 0, moscowZone).toEpochSecond()
+        assertNull(NfcCheckInStamp.progressForWake(stamp, nextWake, moscowZone))
+        assertNull(NfcCheckInStamp.progressForWake(null, nextWake, moscowZone))
+    }
+
+    @Test
+    fun stampKeepsItsProgressEvenAfterPointerMoves() {
+        val wake = ZonedDateTime.of(2026, 8, 23, 7, 0, 0, 0, moscowZone).toEpochSecond()
+        val stamp = NfcCheckIn(
+            wakeLocalDate = LocalDate.of(2026, 8, 23),
             progress = 0.125f,
             checkedInEpochSec = 1L,
         )
-        val later = ZonedDateTime.of(2026, 8, 23, 22, 0, 0, 0, moscowZone).toEpochSecond()
-        assertEquals(0.125f, NfcCheckInStamp.progressForToday(stamp, later, moscowZone)!!)
+        assertEquals(0.125f, NfcCheckInStamp.progressForWake(stamp, wake, moscowZone)!!)
     }
 
     @Test
@@ -83,23 +106,23 @@ class NfcCheckInTest {
     }
 
     @Test
-    fun localDateFollowsZoneNotUtc() {
+    fun wakeLocalDateFollowsZoneNotUtc() {
         // 23 Aug 23:30 in Los Angeles is still 23 Aug locally; UTC is already 24 Aug.
         val pacific = ZoneId.of("America/Los_Angeles")
-        val now = ZonedDateTime.of(2026, 8, 23, 23, 30, 0, 0, pacific).toEpochSecond()
-        assertEquals(LocalDate.of(2026, 8, 23), NfcCheckInStamp.localDate(now, pacific))
-        assertEquals(LocalDate.of(2026, 8, 24), NfcCheckInStamp.localDate(now, ZoneId.of("UTC")))
+        val wake = ZonedDateTime.of(2026, 8, 23, 23, 30, 0, 0, pacific).toEpochSecond()
+        assertEquals(LocalDate.of(2026, 8, 23), NfcCheckInStamp.wakeLocalDate(wake, pacific))
+        assertEquals(LocalDate.of(2026, 8, 24), NfcCheckInStamp.wakeLocalDate(wake, ZoneId.of("UTC")))
     }
 
     @Test
     fun jsonRoundTripPreservesStamp() {
         val original = NfcCheckIn(
-            localDate = LocalDate.of(2026, 8, 23),
+            wakeLocalDate = LocalDate.of(2026, 8, 23),
             progress = 0.3125f,
             checkedInEpochSec = 1_777_000_000L,
         )
         val restored = NfcCheckIn.fromJson(original.toJson())!!
-        assertEquals(original.localDate, restored.localDate)
+        assertEquals(original.wakeLocalDate, restored.wakeLocalDate)
         assertEquals(original.progress, restored.progress, 0.00001f)
         assertEquals(original.checkedInEpochSec, restored.checkedInEpochSec)
     }

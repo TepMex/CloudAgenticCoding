@@ -79,7 +79,7 @@ data class ClockUiState(
     val error: String? = null,
     val sunMarkers: DialSunMarkers? = null,
     val cueMarkers: DialCueMarkers? = null,
-    /** Dial progress of today's NFC physical check-in, or null if none yet. */
+    /** Dial progress of the NFC check-in for the current wake day, or null if none. */
     val nfcCheckInProgress: Float? = null,
 )
 

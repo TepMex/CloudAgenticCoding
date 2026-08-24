@@ -9,16 +9,18 @@ import org.json.JSONObject
  * Physical NFC check-in: a stamp of the 16-hour dial progress at the moment any
  * NFC tag was scanned while the app was in the foreground.
  *
- * The stamp is keyed by **local calendar date** ([zoneId] at [checkedInEpochSec]).
- * First tap of the day wins; later taps that day keep the original angle.
+ * The stamp belongs to a **wake day** — the local calendar date of the wake
+ * epoch it was made against. First tap for that wake day wins. A later Mi Fitness
+ * sync keeps the stamp when the new wake is still that same local date, and drops
+ * it when wake data arrives for a different day.
  */
 data class NfcCheckIn(
-    val localDate: LocalDate,
+    val wakeLocalDate: LocalDate,
     val progress: Float,
     val checkedInEpochSec: Long,
 ) {
     fun toJson(): String = JSONObject()
-        .put("local_date", localDate.toString())
+        .put("local_date", wakeLocalDate.toString())
         .put("progress", progress.toDouble())
         .put("checked_in_epoch_sec", checkedInEpochSec)
         .toString()
@@ -32,7 +34,7 @@ data class NfcCheckIn(
                 val progress = o.getDouble("progress").toFloat()
                 val epoch = o.optLong("checked_in_epoch_sec", 0L)
                 if (epoch <= 0L) null
-                else NfcCheckIn(localDate = date, progress = progress, checkedInEpochSec = epoch)
+                else NfcCheckIn(wakeLocalDate = date, progress = progress, checkedInEpochSec = epoch)
             } catch (_: Exception) {
                 null
             }
@@ -41,12 +43,13 @@ data class NfcCheckIn(
 }
 
 object NfcCheckInStamp {
-    fun localDate(nowEpochSec: Long, zoneId: ZoneId): LocalDate =
-        Instant.ofEpochSecond(nowEpochSec).atZone(zoneId).toLocalDate()
+    fun wakeLocalDate(wakeEpochSec: Long, zoneId: ZoneId): LocalDate =
+        Instant.ofEpochSecond(wakeEpochSec).atZone(zoneId).toLocalDate()
 
     /**
      * Stamp the current pointer progress. Returns [existing] unchanged when it
-     * already belongs to today's local date (first check-in of the day is fixed).
+     * already belongs to [wakeEpochSec]'s local date (first check-in for this
+     * wake day is fixed, including after a same-day re-sync).
      */
     fun apply(
         existing: NfcCheckIn?,
@@ -54,23 +57,26 @@ object NfcCheckInStamp {
         nowEpochSec: Long,
         zoneId: ZoneId,
     ): NfcCheckIn {
-        val today = localDate(nowEpochSec, zoneId)
-        if (existing != null && existing.localDate == today) return existing
+        val wakeDate = wakeLocalDate(wakeEpochSec, zoneId)
+        if (existing != null && existing.wakeLocalDate == wakeDate) return existing
         val reading = IdealClock.reading(wakeEpochSec, nowEpochSec)
         return NfcCheckIn(
-            localDate = today,
+            wakeLocalDate = wakeDate,
             progress = reading.progress,
             checkedInEpochSec = nowEpochSec,
         )
     }
 
-    /** Dial progress to draw today, or null when there is no stamp for this local date. */
-    fun progressForToday(
+    /**
+     * Dial progress to draw for the current wake, or null when the stamp belongs
+     * to a different wake day (or there is none).
+     */
+    fun progressForWake(
         checkIn: NfcCheckIn?,
-        nowEpochSec: Long,
+        wakeEpochSec: Long,
         zoneId: ZoneId,
     ): Float? {
-        val today = localDate(nowEpochSec, zoneId)
-        return checkIn?.takeIf { it.localDate == today }?.progress
+        val wakeDate = wakeLocalDate(wakeEpochSec, zoneId)
+        return checkIn?.takeIf { it.wakeLocalDate == wakeDate }?.progress
     }
 }
