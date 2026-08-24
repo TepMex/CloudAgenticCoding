@@ -5,7 +5,8 @@ import android.content.SharedPreferences
 import com.tepmex.idealtiming.domain.NfcCheckIn
 
 /**
- * Last NFC physical check-in. Plain prefs (not secrets); invalid after the local date rolls.
+ * Last NFC physical check-in. Plain prefs (not secrets); ignored once a wake
+ * for a different local date is synced.
  */
 class NfcCheckInStore(context: Context) {
     private val prefs: SharedPreferences =

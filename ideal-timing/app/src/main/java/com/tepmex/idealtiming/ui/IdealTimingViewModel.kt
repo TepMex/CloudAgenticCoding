@@ -111,14 +111,17 @@ class IdealTimingViewModel(
         return DailyCues.markers(wake, zoneId)
     }
 
-    private fun nfcCheckInProgress(nowEpochSec: Long): Float? =
-        NfcCheckInStamp.progressForToday(nfcCheckInStore.load(), nowEpochSec, zoneId)
+    private fun nfcCheckInProgress(): Float? {
+        val wake = repository.currentWake()?.wakeEpochSec ?: return null
+        return NfcCheckInStamp.progressForWake(nfcCheckInStore.load(), wake, zoneId)
+    }
 
     /**
      * Physical check-in: any NFC tag while the clock is on screen stamps the
-     * current pointer angle for the rest of the local calendar day.
+     * current pointer angle for this wake day. A later sync of the same wake day
+     * keeps the stamp; a wake for a different local date clears it.
      *
-     * @return true when this tap created today's stamp (for haptic feedback).
+     * @return true when this tap created a stamp for the current wake day.
      */
     fun onPhysicalCheckIn(): Boolean {
         val wake = repository.currentWake()?.wakeEpochSec ?: return false
@@ -156,7 +159,7 @@ class IdealTimingViewModel(
             error = error,
             sunMarkers = computeSunMarkers(),
             cueMarkers = computeCueMarkers(),
-            nfcCheckInProgress = nfcCheckInProgress(now),
+            nfcCheckInProgress = nfcCheckInProgress(),
         )
     }
 
@@ -173,7 +176,7 @@ class IdealTimingViewModel(
                         sleepScore = snap?.sleepScore ?: cur.sleepScore,
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
-                        nfcCheckInProgress = nfcCheckInProgress(now),
+                        nfcCheckInProgress = nfcCheckInProgress(),
                     )
                 }
                 delay(30_000)
@@ -398,7 +401,7 @@ class IdealTimingViewModel(
                         error = e.message,
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
-                        nfcCheckInProgress = nfcCheckInProgress(System.currentTimeMillis() / 1000L),
+                        nfcCheckInProgress = nfcCheckInProgress(),
                     )
                 }
                 if (e.message?.contains("Not signed in", ignoreCase = true) == true) {
@@ -415,7 +418,7 @@ class IdealTimingViewModel(
                         error = e.message ?: "Sync failed",
                         sunMarkers = computeSunMarkers(),
                         cueMarkers = computeCueMarkers(),
-                        nfcCheckInProgress = nfcCheckInProgress(System.currentTimeMillis() / 1000L),
+                        nfcCheckInProgress = nfcCheckInProgress(),
                     )
                 }
                 if (scheduleAfter && repository.currentWake() != null) {
