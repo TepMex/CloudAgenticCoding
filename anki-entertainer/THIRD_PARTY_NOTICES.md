@@ -60,6 +60,15 @@ SQLite database shipped with the anki-entertainer APK.
 - License: CC0-1.0
 - Used for: SIMPL_HISTORY curated explanations
 
+## anki-entertainer greedy components with conservative phonetics
+
+- Lock key: `project_greedy_components`
+- Version / revision: `1.0.0`
+- Path: `hanzi_data/seed/greedy_components.csv`
+- License: CC0-1.0
+- Used for: local composition cards, conservative phonetic-semantic flags, greedy visible components
+- Note: 3500-character table of greedy parts plus a conservative pictophonetic flag and phonetic. Shown on the main screen before mnemonic/LLM stories.
+
 ## Make Me a Hanzi LGPL notice
 
 `dictionary.txt` from Make Me a Hanzi is licensed under LGPL-3.0-or-later.

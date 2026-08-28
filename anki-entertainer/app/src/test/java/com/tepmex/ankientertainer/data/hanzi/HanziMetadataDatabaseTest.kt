@@ -44,6 +44,13 @@ class HanziMetadataDatabaseTest {
         )
         db.openHelper.writableDatabase.execSQL(
             """
+            INSERT INTO greedy_composition (
+              character, componentsJson, isPhoneticSemantic, phonetic
+            ) VALUES ('清', '["氵","丰","月"]', 1, '青')
+            """.trimIndent(),
+        )
+        db.openHelper.writableDatabase.execSQL(
+            """
             INSERT INTO variant (
               sourceCharacter, targetCharacter, direction, localeOrStandard,
               isPreferred, isAmbiguous, source, sourceRecordId
@@ -81,6 +88,9 @@ class HanziMetadataDatabaseTest {
 
         assertEquals(1, dao.getHanzi(listOf("清")).size)
         assertEquals("氵", dao.getHanzi(listOf("清")).first().semanticComponent)
+        val greedy = dao.getGreedyCompositions(listOf("清")).first()
+        assertEquals(true, greedy.isPhoneticSemantic)
+        assertEquals("青", greedy.phonetic)
         assertEquals(1, dao.getVariants(listOf("清")).size)
         assertEquals("UNCHANGED", dao.getSimplifications(listOf("清")).first().classification)
         assertEquals("clear water", dao.getMnemonics(listOf("清")).first().story)
@@ -113,6 +123,46 @@ class HanziMetadataDatabaseTest {
         val result = engine.expand("{SEMANTIC}|{PHONETIC}", "清")
         assertEquals("清: semantic component 氵|清: phonetic component 青", result.prompt)
         assertTrue(repo.datasetStatus().available)
+    }
+
+    @Test
+    fun repositoryExposesGreedyCompositionForOfflineCards() = runBlocking {
+        db.openHelper.writableDatabase.execSQL(
+            """
+            INSERT INTO hanzi (
+              character, codePoint, decomposition, etymologyType, etymologyHint,
+              semanticComponent, phoneticComponent, primarySource, sourceRecordId
+            ) VALUES ('清', ${'清'.code}, '⿰氵青', 'pictophonetic', 'water', '氵', '青', 'test', '1')
+            """.trimIndent(),
+        )
+        db.openHelper.writableDatabase.execSQL(
+            """
+            INSERT INTO greedy_composition (
+              character, componentsJson, isPhoneticSemantic, phonetic
+            ) VALUES ('清', '["氵","丰","月"]', 1, '青')
+            """.trimIndent(),
+        )
+        db.openHelper.writableDatabase.execSQL(
+            """
+            INSERT INTO dataset_metadata (
+              id, schemaVersion, datasetVersion, buildTimestamp, sourceVersionsJson,
+              sourceChecksumsJson, recordCountsJson, licenseIdentifiersJson, roomIdentityHash
+            ) VALUES (1, 2, '1.2.0-test', 't', '{}', '{}', '{}', '[]', NULL)
+            """.trimIndent(),
+        )
+        val repo = RoomHanziMetadataRepository(databaseProvider = { db }, cacheSize = 8)
+        val cards = CharacterCompositionLoader(repo).loadCards("清")
+        assertEquals(1, cards.size)
+        assertEquals("清", cards[0].character)
+        assertEquals(
+            """
+            清
+            Composition: 氵 + 丰 + 月
+            Phonetic-semantic: yes
+            Phonetic: 青
+            """.trimIndent(),
+            cards[0].text,
+        )
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.tepmex.ankientertainer.AnkiEntertainerApp
 import com.tepmex.ankientertainer.data.LikedChunksRepository
 import com.tepmex.ankientertainer.data.RemoteLlmClient
 import com.tepmex.ankientertainer.data.StoredChunk
+import com.tepmex.ankientertainer.data.hanzi.CharacterCompositionLoader
 import com.tepmex.ankientertainer.data.hanzi.OfflineMnemonicFallback
 import com.tepmex.ankientertainer.data.hanzi.PromptExpansionResult
 import com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine
@@ -25,7 +26,14 @@ data class TextChunk(
     val text: String,
     val isLiked: Boolean,
     val modelName: String?,
+    val likeable: Boolean = true,
 )
+
+fun mergeSessionChunks(
+    composition: List<TextChunk>,
+    liked: List<TextChunk>,
+    stories: List<TextChunk>,
+): List<TextChunk> = composition + liked + stories
 
 data class EntertainerUiState(
     val vocab: String? = null,
@@ -41,6 +49,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     private val likedRepo = app.likedChunks
     private val promptEngine: PromptTemplateEngine = app.promptTemplateEngine
     private val mnemonicFallback = OfflineMnemonicFallback(app.hanziMetadataRepository)
+    private val compositionLoader = CharacterCompositionLoader(app.hanziMetadataRepository)
     private val llmClient = RemoteLlmClient()
 
     private val _uiState = MutableStateFlow(EntertainerUiState(statusMessage = ""))
@@ -86,6 +95,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     fun toggleLike(chunkId: String) {
         val vocab = _uiState.value.vocab ?: return
         val chunk = _uiState.value.chunks.find { it.id == chunkId } ?: return
+        if (!chunk.likeable) return
         viewModelScope.launch {
             if (chunk.isLiked) {
                 likedRepo.unlike(vocab, chunkId)
@@ -110,6 +120,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
 
     private suspend fun loadAndGenerate(vocab: String, regenerateOnly: Boolean) {
         val settings = prefs.settings.first()
+        val composition = compositionChunks(vocab)
         val liked = likedRepo.getLiked(vocab).map {
             TextChunk(id = it.id, text = it.text, isLiked = true, modelName = it.modelName)
         }
@@ -117,6 +128,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
         if (!settings.isLlmConfigured()) {
             showMnemonicFallback(
                 vocab = vocab,
+                composition = composition,
                 liked = liked,
                 reason = "LLM not configured — showing local mnemonic stories.",
             )
@@ -128,7 +140,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
 
         _uiState.value = _uiState.value.copy(
             vocab = vocab,
-            chunks = liked,
+            chunks = mergeSessionChunks(composition, liked, emptyList()),
             loading = needed > 0,
             statusMessage = if (needed > 0) "Generating chunks…" else "Ready",
         )
@@ -163,7 +175,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                     )
                     generated.add(chunk)
                     _uiState.value = _uiState.value.copy(
-                        chunks = liked + generated,
+                        chunks = mergeSessionChunks(composition, liked, generated),
                     )
                 }
                 _uiState.value = _uiState.value.copy(
@@ -176,7 +188,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                 )
             } catch (_: CancellationException) {
                 _uiState.value = _uiState.value.copy(
-                    chunks = liked + generated,
+                    chunks = mergeSessionChunks(composition, liked, generated),
                     loading = false,
                     statusMessage = "Generation stopped.",
                 )
@@ -184,13 +196,14 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                 if (generated.isEmpty()) {
                     showMnemonicFallback(
                         vocab = vocab,
+                        composition = composition,
                         liked = liked,
                         reason = "LLM unavailable — showing local mnemonic stories. " +
                             (e.message ?: "Generation failed."),
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        chunks = liked + generated,
+                        chunks = mergeSessionChunks(composition, liked, generated),
                         loading = false,
                         statusMessage = e.message ?: "Generation failed.",
                     )
@@ -199,8 +212,20 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    private suspend fun compositionChunks(vocab: String): List<TextChunk> =
+        compositionLoader.loadCards(vocab).map { card ->
+            TextChunk(
+                id = "composition:${card.character}",
+                text = card.text,
+                isLiked = false,
+                modelName = CharacterCompositionLoader.MODEL_LABEL,
+                likeable = false,
+            )
+        }
+
     private suspend fun showMnemonicFallback(
         vocab: String,
+        composition: List<TextChunk>,
         liked: List<TextChunk>,
         reason: String,
     ) {
@@ -214,13 +239,13 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
         val status = when {
-            offlineChunks.isNotEmpty() -> reason
+            composition.isNotEmpty() || offlineChunks.isNotEmpty() -> reason
             liked.isNotEmpty() -> "$reason No mnemonic stories found for this vocabulary."
             else -> "$reason No mnemonic stories found — add Han characters or configure an LLM in Settings."
         }
         _uiState.value = _uiState.value.copy(
             vocab = vocab,
-            chunks = liked + offlineChunks,
+            chunks = mergeSessionChunks(composition, liked, offlineChunks),
             loading = false,
             statusMessage = status,
         )

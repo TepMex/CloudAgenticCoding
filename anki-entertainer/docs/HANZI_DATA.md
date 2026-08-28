@@ -10,6 +10,7 @@ This document describes the bundled Hanzi metadata database used by prompt place
 | `{OPPOSITE}` | Unihan `kSimplifiedVariant` / `kTraditionalVariant`; OpenCC ST/TS character dicts as supplemental | Character-level only; one-to-many kept visible |
 | `{SEMANTIC}` | Make Me a Hanzi `etymology.type=pictophonetic` + `semantic` | Omitted unless type is pictophonetic **and** semantic is non-null |
 | `{PHONETIC}` | Make Me a Hanzi `etymology.type=pictophonetic` + `phonetic` | Same filtering as `{SEMANTIC}` |
+| Local composition cards | Project greedy-component CSV (3500 chars, conservative phonetics); MMAH IDS + etymology as fallback | Shown on the main screen **before** stories; not a prompt placeholder |
 | `{MNEMO_EXAMPLES}` | Project seed mnemonics (`CC0-1.0`) + deterministic memory cues derived from Make Me a Hanzi structure fields (`LGPL-3.0-or-later`) | Project stories rank first; keys may be single Han or compounds |
 | `{SIMPL_HISTORY}` | Unihan/OpenCC variant pairs + MMAH IDS; optional curated seed rows | Distinguishes **curated** vs **derived** structural comparison |
 
@@ -19,6 +20,7 @@ This document describes the bundled Hanzi metadata database used by prompt place
 
 - Variant pairs from Unihan (primary) and OpenCC (supplemental).
 - Pictophonetic semantic/phonetic components from Make Me a Hanzi.
+- Greedy visible components and conservative phonetic-semantic flags from `tools/hanzi-data/hanzi_data/seed/greedy_components.csv`.
 - Curated simplification explanations in `tools/hanzi-data/hanzi_data/seed/curated_simplifications.json`.
 - Seed mnemonic stories and their attribution/license fields.
 - Make Me a Hanzi etymology hints and semantic/phonetic components used to produce local memory cues.
@@ -57,7 +59,7 @@ This document describes the bundled Hanzi metadata database used by prompt place
 
 ## Rebuild the database
 
-Ordinary Android/Gradle builds **do not** download Hanzi sources.
+Ordinary Android/Gradle builds **do not** download Hanzi sources. The greedy-component CSV is a project seed (`tools/hanzi-data/hanzi_data/seed/greedy_components.csv`) and is imported into the `greedy_composition` table at database build time.
 
 ```bash
 # From anki-entertainer/
@@ -74,7 +76,7 @@ Pipeline steps: read lock file → download/verify SHA-256 → parse → merge �
 
 The same notices are copied to `app/src/main/assets/licenses/HANZI_DATA_NOTICES.md` so provenance and license information travel inside the APK with the database.
 
-After Room schema changes, run `./gradlew :app:kspDebugKotlin` so `app/schemas/.../1.json` exists, then rebuild so `room_master_table.identity_hash` matches.
+After Room schema changes, run `./gradlew :app:kspDebugKotlin` so `app/schemas/.../2.json` exists, then rebuild so `room_master_table.identity_hash` matches.
 
 ## Database and APK size
 

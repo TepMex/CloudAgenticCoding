@@ -4,6 +4,14 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Entity(tableName = "greedy_composition")
+data class GreedyCompositionEntity(
+    @PrimaryKey val character: String,
+    val componentsJson: String,
+    val isPhoneticSemantic: Boolean,
+    val phonetic: String?,
+)
+
 @Entity(tableName = "hanzi")
 data class HanziEntity(
     @PrimaryKey val character: String,

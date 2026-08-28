@@ -86,6 +86,44 @@ object HanziMetadataFormatter {
         return appendTruncation(blocks.joinToString("\n\n"), truncated)
     }
 
+    /**
+     * One local card for a single Han character: greedy components first,
+     * then whether it is phonetic-semantic and which phonetic if so.
+     * Returns null when neither the greedy table nor MMAH decomposition is present.
+     */
+    fun formatCompositionCard(character: String, meta: HanziCharacterMetadata): String? {
+        val components = meta.greedyComponents.ifEmpty {
+            listOfNotNull(meta.decomposition?.takeIf { it.isNotBlank() })
+        }
+        if (components.isEmpty()) return null
+
+        val pictophonetic = meta.isPhoneticSemantic
+            ?: (meta.etymologyType == "pictophonetic")
+        val phonetic = when (meta.isPhoneticSemantic) {
+            true -> meta.greedyPhonetic?.takeIf { it.isNotBlank() }
+            false -> null
+            null -> meta.phoneticComponent.takeIf { pictophonetic && !it.isNullOrBlank() }
+        }
+
+        return buildString {
+            append(character)
+            append('\n')
+            append("Composition: ")
+            append(components.joinToString(" + "))
+            append('\n')
+            if (pictophonetic) {
+                append("Phonetic-semantic: yes")
+                if (!phonetic.isNullOrBlank()) {
+                    append('\n')
+                    append("Phonetic: ")
+                    append(phonetic)
+                }
+            } else {
+                append("Phonetic-semantic: no")
+            }
+        }
+    }
+
     private fun appendTruncation(body: String, truncated: Boolean): String {
         if (!truncated) return body
         return if (body.isEmpty()) TRUNCATION_LINE else body + "\n" + TRUNCATION_LINE

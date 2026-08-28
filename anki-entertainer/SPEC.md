@@ -116,15 +116,26 @@ A provider is configured when its base URL is non-blank and its model list is no
 ### 8. Offline mnemonic fallback when LLM is unavailable
 
 - If no LLM provider is **configured** (no provider with base URL and model list), or a generation attempt **fails before any chunk is returned**, the app falls back to the local Hanzi metadata database.
-- Fallback shows **up to 5 mnemonic stories or source-backed structure cues** for the vocabulary: contiguous multi-character Han runs (compound words) first, then individual Han characters (first-occurrence order, then ranked score within each key).
+- Fallback **still shows local composition cards first** (requirement 9), then **up to 5 mnemonic stories or source-backed structure cues** for the vocabulary: contiguous multi-character Han runs (compound words) first, then individual Han characters (first-occurrence order, then ranked score within each key).
 - Each story is shown as a normal chunk (`key — story`), labeled with model `local mnemonic`.
 - Local mnemonic rows may be keyed by a **single Han character or a compound** (2+ contiguous Han); compounds are preferred when the query matches. Project-authored CC0 stories rank before deterministic cues derived from Make Me a Hanzi fields.
-- Liked chunks still appear first; mnemonic stories follow.
-- If no mnemonic stories are found, show a clear status message (and still keep any liked chunks).
+- Liked chunks still appear first among stories; mnemonic stories follow. Composition cards stay ahead of both.
+- If no mnemonic stories are found, show a clear status message (and still keep any liked chunks and composition cards).
+
+### 9. Local character composition shown first
+
+- For **each unique Han character** in the vocabulary (first-occurrence order, max 20), the main screen shows a **local composition card** before liked chunks and stories.
+- Each card includes:
+  1. **Composition** — greedy visible parts from the bundled 3500-character table; if the character is not in that table, Make Me a Hanzi IDS decomposition.
+  2. **Phonetic-semantic?** — conservative table flag when present (`yes` / `no`). If the character is absent from that table, fall back to Make Me a Hanzi `etymology.type=pictophonetic`.
+  3. **Phonetic** — only when the answer is yes; uses the table's phonetic (which may differ from a visible part, e.g. simplified 亿 → 意). Otherwise MMAH `phonetic` when using the MMAH fallback.
+- These cards are stored in the prepackaged SQLite database. They work **offline**, with **no LLM**, and when the network is down.
+- Composition cards do **not** consume the generation quota, are **not likeable**, and remain when regenerating.
+- Stories (liked + newly generated, or offline mnemonic fallback) appear **after** composition cards, in the same order as before this requirement.
 
 ## Non-functional requirements
 
-- **Offline**: LLM generation requires network. When the LLM is missing or unreachable, fall back to up to 5 local mnemonic stories (requirement 8) instead of leaving the session empty.
+- **Offline**: LLM generation requires network. Local composition cards (requirement 9) always load from the bundled database. When the LLM is missing or unreachable, fall back to up to 5 local mnemonic stories (requirement 8) instead of leaving the session empty.
 - **Privacy**: API keys stored locally in DataStore on device only.
 - **Cancellation**: in-flight generation can be stopped; partial results remain until regenerate.
 - **Theme**: UI follows the system light/dark setting (`Theme.Material3.DayNight`, `MODE_NIGHT_FOLLOW_SYSTEM`). No in-app theme override in v1.
@@ -153,10 +164,11 @@ Legacy single-provider DataStore keys (`llm_base_url`, `llm_token`, `model_names
 
 ```kotlin
 data class TextChunk(
-    val id: String,               // UUID
+    val id: String,               // UUID, or `composition:{char}` for local composition cards
     val text: String,
     val isLiked: Boolean,
     val modelName: String?,       // model used when generated
+    val likeable: Boolean = true, // false for local composition cards
 )
 ```
 
@@ -177,9 +189,9 @@ data class TextChunk(
 - Vocabulary headline (current `{VOCAB}`).
 - Status line + progress during generation.
 - **Regenerate** and **Stop** actions.
-- Scrollable list of chunks; each row:
+- Scrollable list of chunks; order is **composition cards**, then liked stories, then newly generated or offline mnemonic stories. Each row:
   - chunk text (selectable)
-  - like / unlike toggle
+  - like / unlike toggle (hidden for composition cards)
   - subtle badge if chunk is saved (liked)
 
 ### Settings screen
@@ -197,7 +209,7 @@ data class TextChunk(
 ### Empty / launch states
 
 - Launcher open without URI: hint explaining AnkiDroid deep link format.
-- Missing API config (no configured provider): load offline mnemonic fallback (requirement 8); status explains LLM is not configured.
+- Missing API config (no configured provider): load local composition cards then offline mnemonic fallback (requirements 8–9); status explains LLM is not configured.
 
 ## LLM integration
 
@@ -231,7 +243,7 @@ anki-entertainer/
 │           │   ├── LikedChunksRepository.kt
 │           │   ├── RemoteLlmClient.kt
 │           │   ├── DeepLinkParser.kt
-│           │   └── hanzi/   # Room DB, repository, formatter, template engine, offline mnemonic fallback
+│           │   └── hanzi/   # Room DB, repository, formatter, template engine, composition cards, offline mnemonic fallback
 │           └── ui/
 │               ├── MainActivity.kt
 │               ├── SettingsActivity.kt
@@ -254,7 +266,8 @@ anki-entertainer/
 3. Liked chunks reappear for the same vocab on next launch; new chunks fill up to configured count.
 4. Regenerate updates only non-liked chunks.
 5. Unlike removes chunk from saved set for that vocab.
-6. With no LLM provider configured or all providers unreachable (zero chunks generated), the session shows up to 5 local mnemonic stories for Han compounds and characters in the vocabulary when the offline DB has them.
-7. With multiple providers configured, if the first fails a chunk request, the next provider in order is tried before falling back offline.
-8. When a provider's optional project/folder ID is set, chat completion requests include `OpenAI-Project: <value>`; when blank, that header is omitted.
-9. With the device in light mode the app uses a light Material 3 surface; with the device in dark mode it uses a dark surface (system theme, no forced light theme).
+6. With no LLM provider configured or all providers unreachable (zero chunks generated), the session shows local composition cards for each unique Han character first, then up to 5 local mnemonic stories for Han compounds and characters in the vocabulary when the offline DB has them.
+7. Composition cards for characters in the bundled 3500-character greedy table show parts, whether the character is phonetic-semantic, and the phonetic when it is; this works with no network and no LLM. Stories appear after those cards.
+8. With multiple providers configured, if the first fails a chunk request, the next provider in order is tried before falling back offline.
+9. When a provider's optional project/folder ID is set, chat completion requests include `OpenAI-Project: <value>`; when blank, that header is omitted.
+10. With the device in light mode the app uses a light Material 3 surface; with the device in dark mode it uses a dark surface (system theme, no forced light theme).

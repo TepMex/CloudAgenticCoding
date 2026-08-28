@@ -149,6 +149,11 @@ class RoomHanziMetadataRepository(
                 } else {
                     emptyMap()
                 }
+                val greedyRows = if (loadHanzi) {
+                    dao.getGreedyCompositions(missing).associateBy { it.character }
+                } else {
+                    emptyMap()
+                }
                 val variantRows = if (needsVariants) {
                     dao.getVariants(missing).groupBy { it.sourceCharacter }
                 } else {
@@ -215,12 +220,18 @@ class RoomHanziMetadataRepository(
                     } else {
                         previous?.meta?.mnemonics.orEmpty()
                     }
+                    val greedy = if (loadHanzi) greedyRows[ch] else null
                     val assembled = HanziCharacterMetadata(
                         character = ch,
                         decomposition = h?.decomposition ?: previous?.meta?.decomposition,
                         etymologyType = h?.etymologyType ?: previous?.meta?.etymologyType,
                         semanticComponent = h?.semanticComponent ?: previous?.meta?.semanticComponent,
                         phoneticComponent = h?.phoneticComponent ?: previous?.meta?.phoneticComponent,
+                        greedyComponents = greedy?.let { parseComponentsJson(it.componentsJson) }
+                            ?: previous?.meta?.greedyComponents.orEmpty(),
+                        isPhoneticSemantic = greedy?.isPhoneticSemantic
+                            ?: previous?.meta?.isPhoneticSemantic,
+                        greedyPhonetic = greedy?.phonetic ?: previous?.meta?.greedyPhonetic,
                         oppositeTargets = opposites,
                         simplification = simpl,
                         mnemonics = mnemos,
@@ -256,6 +267,21 @@ class RoomHanziMetadataRepository(
                 schemaVersion = null,
             )
         }
+    }
+}
+
+internal fun parseComponentsJson(raw: String): List<String> {
+    if (raw.isBlank()) return emptyList()
+    return try {
+        val arr = org.json.JSONArray(raw)
+        buildList(arr.length()) {
+            for (i in 0 until arr.length()) {
+                val part = arr.optString(i).trim()
+                if (part.isNotEmpty()) add(part)
+            }
+        }
+    } catch (_: Exception) {
+        emptyList()
     }
 }
 
