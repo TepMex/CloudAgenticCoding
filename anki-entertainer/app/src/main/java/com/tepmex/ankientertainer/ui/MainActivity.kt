@@ -28,7 +28,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
 
-        chunkAdapter = ChunkAdapter(onToggleLike = viewModel::toggleLike)
+        chunkAdapter = ChunkAdapter(
+            onToggleLike = viewModel::toggleLike,
+            onOpenPoster = { asset, title ->
+                startActivity(PosterViewerActivity.intent(this, asset, title))
+            },
+        )
         binding.chunksRecycler.layoutManager = LinearLayoutManager(this)
         binding.chunksRecycler.adapter = chunkAdapter
 

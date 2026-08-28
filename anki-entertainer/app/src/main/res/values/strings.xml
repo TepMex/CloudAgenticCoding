@@ -35,4 +35,7 @@
     <string name="placeholder_help">Supported placeholders (case-sensitive):\n{QUERY} — exact vocabulary from the deep link\n{OPPOSITE} — simplified/traditional variants per unique Han character\n{SIMPL_HISTORY} — simplification notes (source-backed vs derived)\n{MNEMO_EXAMPLES} — up to five mnemonic stories per Han compound or character (compounds first)\n{SEMANTIC} — semantic component for pictophonetic characters\n{PHONETIC} — phonetic component for pictophonetic characters\n\nMulti-character queries: metadata placeholders list each distinct Han character in first-occurrence order (max 20). {MNEMO_EXAMPLES} also looks up contiguous compound words. Non-Han characters are ignored for metadata but kept in {QUERY}. Unknown {PLACEHOLDERS} are left unchanged and warned about; saving is still allowed.</string>
     <string name="unknown_placeholders_warning">Unknown placeholders (will be left as-is): %1$s</string>
     <string name="preview_warnings">Warnings:\n%1$s</string>
+    <string name="poster_tap_to_enlarge">Tap to enlarge</string>
+    <string name="poster_image_description">Pinyin mnemonic poster</string>
+    <string name="poster_viewer_title">Mnemonic poster</string>
 </resources>

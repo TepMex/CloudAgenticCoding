@@ -9,6 +9,7 @@ import com.tepmex.ankientertainer.data.RemoteLlmClient
 import com.tepmex.ankientertainer.data.StoredChunk
 import com.tepmex.ankientertainer.data.hanzi.CharacterCompositionLoader
 import com.tepmex.ankientertainer.data.hanzi.OfflineMnemonicFallback
+import com.tepmex.ankientertainer.data.hanzi.PinyinMnemonicPosters
 import com.tepmex.ankientertainer.data.hanzi.PromptExpansionResult
 import com.tepmex.ankientertainer.data.hanzi.PromptTemplateEngine
 import com.tepmex.ankientertainer.data.configuredProviders
@@ -27,13 +28,27 @@ data class TextChunk(
     val isLiked: Boolean,
     val modelName: String?,
     val likeable: Boolean = true,
+    val imageAsset: String? = null,
 )
+
+fun posterChunks(): List<TextChunk> =
+    PinyinMnemonicPosters.ALL.map { poster ->
+        TextChunk(
+            id = poster.id,
+            text = poster.title,
+            isLiked = false,
+            modelName = PinyinMnemonicPosters.MODEL_LABEL,
+            likeable = false,
+            imageAsset = poster.assetPath,
+        )
+    }
 
 fun mergeSessionChunks(
     composition: List<TextChunk>,
+    posters: List<TextChunk>,
     liked: List<TextChunk>,
     stories: List<TextChunk>,
-): List<TextChunk> = composition + liked + stories
+): List<TextChunk> = composition + posters + liked + stories
 
 data class EntertainerUiState(
     val vocab: String? = null,
@@ -121,6 +136,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun loadAndGenerate(vocab: String, regenerateOnly: Boolean) {
         val settings = prefs.settings.first()
         val composition = compositionChunks(vocab)
+        val posters = posterChunks()
         val liked = likedRepo.getLiked(vocab).map {
             TextChunk(id = it.id, text = it.text, isLiked = true, modelName = it.modelName)
         }
@@ -129,6 +145,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
             showMnemonicFallback(
                 vocab = vocab,
                 composition = composition,
+                posters = posters,
                 liked = liked,
                 reason = "LLM not configured — showing local mnemonic stories.",
             )
@@ -140,7 +157,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
 
         _uiState.value = _uiState.value.copy(
             vocab = vocab,
-            chunks = mergeSessionChunks(composition, liked, emptyList()),
+            chunks = mergeSessionChunks(composition, posters, liked, emptyList()),
             loading = needed > 0,
             statusMessage = if (needed > 0) "Generating chunks…" else "Ready",
         )
@@ -175,7 +192,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                     )
                     generated.add(chunk)
                     _uiState.value = _uiState.value.copy(
-                        chunks = mergeSessionChunks(composition, liked, generated),
+                        chunks = mergeSessionChunks(composition, posters, liked, generated),
                     )
                 }
                 _uiState.value = _uiState.value.copy(
@@ -188,7 +205,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                 )
             } catch (_: CancellationException) {
                 _uiState.value = _uiState.value.copy(
-                    chunks = mergeSessionChunks(composition, liked, generated),
+                    chunks = mergeSessionChunks(composition, posters, liked, generated),
                     loading = false,
                     statusMessage = "Generation stopped.",
                 )
@@ -197,13 +214,14 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
                     showMnemonicFallback(
                         vocab = vocab,
                         composition = composition,
+                        posters = posters,
                         liked = liked,
                         reason = "LLM unavailable — showing local mnemonic stories. " +
                             (e.message ?: "Generation failed."),
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        chunks = mergeSessionChunks(composition, liked, generated),
+                        chunks = mergeSessionChunks(composition, posters, liked, generated),
                         loading = false,
                         statusMessage = e.message ?: "Generation failed.",
                     )
@@ -226,6 +244,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun showMnemonicFallback(
         vocab: String,
         composition: List<TextChunk>,
+        posters: List<TextChunk>,
         liked: List<TextChunk>,
         reason: String,
     ) {
@@ -245,7 +264,7 @@ class EntertainerViewModel(application: Application) : AndroidViewModel(applicat
         }
         _uiState.value = _uiState.value.copy(
             vocab = vocab,
-            chunks = mergeSessionChunks(composition, liked, offlineChunks),
+            chunks = mergeSessionChunks(composition, posters, liked, offlineChunks),
             loading = false,
             statusMessage = status,
         )

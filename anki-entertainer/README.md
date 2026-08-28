@@ -37,7 +37,7 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 Prompt placeholders (except `{QUERY}`) are filled from a prepackaged SQLite database. Ordinary Gradle builds do not download source data.
 
-When the LLM is not configured or unreachable (no chunks generated yet), the main screen still shows **local composition cards** for each unique Han character (parts, phonetic-semantic flag, phonetic), then **up to 5 local mnemonic stories or source-backed structure cues**. Project-authored stories rank ahead of cues derived from the bundled Make Me a Hanzi fields.
+When the LLM is not configured or unreachable (no chunks generated yet), the main screen still shows **local composition cards** for each unique Han character (parts, phonetic-semantic flag, phonetic), then **two bundled pinyin mnemonic posters** (finals, then initials; tap to pinch-zoom), then **up to 5 local mnemonic stories or source-backed structure cues**. Project-authored stories rank ahead of cues derived from the bundled Make Me a Hanzi fields.
 
 ```bash
 python3 tools/hanzi-data/build.py
