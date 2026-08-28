@@ -32,10 +32,13 @@ class ChunkAdapter(
             binding.likedBadge.isVisible = chunk.isLiked
             binding.modelText.text = chunk.modelName.orEmpty()
             binding.modelText.isVisible = !chunk.modelName.isNullOrBlank()
+            binding.likeButton.isVisible = chunk.likeable
             binding.likeButton.text = binding.root.context.getString(
                 if (chunk.isLiked) R.string.unlike_chunk else R.string.like_chunk,
             )
-            binding.likeButton.setOnClickListener { onToggleLike(chunk.id) }
+            binding.likeButton.setOnClickListener {
+                if (chunk.likeable) onToggleLike(chunk.id)
+            }
         }
     }
 

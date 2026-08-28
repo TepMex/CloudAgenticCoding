@@ -1,0 +1,402 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "88fe5d72089d1345ccb40e01dfaab875",
+    "entities": [
+      {
+        "tableName": "hanzi",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`character` TEXT NOT NULL, `codePoint` INTEGER NOT NULL, `decomposition` TEXT, `etymologyType` TEXT, `etymologyHint` TEXT, `semanticComponent` TEXT, `phoneticComponent` TEXT, `primarySource` TEXT NOT NULL, `sourceRecordId` TEXT NOT NULL, PRIMARY KEY(`character`))",
+        "fields": [
+          {
+            "fieldPath": "character",
+            "columnName": "character",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codePoint",
+            "columnName": "codePoint",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decomposition",
+            "columnName": "decomposition",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "etymologyType",
+            "columnName": "etymologyType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "etymologyHint",
+            "columnName": "etymologyHint",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "semanticComponent",
+            "columnName": "semanticComponent",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "phoneticComponent",
+            "columnName": "phoneticComponent",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "primarySource",
+            "columnName": "primarySource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRecordId",
+            "columnName": "sourceRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "character"
+          ]
+        }
+      },
+      {
+        "tableName": "greedy_composition",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`character` TEXT NOT NULL, `componentsJson` TEXT NOT NULL, `isPhoneticSemantic` INTEGER NOT NULL, `phonetic` TEXT, PRIMARY KEY(`character`))",
+        "fields": [
+          {
+            "fieldPath": "character",
+            "columnName": "character",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "componentsJson",
+            "columnName": "componentsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPhoneticSemantic",
+            "columnName": "isPhoneticSemantic",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phonetic",
+            "columnName": "phonetic",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "character"
+          ]
+        }
+      },
+      {
+        "tableName": "variant",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceCharacter` TEXT NOT NULL, `targetCharacter` TEXT NOT NULL, `direction` TEXT NOT NULL, `localeOrStandard` TEXT, `isPreferred` INTEGER NOT NULL, `isAmbiguous` INTEGER NOT NULL, `source` TEXT NOT NULL, `sourceRecordId` TEXT NOT NULL, PRIMARY KEY(`sourceCharacter`, `targetCharacter`, `direction`, `source`))",
+        "fields": [
+          {
+            "fieldPath": "sourceCharacter",
+            "columnName": "sourceCharacter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetCharacter",
+            "columnName": "targetCharacter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localeOrStandard",
+            "columnName": "localeOrStandard",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isPreferred",
+            "columnName": "isPreferred",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAmbiguous",
+            "columnName": "isAmbiguous",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRecordId",
+            "columnName": "sourceRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sourceCharacter",
+            "targetCharacter",
+            "direction",
+            "source"
+          ]
+        }
+      },
+      {
+        "tableName": "simplification",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`inputCharacter` TEXT NOT NULL, `simplifiedCharacter` TEXT NOT NULL, `traditionalCharacter` TEXT NOT NULL, `classification` TEXT NOT NULL, `explanation` TEXT NOT NULL, `changedComponentsJson` TEXT, `evidenceType` TEXT NOT NULL, `confidence` REAL NOT NULL, `source` TEXT NOT NULL, `sourceRecordId` TEXT NOT NULL, PRIMARY KEY(`inputCharacter`))",
+        "fields": [
+          {
+            "fieldPath": "inputCharacter",
+            "columnName": "inputCharacter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "simplifiedCharacter",
+            "columnName": "simplifiedCharacter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalCharacter",
+            "columnName": "traditionalCharacter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "classification",
+            "columnName": "classification",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "explanation",
+            "columnName": "explanation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "changedComponentsJson",
+            "columnName": "changedComponentsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "evidenceType",
+            "columnName": "evidenceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRecordId",
+            "columnName": "sourceRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "inputCharacter"
+          ]
+        }
+      },
+      {
+        "tableName": "mnemonic",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `character` TEXT NOT NULL, `story` TEXT NOT NULL, `language` TEXT NOT NULL, `rawScore` REAL, `normalizedScore` REAL NOT NULL, `sourcePriority` INTEGER NOT NULL, `source` TEXT NOT NULL, `sourceRecordId` TEXT NOT NULL, `attribution` TEXT NOT NULL, `license` TEXT NOT NULL, `contentHash` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "character",
+            "columnName": "character",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "story",
+            "columnName": "story",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawScore",
+            "columnName": "rawScore",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "normalizedScore",
+            "columnName": "normalizedScore",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcePriority",
+            "columnName": "sourcePriority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRecordId",
+            "columnName": "sourceRecordId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attribution",
+            "columnName": "attribution",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "license",
+            "columnName": "license",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentHash",
+            "columnName": "contentHash",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mnemonic_character_normalizedScore",
+            "unique": false,
+            "columnNames": [
+              "character",
+              "normalizedScore"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mnemonic_character_normalizedScore` ON `${TABLE_NAME}` (`character`, `normalizedScore`)"
+          }
+        ]
+      },
+      {
+        "tableName": "dataset_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `schemaVersion` INTEGER NOT NULL, `datasetVersion` TEXT NOT NULL, `buildTimestamp` TEXT NOT NULL, `sourceVersionsJson` TEXT NOT NULL, `sourceChecksumsJson` TEXT NOT NULL, `recordCountsJson` TEXT NOT NULL, `licenseIdentifiersJson` TEXT NOT NULL, `roomIdentityHash` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schemaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "datasetVersion",
+            "columnName": "datasetVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "buildTimestamp",
+            "columnName": "buildTimestamp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceVersionsJson",
+            "columnName": "sourceVersionsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceChecksumsJson",
+            "columnName": "sourceChecksumsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordCountsJson",
+            "columnName": "recordCountsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "licenseIdentifiersJson",
+            "columnName": "licenseIdentifiersJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roomIdentityHash",
+            "columnName": "roomIdentityHash",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '88fe5d72089d1345ccb40e01dfaab875')"
+    ]
+  }
+}

@@ -46,7 +46,7 @@ class PrepackagedDatabaseSmokeTest {
             )
             val cursor = raw.rawQuery("SELECT schemaVersion, datasetVersion FROM dataset_metadata WHERE id=1", null)
             assertTrue(cursor.moveToFirst())
-            assertEquals(1, cursor.getInt(0))
+            assertEquals(2, cursor.getInt(0))
             assertNotNull(cursor.getString(1))
             cursor.close()
             raw.close()
@@ -57,10 +57,27 @@ class PrepackagedDatabaseSmokeTest {
         try {
             val meta = db.hanziDao().getDatasetMetadata()
             assertNotNull(meta)
-            assertEquals(1, meta!!.schemaVersion)
-            assertEquals("1.1.0", meta.datasetVersion)
+            assertEquals(2, meta!!.schemaVersion)
+            assertEquals("1.2.0", meta.datasetVersion)
             val sample = db.hanziDao().getHanzi(listOf("清", "好"))
             assertTrue(sample.isNotEmpty())
+            val qingGreedy = db.hanziDao().getGreedyCompositions(listOf("清", "休", "吗", "亿"))
+            val byChar = qingGreedy.associateBy { it.character }
+            assertEquals(listOf("氵", "丰", "月"), parseComponentsJson(byChar.getValue("清").componentsJson))
+            assertEquals(true, byChar.getValue("清").isPhoneticSemantic)
+            assertEquals("青", byChar.getValue("清").phonetic)
+            assertEquals(false, byChar.getValue("休").isPhoneticSemantic)
+            assertEquals(false, byChar.getValue("吗").isPhoneticSemantic)
+            assertEquals("意", byChar.getValue("亿").phonetic)
+            val loaderCards = CharacterCompositionLoader(
+                RoomHanziMetadataRepository(databaseProvider = { db }),
+            ).loadCards("清休")
+            assertEquals(listOf("清", "休"), loaderCards.map { it.character })
+            assertTrue(loaderCards[0].text.contains("Composition: 氵 + 丰 + 月"))
+            assertTrue(loaderCards[0].text.contains("Phonetic-semantic: yes"))
+            assertTrue(loaderCards[0].text.contains("Phonetic: 青"))
+            assertTrue(loaderCards[1].text.contains("Composition: 人 + 木"))
+            assertTrue(loaderCards[1].text.contains("Phonetic-semantic: no"))
             val broadCoverageSample = db.hanziDao().getMnemonics(listOf("你"))
             assertTrue(
                 broadCoverageSample.any {

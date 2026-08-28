@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         HanziEntity::class,
+        GreedyCompositionEntity::class,
         VariantEntity::class,
         SimplificationEntity::class,
         MnemonicEntity::class,
@@ -20,7 +21,7 @@ abstract class HanziMetadataDatabase : RoomDatabase() {
     abstract fun hanziDao(): HanziDao
 
     companion object {
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
         const val DB_NAME = "hanzi_metadata.db"
         const val ASSET_PATH = "databases/hanzi_metadata.db"
 

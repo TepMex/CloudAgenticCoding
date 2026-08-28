@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "datasetVersion": "1.1.0",
+  "datasetVersion": "1.2.0",
   "sources": {
     "unihan": {
       "name": "Unicode Unihan Database",
@@ -57,6 +57,18 @@
       "path": "hanzi_data/seed/curated_simplifications.json",
       "license": "CC0-1.0",
       "usedFor": ["SIMPL_HISTORY curated explanations"]
+    },
+    "project_greedy_components": {
+      "name": "anki-entertainer greedy components with conservative phonetics",
+      "version": "1.0.0",
+      "path": "hanzi_data/seed/greedy_components.csv",
+      "license": "CC0-1.0",
+      "usedFor": [
+        "local composition cards",
+        "conservative phonetic-semantic flags",
+        "greedy visible components"
+      ],
+      "note": "3500-character table of greedy parts plus a conservative pictophonetic flag and phonetic. Shown on the main screen before mnemonic/LLM stories."
     }
   }
 }

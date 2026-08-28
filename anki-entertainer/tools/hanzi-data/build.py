@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 from hanzi_data.db_writer import build_simplifications, write_database  # noqa: E402
 from hanzi_data.download import ensure_sources, load_lock, sha256_file  # noqa: E402
+from hanzi_data.greedy import parse_greedy_components_csv  # noqa: E402
 from hanzi_data.mmah import parse_mmah_dictionary  # noqa: E402
 from hanzi_data.mnemonics import (  # noqa: E402
     JsonMnemonicProvider,
@@ -34,7 +35,11 @@ def find_room_identity_hash(project_root: Path) -> str | None:
     schema_dir = project_root / "app" / "schemas"
     if not schema_dir.exists():
         return None
-    candidates = sorted(schema_dir.rglob("1.json"))
+    candidates = sorted(
+        [p for p in schema_dir.rglob("*.json") if p.stem.isdigit()],
+        key=lambda p: int(p.stem),
+        reverse=True,
+    )
     for path in candidates:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -162,6 +167,10 @@ def main() -> int:
     curated_path = ROOT / "hanzi_data" / "seed" / "curated_simplifications.json"
     curated = json.loads(curated_path.read_text(encoding="utf-8"))
 
+    greedy_path = ROOT / "hanzi_data" / "seed" / "greedy_components.csv"
+    print("Parsing greedy components…")
+    greedy = parse_greedy_components_csv(greedy_path)
+
     print("Building simplification explanations…")
     simplifications = build_simplifications(hanzi, variants, curated)
 
@@ -177,6 +186,7 @@ def main() -> int:
     checksums = {k: sha256_file(p) for k, p in paths.items()}
     checksums["project_seed_mnemonics"] = sha256_file(seed_path)
     checksums["project_curated_simplifications"] = sha256_file(curated_path)
+    checksums["project_greedy_components"] = sha256_file(greedy_path)
 
     out_db = out_dir / "hanzi_metadata.db"
     counts = write_database(
@@ -185,6 +195,7 @@ def main() -> int:
         variants=variants,
         simplifications=simplifications,
         mnemonics=mnemonics,
+        greedy=greedy,
         lock=lock,
         source_paths_checksums=checksums,
         room_identity_hash=identity,
@@ -195,7 +206,7 @@ def main() -> int:
 
     report = {
         "datasetVersion": lock.get("datasetVersion"),
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "roomIdentityHash": identity,
         "recordCounts": counts,
         "databaseBytes": out_db.stat().st_size,

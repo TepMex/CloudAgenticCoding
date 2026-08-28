@@ -6,6 +6,15 @@ data class HanziCharacterMetadata(
     val etymologyType: String?,
     val semanticComponent: String?,
     val phoneticComponent: String?,
+    /** Greedy visible parts from the local 3500-character table; empty if unknown. */
+    val greedyComponents: List<String> = emptyList(),
+    /**
+     * Conservative phonetic-semantic flag from the local table.
+     * Null when the character is not in that table (MMAH etymology is the fallback).
+     */
+    val isPhoneticSemantic: Boolean? = null,
+    /** Phonetic recorded by the local table when [isPhoneticSemantic] is true. */
+    val greedyPhonetic: String? = null,
     /** Targets in deterministic source order for opposite-form lookup. */
     val oppositeTargets: List<OppositeTarget>,
     val simplification: SimplificationInfo?,

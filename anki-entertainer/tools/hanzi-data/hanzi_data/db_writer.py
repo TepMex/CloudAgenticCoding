@@ -8,13 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .ids_diff import StructuralDiffResult, compare_ids_trees
+from .greedy import GreedyCompositionRecord
 from .mmah import HanziRecord
 from .mnemonics import MnemonicRecord
 from .unihan import VariantEdge
 
 # Must match Room @Database version and entity table/column names.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 DDL = """
@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS hanzi (
   phoneticComponent TEXT,
   primarySource TEXT NOT NULL,
   sourceRecordId TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS greedy_composition (
+  character TEXT NOT NULL PRIMARY KEY,
+  componentsJson TEXT NOT NULL,
+  isPhoneticSemantic INTEGER NOT NULL,
+  phonetic TEXT
 );
 
 CREATE TABLE IF NOT EXISTS variant (
@@ -195,6 +202,7 @@ def write_database(
     variants: list[VariantEdge],
     simplifications: list[dict[str, Any]],
     mnemonics: list[MnemonicRecord],
+    greedy: dict[str, GreedyCompositionRecord],
     lock: dict[str, Any],
     source_paths_checksums: dict[str, str],
     room_identity_hash: str | None,
@@ -206,6 +214,7 @@ def write_database(
     conn = sqlite3.connect(dest)
     try:
         conn.executescript(DDL)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         cur = conn.cursor()
 
         cur.executemany(
@@ -228,6 +237,23 @@ def write_database(
                     r.source_record_id,
                 )
                 for r in hanzi.values()
+            ],
+        )
+
+        cur.executemany(
+            """
+            INSERT INTO greedy_composition (
+              character, componentsJson, isPhoneticSemantic, phonetic
+            ) VALUES (?, ?, ?, ?)
+            """,
+            [
+                (
+                    rec.character,
+                    json.dumps(rec.components, ensure_ascii=False),
+                    1 if rec.is_phonetic_semantic else 0,
+                    rec.phonetic,
+                )
+                for rec in greedy.values()
             ],
         )
 
@@ -315,6 +341,7 @@ def write_database(
 
         counts = {
             "hanzi": len(hanzi),
+            "greedy_composition": len(greedy),
             "variant": len(vrows),
             "simplification": len(simplifications),
             "mnemonic": len(mnemonics),

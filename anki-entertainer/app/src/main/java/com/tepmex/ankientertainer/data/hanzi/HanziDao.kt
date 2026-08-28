@@ -8,6 +8,9 @@ interface HanziDao {
     @Query("SELECT * FROM hanzi WHERE character IN (:characters)")
     suspend fun getHanzi(characters: List<String>): List<HanziEntity>
 
+    @Query("SELECT * FROM greedy_composition WHERE character IN (:characters)")
+    suspend fun getGreedyCompositions(characters: List<String>): List<GreedyCompositionEntity>
+
     @Query("SELECT * FROM variant WHERE sourceCharacter IN (:characters)")
     suspend fun getVariants(characters: List<String>): List<VariantEntity>
 
