@@ -38,5 +38,12 @@
             android:label="@string/settings_title"
             android:parentActivityName="com.tepmex.ankientertainer.ui.MainActivity"
             android:theme="@style/Theme.AnkiEntertainer.WithActionBar" />
+
+        <activity
+            android:name=".ui.PosterViewerActivity"
+            android:exported="false"
+            android:label="@string/poster_viewer_title"
+            android:parentActivityName="com.tepmex.ankientertainer.ui.MainActivity"
+            android:theme="@style/Theme.AnkiEntertainer" />
     </application>
 </manifest>

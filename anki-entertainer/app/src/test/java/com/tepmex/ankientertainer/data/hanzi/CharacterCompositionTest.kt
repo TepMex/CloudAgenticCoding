@@ -143,10 +143,11 @@ class CharacterCompositionTest {
     @Test
     fun sessionPutsCompositionAheadOfLikedAndStories() {
         val composition = listOf(chunk("c", "composition"))
+        val posters = listOf(chunk("p", "poster"))
         val liked = listOf(chunk("l", "liked", liked = true))
         val stories = listOf(chunk("s", "story"))
-        val merged = mergeSessionChunks(composition, liked, stories)
-        assertEquals(listOf("c", "l", "s"), merged.map { it.id })
+        val merged = mergeSessionChunks(composition, posters, liked, stories)
+        assertEquals(listOf("c", "p", "l", "s"), merged.map { it.id })
         assertEquals("composition", merged.first().text)
         assertEquals("story", merged.last().text)
     }
