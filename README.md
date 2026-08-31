@@ -32,8 +32,9 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `pair-comp-elo` | [pair-comp-elo](https://tepmex.github.io/CloudAgenticCoding/pair-comp-elo/) | Pair Comp Elo · pairwise ranking with Elo + decay (APK) |
 | `running-log` | [running-log](https://tepmex.github.io/CloudAgenticCoding/running-log/) | running-log · Mi Band running journal (APK) |
 | `ideal-timing` | [ideal-timing](https://tepmex.github.io/CloudAgenticCoding/ideal-timing/) | ideal-timing · 16h day clock from Mi Fitness wake-up (APK) |
+| `wo-de-luyou` | [wo-de-luyou](https://tepmex.github.io/CloudAgenticCoding/wo-de-luyou/) | wo-de-luyou · 我的旅游 travel dictionary (APK) |
 | `china-railways-map` | [china-railways-map](https://tepmex.github.io/CloudAgenticCoding/china_rail_interactive_map.html) | Chinese Railways map with pinyin and hanzi |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
-Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `ideal-timing`, `han-count-android`, `rth-agriculture-android`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
+Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `ideal-timing`, `han-count-android`, `rth-agriculture-android`, `wo-de-luyou`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
