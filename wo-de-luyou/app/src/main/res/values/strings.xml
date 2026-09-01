@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">我的旅游</string>
+    <string name="app_subtitle">Китай 2026 · wo-de-luyou</string>
+    <string name="search_hint">Поиск: иероглифы, пиньинь, русский</string>
+    <string name="search_empty">Ничего не найдено</string>
+    <string name="category_empty">В этой категории пока нет слов</string>
+    <string name="copy_hanzi">Копировать иероглифы</string>
+    <string name="copy_pinyin">Копировать пиньинь</string>
+    <string name="copied_hanzi">Скопировано: %1$s</string>
+    <string name="copied_pinyin">Скопирован пиньинь: %1$s</string>
+    <string name="open_in_pleco">Открыть в Pleco</string>
+    <string name="pleco_missing">Pleco не установлен</string>
+    <string name="back">Назад</string>
+</resources>

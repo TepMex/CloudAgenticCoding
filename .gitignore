@@ -84,3 +84,8 @@ han-count-android/local.properties
 han-count-android/app/src/main/assets/www/**
 !han-count-android/app/src/main/assets/www/.gitkeep
 !han-count-android/app/src/main/assets/www/.gitignore
+
+# Android (wo-de-luyou)
+wo-de-luyou/.gradle/
+wo-de-luyou/**/build/
+wo-de-luyou/local.properties

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none" role="img" aria-label="wo-de-luyou">
+  <rect width="72" height="72" rx="16" fill="#C23A2B"/>
+  <path fill="#fff" d="M36 16 L58 50 H14 Z"/>
+  <path fill="#C23A2B" d="M36 26 L46 44 H26 Z"/>
+  <rect x="14" y="54" width="44" height="5" rx="1" fill="#fff"/>
+  <circle cx="52" cy="20" r="6" fill="#fff"/>
+</svg>
