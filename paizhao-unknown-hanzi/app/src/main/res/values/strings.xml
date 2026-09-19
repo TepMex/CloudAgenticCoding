@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">拍照未知汉字</string>
+    <string name="settings">Настройки</string>
+    <string name="back">Назад</string>
+    <string name="save">Сохранить</string>
+    <string name="take_photo">Сделать фото</string>
+    <string name="capture_hint">Сфотографируйте китайский текст. Известные иероглифы из настроек будут скрыты.</string>
+    <string name="camera_permission_rationale">Нужен доступ к камере, чтобы сфотографировать текст.</string>
+    <string name="grant_camera">Разрешить камеру</string>
+    <string name="ocr_working">Читаю иероглифы…</string>
+    <string name="ocr_failed">Не удалось распознать фото: %1$s</string>
+    <string name="results_title">Неизвестные иероглифы</string>
+    <string name="empty_none_found">На фото не нашлось китайских иероглифов.</string>
+    <string name="empty_all_known">Все иероглифы на фото уже в списке известных.</string>
+    <string name="known_hint">Вставьте или наберите текст. Каждый китайский иероглиф в этом поле считается известным.</string>
+    <string name="known_field_label">Известные иероглифы</string>
+    <string name="known_count">Уникальных известных: %1$d</string>
+    <string name="known_saved">Сохранено</string>
+    <string name="pleco_missing">Pleco не установлен</string>
+</resources>

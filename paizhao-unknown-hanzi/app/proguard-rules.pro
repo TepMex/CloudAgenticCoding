@@ -1,0 +1,6 @@
+-keep class com.tepmex.paizhaounknownhanzi.** { *; }
+-keep class com.google.ai.edge.litert.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+-keep class net.sourceforge.pinyin4j.** { *; }
+-dontwarn com.google.ai.edge.litert.**
+-dontwarn org.tensorflow.lite.**
