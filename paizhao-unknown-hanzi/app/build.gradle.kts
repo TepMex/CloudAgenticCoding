@@ -109,7 +109,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
 
-    implementation("com.google.ai.edge.litert:litert:2.2.0")
+    implementation("com.google.ai.edge.litert:litert:2.1.0")
     implementation("com.belerweb:pinyin4j:2.5.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

@@ -84,7 +84,7 @@ class LiteRtHanziOcr(private val context: Context) {
         var detector: CompiledModel? = null
         var recognizer: CompiledModel? = null
         try {
-            environment = Environment.create(context.applicationContext)
+            environment = Environment.create()
             val options = CompiledModel.Options(accelerator)
             detector = CompiledModel.create(context.assets, "ocr/$DET_FILE", options, environment)
             recognizer = CompiledModel.create(context.assets, "ocr/$REC_FILE", options, environment)

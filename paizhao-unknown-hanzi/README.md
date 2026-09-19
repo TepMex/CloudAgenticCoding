@@ -43,6 +43,6 @@ On push to `master`, `.github/workflows/deploy.yml` builds the release APK, veri
 ## Tech stack
 
 - Kotlin, Jetpack Compose, Material 3, CameraX
-- LiteRT `CompiledModel` 2.2.0 — detector and recognizer share one GPU `Environment` (CPU fallback)
+- LiteRT `CompiledModel` — detector and recognizer share one GPU `Environment` (CPU fallback)
 - PP-OCRv5 FP16 detection + CTC recognition
 - pinyin4j tone marks
