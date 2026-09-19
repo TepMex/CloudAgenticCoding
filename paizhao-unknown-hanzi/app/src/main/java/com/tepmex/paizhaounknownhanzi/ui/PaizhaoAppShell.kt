@@ -352,7 +352,7 @@ private fun ResultsScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(stringResource(R.string.ocr_failed, state.message), textAlign = TextAlign.Center)
+                    Text(state.message, textAlign = TextAlign.Center)
                     FilledTonalButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
                         Text(stringResource(R.string.back))
                     }
