@@ -2,13 +2,16 @@ package com.tepmex.paizhaounknownhanzi.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tepmex.paizhaounknownhanzi.PaizhaoApp
+import com.tepmex.paizhaounknownhanzi.R
 import com.tepmex.paizhaounknownhanzi.domain.Hanzi
 import com.tepmex.paizhaounknownhanzi.domain.HanziCard
 import com.tepmex.paizhaounknownhanzi.domain.PinyinLookup
 import com.tepmex.paizhaounknownhanzi.domain.UnknownHanzi
+import com.tepmex.paizhaounknownhanzi.ocr.OcrErrors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -67,7 +70,13 @@ class PaizhaoViewModel(application: Application) : AndroidViewModel(application)
                     _scan.value = ScanState.Ready(cards, found)
                 },
                 onFailure = { e ->
-                    _scan.value = ScanState.Failed(e.message ?: e.javaClass.simpleName)
+                    Log.e("PaizhaoViewModel", "OCR failed", e)
+                    val message = if (OcrErrors.isEngineFailure(e)) {
+                        app.getString(R.string.ocr_engine_failed)
+                    } else {
+                        app.getString(R.string.ocr_failed, e.message ?: e.javaClass.simpleName)
+                    }
+                    _scan.value = ScanState.Failed(message)
                 },
             )
         }

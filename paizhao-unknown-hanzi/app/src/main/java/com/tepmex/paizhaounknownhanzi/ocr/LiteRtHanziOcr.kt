@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.google.ai.edge.litert.Accelerator
 import com.google.ai.edge.litert.CompiledModel
-import java.io.File
-import java.io.FileOutputStream
+import com.google.ai.edge.litert.Environment
+import com.google.ai.edge.litert.TensorBuffer
 
 data class OcrLine(
     val text: String,
@@ -15,8 +15,13 @@ data class OcrLine(
 
 class LiteRtHanziOcr(private val context: Context) {
     private val lock = Any()
+    private var env: Environment? = null
     private var det: CompiledModel? = null
     private var rec: CompiledModel? = null
+    private var detIn: List<TensorBuffer> = emptyList()
+    private var detOut: List<TensorBuffer> = emptyList()
+    private var recIn: List<TensorBuffer> = emptyList()
+    private var recOut: List<TensorBuffer> = emptyList()
     private var charset: List<String> = emptyList()
 
     fun recognize(bitmap: Bitmap): List<OcrLine> {
@@ -52,78 +57,114 @@ class LiteRtHanziOcr(private val context: Context) {
     private fun ensureLoaded() {
         synchronized(lock) {
             if (det != null && rec != null) return
-            copyAsset(DET_FILE)
-            copyAsset(REC_FILE)
-            copyAsset(DICT_FILE)
             charset = CtcDecoder.charsetFromDictLines(
-                File(modelDir(), DICT_FILE).readLines(Charsets.UTF_8).map { it.trimEnd('\r') },
+                context.assets.open("ocr/$DICT_FILE").bufferedReader(Charsets.UTF_8).use { reader ->
+                    reader.readLines().map { it.trimEnd('\r') }
+                },
             )
-            det = openModel(DET_FILE)
-            rec = openModel(REC_FILE)
-            Log.i(TAG, "LiteRT OCR ready charset=${charset.size}")
-        }
-    }
-
-    private fun runDet(model: CompiledModel, input: FloatArray): FloatArray {
-        val ins = model.createInputBuffers()
-        val outs = model.createOutputBuffers()
-        try {
-            ins[0].writeFloat(input)
-            model.run(ins, outs)
-            return outs[0].readFloat()
-        } finally {
-            closeBuffers(ins)
-            closeBuffers(outs)
-        }
-    }
-
-    private fun runRec(model: CompiledModel, input: FloatArray): String {
-        val ins = model.createInputBuffers()
-        val outs = model.createOutputBuffers()
-        try {
-            ins[0].writeFloat(input)
-            model.run(ins, outs)
-            val logits = outs[0].readFloat()
-            val classes = charset.size
-            val time = if (classes == 0) 0 else logits.size / classes
-            return CtcDecoder.greedyFromLogits(logits, time, classes, charset)
-        } finally {
-            closeBuffers(ins)
-            closeBuffers(outs)
-        }
-    }
-
-    private fun openModel(fileName: String): CompiledModel {
-        val path = File(modelDir(), fileName).absolutePath
-        return try {
-            CompiledModel.create(path, CompiledModel.Options(Accelerator.GPU))
-        } catch (gpu: Exception) {
-            Log.w(TAG, "GPU compile failed for $fileName, falling back to CPU", gpu)
-            CompiledModel.create(path, CompiledModel.Options(Accelerator.CPU))
-        }
-    }
-
-    private fun copyAsset(name: String) {
-        val dest = File(modelDir(), name)
-        if (dest.exists() && dest.length() > 0) return
-        dest.parentFile?.mkdirs()
-        context.assets.open("ocr/$name").use { input ->
-            FileOutputStream(dest).use { output -> input.copyTo(output) }
-        }
-    }
-
-    private fun modelDir(): File = File(context.filesDir, "ocr")
-
-    private fun closeBuffers(buffers: List<*>) {
-        for (b in buffers) {
-            if (b is AutoCloseable) {
-                try {
-                    b.close()
-                } catch (_: Exception) {
-                }
+            try {
+                bind(openPair(Accelerator.GPU))
+                Log.i(TAG, "LiteRT OCR ready GPU charset=${charset.size}")
+            } catch (gpu: Exception) {
+                Log.w(TAG, "GPU compile failed, falling back to CPU", gpu)
+                closeSession()
+                bind(openPair(Accelerator.CPU))
+                Log.i(TAG, "LiteRT OCR ready CPU charset=${charset.size}")
             }
         }
     }
+
+    /**
+     * Detector and recognizer must share one [Environment]. LiteRT 2.1 GPU
+     * fails in `createInputBuffers` / `run` when each model owns its own env
+     * (google-ai-edge/LiteRT#5264).
+     */
+    private fun openPair(accelerator: Accelerator): Session {
+        var environment: Environment? = null
+        var detector: CompiledModel? = null
+        var recognizer: CompiledModel? = null
+        try {
+            environment = Environment.create(context.applicationContext)
+            val options = CompiledModel.Options(accelerator)
+            detector = CompiledModel.create(context.assets, "ocr/$DET_FILE", options, environment)
+            recognizer = CompiledModel.create(context.assets, "ocr/$REC_FILE", options, environment)
+            return Session(
+                env = environment,
+                det = detector,
+                rec = recognizer,
+                detIn = detector.createInputBuffers(),
+                detOut = detector.createOutputBuffers(),
+                recIn = recognizer.createInputBuffers(),
+                recOut = recognizer.createOutputBuffers(),
+            )
+        } catch (e: Exception) {
+            runCatching { detector?.close() }
+            runCatching { recognizer?.close() }
+            runCatching { environment?.close() }
+            throw e
+        }
+    }
+
+    private fun bind(session: Session) {
+        env = session.env
+        det = session.det
+        rec = session.rec
+        detIn = session.detIn
+        detOut = session.detOut
+        recIn = session.recIn
+        recOut = session.recOut
+    }
+
+    private fun runDet(model: CompiledModel, input: FloatArray): FloatArray {
+        detIn[0].writeFloat(input)
+        model.run(detIn, detOut)
+        return detOut[0].readFloat()
+    }
+
+    private fun runRec(model: CompiledModel, input: FloatArray): String {
+        recIn[0].writeFloat(input)
+        model.run(recIn, recOut)
+        val logits = recOut[0].readFloat()
+        val classes = charset.size
+        val time = if (classes == 0) 0 else logits.size / classes
+        return CtcDecoder.greedyFromLogits(logits, time, classes, charset)
+    }
+
+    private fun closeSession() {
+        closeBuffers(detIn)
+        closeBuffers(detOut)
+        closeBuffers(recIn)
+        closeBuffers(recOut)
+        detIn = emptyList()
+        detOut = emptyList()
+        recIn = emptyList()
+        recOut = emptyList()
+        runCatching { det?.close() }
+        runCatching { rec?.close() }
+        runCatching { env?.close() }
+        det = null
+        rec = null
+        env = null
+    }
+
+    private fun closeBuffers(buffers: List<TensorBuffer>) {
+        for (b in buffers) {
+            try {
+                b.close()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private data class Session(
+        val env: Environment,
+        val det: CompiledModel,
+        val rec: CompiledModel,
+        val detIn: List<TensorBuffer>,
+        val detOut: List<TensorBuffer>,
+        val recIn: List<TensorBuffer>,
+        val recOut: List<TensorBuffer>,
+    )
 
     companion object {
         private const val TAG = "LiteRtHanziOcr"

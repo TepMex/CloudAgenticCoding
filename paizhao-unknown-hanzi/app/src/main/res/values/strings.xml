@@ -10,6 +10,7 @@
     <string name="grant_camera">Разрешить камеру</string>
     <string name="ocr_working">Читаю иероглифы…</string>
     <string name="ocr_failed">Не удалось распознать фото: %1$s</string>
+    <string name="ocr_engine_failed">Не удалось распознать фото. Перезапустите приложение и снимите текст ещё раз при ровном свете.</string>
     <string name="results_title">Неизвестные иероглифы</string>
     <string name="empty_none_found">На фото не нашлось китайских иероглифов.</string>
     <string name="empty_all_known">Все иероглифы на фото уже в списке известных.</string>

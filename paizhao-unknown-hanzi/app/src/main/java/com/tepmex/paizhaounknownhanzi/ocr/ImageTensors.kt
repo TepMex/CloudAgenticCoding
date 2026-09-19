@@ -11,12 +11,19 @@ object ImageTensors {
     private val IMAGENET_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
 
     fun constrain(src: Bitmap, maxSide: Int = 1920): Bitmap {
-        val side = maxOf(src.width, src.height)
-        if (side <= maxSide) return src
+        val software = if (src.config == Bitmap.Config.HARDWARE) {
+            src.copy(Bitmap.Config.ARGB_8888, false) ?: src
+        } else {
+            src
+        }
+        val side = maxOf(software.width, software.height)
+        if (side <= maxSide) return software
         val scale = maxSide.toFloat() / side
-        val w = (src.width * scale).roundToInt().coerceAtLeast(1)
-        val h = (src.height * scale).roundToInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(src, w, h, true)
+        val w = (software.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (software.height * scale).roundToInt().coerceAtLeast(1)
+        val scaled = Bitmap.createScaledBitmap(software, w, h, true)
+        if (software !== src && software !== scaled) software.recycle()
+        return scaled
     }
 
     fun letterboxRgb(src: Bitmap, dst: Int = DET_SIZE): Pair<Bitmap, Letterbox> {
