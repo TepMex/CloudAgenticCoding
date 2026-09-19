@@ -54,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 import com.tepmex.paizhaounknownhanzi.R
 import com.tepmex.paizhaounknownhanzi.domain.Hanzi
 import com.tepmex.paizhaounknownhanzi.domain.HanziCard
@@ -90,6 +92,7 @@ fun PaizhaoAppShell(
     val knownText by viewModel.knownText.collectAsStateWithLifecycle()
     val savedTick by viewModel.savedTick.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val plecoMissing = stringResource(R.string.pleco_missing)
     val savedMessage = stringResource(R.string.known_saved)
@@ -135,7 +138,7 @@ fun PaizhaoAppShell(
                     },
                     onOpenCard = { card ->
                         if (!openPleco(context, card.hanzi)) {
-                            snackbar.showSnackbar(plecoMissing)
+                            scope.launch { snackbar.showSnackbar(plecoMissing) }
                         }
                     },
                 )

@@ -58,6 +58,8 @@ class PaizhaoViewModel(application: Application) : AndroidViewModel(application)
                     val uniqueFound = Hanzi.extractUniqueInOrder(ocrText).size
                     val cards = UnknownHanzi.cards(ocrText, known, PinyinLookup::of)
                     uniqueFound to cards
+                }.also {
+                    if (!bitmap.isRecycled) bitmap.recycle()
                 }
             }
             result.fold(
