@@ -508,7 +508,11 @@ jobs:
 
       - name: Setup Android SDK
         if: needs.detect.outputs.any_android_apk_build == 'true'
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          # Google removed the obsolete `tools` package; v3 still requests it by default
+          # and fails with "Failed to find package 'tools'".
+          packages: platform-tools
 
       - name: Build ChessWatch APK
         if: needs.detect.outputs.build_chesswatch == 'true'
