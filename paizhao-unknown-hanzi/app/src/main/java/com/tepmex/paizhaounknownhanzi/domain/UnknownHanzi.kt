@@ -10,10 +10,17 @@ object UnknownHanzi {
         ocrText: String,
         knownText: String,
         pinyinOf: (String) -> String,
+        includeKnown: Boolean = false,
     ): List<HanziCard> {
-        val known = Hanzi.uniqueSet(knownText)
-        return Hanzi.extractUniqueInOrder(ocrText)
-            .filter { it !in known }
-            .map { HanziCard(hanzi = it, pinyin = pinyinOf(it)) }
+        val unique = Hanzi.extractUniqueInOrder(ocrText)
+        val selected = if (includeKnown) {
+            unique
+        } else {
+            val known = Hanzi.uniqueSet(knownText)
+            unique.filter { it !in known }
+        }
+        return selected.map { HanziCard(hanzi = it, pinyin = pinyinOf(it)) }
     }
+
+    fun shareText(ocrText: String): String = Hanzi.extractUniqueInOrder(ocrText).joinToString("")
 }
