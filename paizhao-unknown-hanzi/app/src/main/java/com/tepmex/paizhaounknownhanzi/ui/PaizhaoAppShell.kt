@@ -8,6 +8,7 @@ import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,10 +35,13 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -90,21 +96,20 @@ fun PaizhaoAppShell(
     val nav = rememberNavController()
     val scan by viewModel.scan.collectAsStateWithLifecycle()
     val knownText by viewModel.knownText.collectAsStateWithLifecycle()
+    val showKnownHanzi by viewModel.showKnownHanzi.collectAsStateWithLifecycle()
     val savedTick by viewModel.savedTick.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val plecoMissing = stringResource(R.string.pleco_missing)
     val savedMessage = stringResource(R.string.known_saved)
+    val resultsRoute = scan is ScanState.Ready || scan is ScanState.Failed
 
-    LaunchedEffect(scan) {
-        when (val s = scan) {
-            is ScanState.Ready, is ScanState.Failed -> {
-                nav.navigate(Routes.RESULTS) {
-                    launchSingleTop = true
-                }
+    LaunchedEffect(resultsRoute) {
+        if (resultsRoute && nav.currentDestination?.route != Routes.RESULTS) {
+            nav.navigate(Routes.RESULTS) {
+                launchSingleTop = true
             }
-            else -> Unit
         }
     }
 
@@ -125,13 +130,18 @@ fun PaizhaoAppShell(
             composable(Routes.CAPTURE) {
                 CaptureScreen(
                     processing = scan is ScanState.Processing,
+                    showKnownHanzi = showKnownHanzi,
+                    onShowKnownChange = viewModel::setShowKnownHanzi,
                     onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                     onPhoto = viewModel::onPhoto,
+                    onGallery = viewModel::onGallery,
                 )
             }
             composable(Routes.RESULTS) {
                 ResultsScreen(
                     state = scan,
+                    showKnownHanzi = showKnownHanzi,
+                    onShowKnownChange = viewModel::setShowKnownHanzi,
                     onBack = {
                         viewModel.consumeScanNavigation()
                         nav.popBackStack(Routes.CAPTURE, inclusive = false)
@@ -141,6 +151,7 @@ fun PaizhaoAppShell(
                             scope.launch { snackbar.showSnackbar(plecoMissing) }
                         }
                     },
+                    onShare = { text -> shareRecognized(context, text) },
                 )
             }
             composable(Routes.SETTINGS) {
@@ -158,8 +169,11 @@ fun PaizhaoAppShell(
 @Composable
 private fun CaptureScreen(
     processing: Boolean,
+    showKnownHanzi: Boolean,
+    onShowKnownChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onPhoto: (android.graphics.Bitmap) -> Unit,
+    onGallery: (Uri) -> Unit,
 ) {
     val context = LocalContext.current
     var granted by remember {
@@ -171,9 +185,15 @@ private fun CaptureScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted = it }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) onGallery(uri)
+    }
 
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val shutterLabel = stringResource(R.string.take_photo)
+    val galleryLabel = stringResource(R.string.pick_gallery)
 
     Scaffold(
         topBar = {
@@ -202,10 +222,31 @@ private fun CaptureScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            ShowKnownRow(
+                showKnown = showKnownHanzi,
+                onShowKnownChange = onShowKnownChange,
+            )
             if (!granted) {
                 Text(stringResource(R.string.camera_permission_rationale))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                     Text(stringResource(R.string.grant_camera))
+                }
+                if (processing) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = stringResource(R.string.ocr_working),
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             } else {
                 Box(
@@ -260,6 +301,21 @@ private fun CaptureScreen(
                     )
                 }
             }
+            FilledTonalButton(
+                onClick = {
+                    galleryLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                enabled = !processing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
+                Text(
+                    text = galleryLabel,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
     }
 }
@@ -311,9 +367,14 @@ private fun CameraPreview(
 @Composable
 private fun ResultsScreen(
     state: ScanState,
+    showKnownHanzi: Boolean,
+    onShowKnownChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenCard: (HanziCard) -> Unit,
+    onShare: (String) -> Unit,
 ) {
+    val shareText = (state as? ScanState.Ready)?.shareText.orEmpty()
+    val canShare = shareText.isNotEmpty()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -324,6 +385,16 @@ private fun ResultsScreen(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
                         )
+                    }
+                },
+                actions = {
+                    if (canShare) {
+                        IconButton(onClick = { onShare(shareText) }) {
+                            Icon(
+                                Icons.Filled.Share,
+                                contentDescription = stringResource(R.string.share_hanzi),
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -359,22 +430,42 @@ private fun ResultsScreen(
                 }
             }
             is ScanState.Ready -> {
-                if (state.uniqueFound == 0) {
-                    EmptyCopy(stringResource(R.string.empty_none_found), padding, onBack)
-                } else if (state.cards.isEmpty()) {
-                    EmptyCopy(stringResource(R.string.empty_all_known), padding, onBack)
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                        contentPadding = PaddingValues(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(state.cards, key = { it.hanzi }) { card ->
-                            HanziCardCell(card = card, onClick = { onOpenCard(card) })
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    ResultsActionsRow(
+                        showKnown = showKnownHanzi,
+                        onShowKnownChange = onShowKnownChange,
+                        canShare = canShare,
+                        onShare = { onShare(shareText) },
+                    )
+                    if (state.uniqueFound == 0) {
+                        EmptyCopy(
+                            text = stringResource(R.string.empty_none_found),
+                            onBack = onBack,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else if (state.cards.isEmpty()) {
+                        EmptyCopy(
+                            text = stringResource(R.string.empty_all_known),
+                            onBack = onBack,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentPadding = PaddingValues(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(state.cards, key = { it.hanzi }) { card ->
+                                HanziCardCell(card = card, onClick = { onOpenCard(card) })
+                            }
                         }
                     }
                 }
@@ -384,11 +475,60 @@ private fun ResultsScreen(
 }
 
 @Composable
-private fun EmptyCopy(text: String, padding: PaddingValues, onBack: () -> Unit) {
-    Column(
+private fun ResultsActionsRow(
+    showKnown: Boolean,
+    onShowKnownChange: (Boolean) -> Unit,
+    canShare: Boolean,
+    onShare: () -> Unit,
+) {
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShowKnownRow(
+            showKnown = showKnown,
+            onShowKnownChange = onShowKnownChange,
+            modifier = Modifier.weight(1f),
+        )
+        if (canShare) {
+            IconButton(onClick = onShare) {
+                Icon(
+                    Icons.Filled.Share,
+                    contentDescription = stringResource(R.string.share_hanzi),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShowKnownRow(
+    showKnown: Boolean,
+    onShowKnownChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.clickable { onShowKnownChange(!showKnown) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = showKnown,
+            onCheckedChange = null,
+        )
+        Text(
+            text = stringResource(R.string.show_known_hanzi),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun EmptyCopy(text: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -504,5 +644,15 @@ private fun openPleco(context: android.content.Context, hanzi: String): Boolean 
     } catch (_: ActivityNotFoundException) {
         false
     }
+}
+
+private fun shareRecognized(context: android.content.Context, text: String) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(
+        Intent.createChooser(send, context.getString(R.string.share_hanzi)),
+    )
 }
 
