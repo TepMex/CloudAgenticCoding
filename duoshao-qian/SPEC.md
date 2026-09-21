@@ -10,10 +10,10 @@ Audience: someone preparing for shops and street stalls in China who already kno
 
 1. Display name **多少钱**; project / Pages path **duoshao-qian**; application id `com.tepmex.duoshaoqian`.
 2. Game loop:
-   1. Show one product a tourist might buy in China (drink, fruit, or food) with a generated photo, Chinese name, pinyin, and Russian gloss. Do **not** show the numeric price before payment.
+   1. Show one product a tourist might buy in China (drink, fruit, snack, or a cheap sit-down/takeaway meal) with a generated photo, Chinese name, pinyin, and Russian gloss. Do **not** show the numeric price before payment.
    2. Tap **多少钱?** to play bundled Chinese audio of that product’s price.
    3. Assemble the heard amount from all currently circulating RMB banknotes and tap **付款**.
-3. Prices must be plausible for the product (a water bottle is a few yuan, not ¥100).
+3. Prices must be plausible for the product (a water bottle is a few yuan, not ¥100). Every whole-yuan amount in the bundled audio catalog must appear on at least one product, including 1–9, teens, and 20–40 meal prices. Rounds pick a spoken amount uniformly from those catalog numbers, then a matching product, so cheap snacks do not dominate listening practice.
 4. Banknote picker includes every current paper denomination: **¥1, ¥5, ¥10, ¥20, ¥50, ¥100**. Designs are stylized but color/layout-similar to the fifth-series notes. Tapping a note adds it to the tender; tapping a tendered note removes it. Show the running total in yuan.
 5. **付款** succeeds only on an exact match with the spoken price. Wrong amounts stay on the same product so the player can listen again. After a correct payment, score updates and a new product appears.
 6. Bundle spoken numbers from `chinese_money_numbers.json` (base64 audio fields). The app plays those clips; it does not call a network TTS API at runtime. Only prices that have an audio entry may be asked.
@@ -39,7 +39,7 @@ No accounts, no network, no custom URL scheme in v1.
 - **AudioCatalog** — map of amount → clip parsed from `chinese_money_numbers.json`.
 - **Product** — id, hanzi, pinyin, russian, image asset, `priceYuanOptions` (whole yuan amounts that exist in the audio catalog and fit the product).
 - **Banknote** — denomination yuan (1, 5, 10, 20, 50, 100), palette, labels.
-- **Round** — product + secret `priceYuan` chosen from that product’s options.
+- **Round** — product + secret `priceYuan` drawn uniformly from the distinct offered audio amounts, then a product that lists that amount.
 - **Tender** — multiset of banknotes; `sumYuan` is their total.
 - **Session** — correct count, current streak, current round.
 
@@ -65,7 +65,7 @@ Persistence: none in v1. Uninstall loses score; that is acceptable.
 
 1. A round shows a product image and never prints the secret price before a correct **付款**.
 2. **多少钱?** plays Chinese audio from the bundled JSON for that price.
-3. Water-class drinks are priced in a low single-digit yuan band; meals can be tens of yuan, never ¥100 for a bottle of water.
+3. Water-class drinks are priced in a low single-digit yuan band; meals can be tens of yuan, never ¥100 for a bottle of water. Playable products jointly cover every amount in `chinese_money_numbers.json`.
 4. Wallet shows ¥1, ¥5, ¥10, ¥20, ¥50, and ¥100 notes. Exact tender pays; a wrong sum keeps the same product.
 5. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
 6. Deploy workflow includes `duoshao-qian` in `ANDROID_APPS` and rebuilds when `duoshao-qian/**` changes.
