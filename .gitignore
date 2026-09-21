@@ -89,3 +89,8 @@ han-count-android/app/src/main/assets/www/**
 wo-de-luyou/.gradle/
 wo-de-luyou/**/build/
 wo-de-luyou/local.properties
+
+# Android (duoshao-qian)
+duoshao-qian/.gradle/
+duoshao-qian/**/build/
+duoshao-qian/local.properties

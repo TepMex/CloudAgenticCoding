@@ -16,7 +16,7 @@ permissions:
 
 env:
   WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou rth-agriculture
-  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android ideal-timing wo-de-luyou paizhao-unknown-hanzi
+  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android ideal-timing wo-de-luyou paizhao-unknown-hanzi duoshao-qian
 
 jobs:
   detect:
@@ -50,6 +50,7 @@ jobs:
       build_rth_agriculture_android: ${{ steps.plan.outputs.build_rth_agriculture_android }}
       build_wo_de_luyou: ${{ steps.plan.outputs.build_wo_de_luyou }}
       build_paizhao_unknown_hanzi: ${{ steps.plan.outputs.build_paizhao_unknown_hanzi }}
+      build_duoshao_qian: ${{ steps.plan.outputs.build_duoshao_qian }}
       refresh_android_landings: ${{ steps.plan.outputs.refresh_android_landings }}
       any_web_build: ${{ steps.plan.outputs.any_web_build }}
       any_android_apk_build: ${{ steps.plan.outputs.any_android_apk_build }}
@@ -118,6 +119,8 @@ jobs:
               - 'wo-de-luyou/**'
             paizhao-unknown-hanzi:
               - 'paizhao-unknown-hanzi/**'
+            duoshao-qian:
+              - 'duoshao-qian/**'
             shared-android-signing:
               - 'android/sideload-signing.gradle.kts'
               - 'android/verify-apk-sideload-cert.sh'
@@ -169,6 +172,7 @@ jobs:
           CHANGED_RTH_AGRICULTURE_ANDROID: ${{ steps.changes.outputs.rth-agriculture-android }}
           CHANGED_WO_DE_LUYOU: ${{ steps.changes.outputs.wo-de-luyou }}
           CHANGED_PAIZHAO_UNKNOWN_HANZI: ${{ steps.changes.outputs.paizhao-unknown-hanzi }}
+          CHANGED_DUOSHAO_QIAN: ${{ steps.changes.outputs.duoshao-qian }}
           CHANGED_ANDROID_SIGNING: ${{ steps.changes.outputs.shared-android-signing }}
           CHANGED_ANDROID_LANDING: ${{ steps.changes.outputs.shared-android-landing }}
           CHANGED_SCRIPTS: ${{ steps.changes.outputs.shared-scripts }}
@@ -215,6 +219,7 @@ jobs:
           build_rth_agriculture_android=false
           build_wo_de_luyou=false
           build_paizhao_unknown_hanzi=false
+          build_duoshao_qian=false
           refresh_android_landings=false
 
           if $full_deploy; then
@@ -244,6 +249,7 @@ jobs:
             build_rth_agriculture_android=true
             build_wo_de_luyou=true
             build_paizhao_unknown_hanzi=true
+            build_duoshao_qian=true
           else
             is_true "$CHANGED_SOCRATUS" && build_socratus=true
             is_true "$CHANGED_MANDARIN_KOAN" && build_mandarin_koan=true
@@ -271,6 +277,7 @@ jobs:
             is_true "$CHANGED_RTH_AGRICULTURE_ANDROID" && build_rth_agriculture_android=true
             is_true "$CHANGED_WO_DE_LUYOU" && build_wo_de_luyou=true
             is_true "$CHANGED_PAIZHAO_UNKNOWN_HANZI" && build_paizhao_unknown_hanzi=true
+            is_true "$CHANGED_DUOSHAO_QIAN" && build_duoshao_qian=true
             # Bundled assets must track the web game.
             is_true "$CHANGED_HAN_COUNT_ME" && build_han_count_android=true
             is_true "$CHANGED_RTH_AGRICULTURE" && build_rth_agriculture_android=true
@@ -293,6 +300,7 @@ jobs:
               build_rth_agriculture_android=true
               build_wo_de_luyou=true
               build_paizhao_unknown_hanzi=true
+              build_duoshao_qian=true
             fi
 
             if is_true "$CHANGED_ANDROID_LANDING" || is_true "$CHANGED_SCRIPTS"; then
@@ -304,7 +312,7 @@ jobs:
           $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou || $build_rth_agriculture && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_ideal_timing || $build_han_count_android || $build_rth_agriculture_android || $build_wo_de_luyou || $build_paizhao_unknown_hanzi && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_ideal_timing || $build_han_count_android || $build_rth_agriculture_android || $build_wo_de_luyou || $build_paizhao_unknown_hanzi || $build_duoshao_qian && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -338,6 +346,7 @@ jobs:
             echo "build_rth_agriculture_android=$build_rth_agriculture_android"
             echo "build_wo_de_luyou=$build_wo_de_luyou"
             echo "build_paizhao_unknown_hanzi=$build_paizhao_unknown_hanzi"
+            echo "build_duoshao_qian=$build_duoshao_qian"
             echo "refresh_android_landings=$refresh_android_landings"
             echo "any_web_build=$any_web_build"
             echo "any_android_apk_build=$any_android_apk_build"
@@ -607,6 +616,11 @@ jobs:
         working-directory: paizhao-unknown-hanzi
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Build duoshao-qian APK
+        if: needs.detect.outputs.build_duoshao_qian == 'true'
+        working-directory: duoshao-qian
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Verify APK sideload signing
         if: needs.detect.outputs.any_android_apk_build == 'true'
         env:
@@ -627,6 +641,7 @@ jobs:
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
+          BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
         run: |
           set -euo pipefail
           chmod +x android/verify-apk-sideload-cert.sh
@@ -651,6 +666,7 @@ jobs:
           if is_true "$BUILD_RTH_AGRICULTURE_ANDROID"; then verify rth-agriculture-android; fi
           if is_true "$BUILD_WO_DE_LUYOU"; then verify wo-de-luyou; fi
           if is_true "$BUILD_PAIZHAO_UNKNOWN_HANZI"; then verify paizhao-unknown-hanzi; fi
+          if is_true "$BUILD_DUOSHAO_QIAN"; then verify duoshao-qian; fi
 
       - name: Prepare GitHub Pages site
         env:
@@ -681,6 +697,7 @@ jobs:
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
+          BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -754,11 +771,12 @@ jobs:
               rth-agriculture-android) is_true "$BUILD_RTH_AGRICULTURE_ANDROID" ;;
               wo-de-luyou) is_true "$BUILD_WO_DE_LUYOU" ;;
               paizhao-unknown-hanzi) is_true "$BUILD_PAIZHAO_UNKNOWN_HANZI" ;;
+              duoshao-qian) is_true "$BUILD_DUOSHAO_QIAN" ;;
               *) return 1 ;;
             esac
           }
 
-          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log ideal-timing han-count-android rth-agriculture-android wo-de-luyou paizhao-unknown-hanzi; do
+          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log ideal-timing han-count-android rth-agriculture-android wo-de-luyou paizhao-unknown-hanzi duoshao-qian; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -799,6 +817,7 @@ jobs:
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
+          BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
           REFRESH_ANDROID_LANDINGS: ${{ needs.detect.outputs.refresh_android_landings }}
         run: |
           set -euo pipefail
@@ -824,6 +843,7 @@ jobs:
           should_inject rth-agriculture-android "$BUILD_RTH_AGRICULTURE_ANDROID" && pages+=(deploy/rth-agriculture-android/index.html)
           should_inject wo-de-luyou "$BUILD_WO_DE_LUYOU" && pages+=(deploy/wo-de-luyou/index.html)
           should_inject paizhao-unknown-hanzi "$BUILD_PAIZHAO_UNKNOWN_HANZI" && pages+=(deploy/paizhao-unknown-hanzi/index.html)
+          should_inject duoshao-qian "$BUILD_DUOSHAO_QIAN" && pages+=(deploy/duoshao-qian/index.html)
           if [[ ${#pages[@]} -eq 0 ]]; then
             echo "No Android landing pages to update"
             exit 0
