@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">多少钱</string>
+    <string name="ask_price">多少钱?</string>
+    <string name="pay">付款</string>
+    <string name="clear_tender">清空</string>
+    <string name="skip">听不清</string>
+    <string name="total_label">合计 ¥%1$d</string>
+    <string name="listen_first">先问多少钱</string>
+    <string name="correct">对了! %1$d元 · %2$s</string>
+    <string name="incorrect">不对，再听一次</string>
+    <string name="skipped">是 %1$d元 · %2$s</string>
+    <string name="score">对了 %1$d · 连胜 %2$d</string>
+    <string name="wallet_label">人民币</string>
+    <string name="tender_empty">点钞付款</string>
+    <string name="catalog_error">Нет озвучки цен. Проверьте chinese_money_numbers.json</string>
+    <string name="replay_hint">ещё раз</string>
+</resources>
