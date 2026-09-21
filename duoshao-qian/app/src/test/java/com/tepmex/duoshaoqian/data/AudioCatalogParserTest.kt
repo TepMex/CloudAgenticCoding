@@ -26,7 +26,7 @@ class AudioCatalogParserTest {
         val catalog = AudioCatalogParser.parse(json)
         assertEquals(setOf(3, 12), catalog.amounts)
         assertEquals("三块", catalog.clip(3)?.hanzi)
-        assertEquals(3, catalog.clip(3)?.audioBytes()?.size)
+        assertEquals(64, catalog.clip(3)?.audioBytes()?.size)
     }
 
     @Test

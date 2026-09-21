@@ -20,7 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -159,7 +159,7 @@ private fun ShopContent(
                 .height(52.dp),
             shape = RoundedCornerShape(14.dp),
         ) {
-            Icon(Icons.Outlined.VolumeUp, contentDescription = null)
+            Icon(Icons.AutoMirrored.Outlined.VolumeUp, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.ask_price), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
