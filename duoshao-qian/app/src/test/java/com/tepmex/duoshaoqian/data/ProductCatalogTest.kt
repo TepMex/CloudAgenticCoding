@@ -16,9 +16,23 @@ class ProductCatalogTest {
         assertTrue(dumplings.priceYuanOptions.all { it in 15..40 })
         val roastDuckRice = ProductCatalog.all.first { it.id == "roast_duck_rice" }
         assertTrue(roastDuckRice.priceYuanOptions.all { it in 25..40 })
+        val claypotRice = ProductCatalog.all.first { it.id == "claypot_rice" }
+        assertTrue(claypotRice.priceYuanOptions.all { it in 40..50 })
+        val dapanji = ProductCatalog.all.first { it.id == "dapanji" }
+        assertTrue(dapanji.priceYuanOptions.all { it in 100..114 })
         ProductCatalog.all.forEach { product ->
             assertTrue("${product.id} has prices", product.priceYuanOptions.isNotEmpty())
-            assertTrue("${product.id} never costs 100", product.priceYuanOptions.none { it >= 100 })
+            assertTrue("${product.id} stays in 1..114", product.priceYuanOptions.all { it in 1..114 })
+        }
+        assertTrue(water.priceYuanOptions.none { it >= 10 })
+        assertTrue(teaEgg.priceYuanOptions.none { it >= 10 })
+    }
+
+    @Test
+    fun sitDownMealsCoverFortyThroughOneHundredFourteen() {
+        val offered = ProductCatalog.all.flatMap { it.priceYuanOptions }.toSet()
+        (40..114).forEach { amount ->
+            assertTrue("missing product for ¥$amount", amount in offered)
         }
     }
 
@@ -29,6 +43,10 @@ class ProductCatalogTest {
         assertTrue(playable.any { it.id == "dumplings" })
         assertTrue(playable.none { it.id == "milk_tea" })
         assertTrue(playable.first { it.id == "water" }.priceYuanOptions == listOf(3))
+        val hundred = ProductCatalog.playable(setOf(100))
+        assertTrue(hundred.any { it.id == "peking_duck" })
+        assertTrue(hundred.any { it.id == "hotpot" })
+        assertTrue(hundred.none { it.id == "water" })
     }
 
     @Test

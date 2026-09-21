@@ -4,8 +4,8 @@ Android listening game for tourist prices in China. See a snack or drink, tap **
 
 ## Features
 
-- Generated stall photos: water, soy milk, tea egg, tanghulu, baozi, jianbing, fruit, milk tea, skewers, dumplings, fried rice, beef noodles, malatang, roast-duck rice
-- Prices stay in a realistic band for each item, and every bundled spoken yuan amount (¥1–40 in the audio catalog) is practiced about equally
+- Generated stall photos: water, soy milk, tea egg, tanghulu, baozi, jianbing, fruit, milk tea, skewers, dumplings, fried rice, beef noodles, malatang, roast-duck rice, claypot rice, xiaolongbao, kung pao chicken, crossing-bridge noodles, suancai fish, mala xiangguo, grilled fish, hotpot, Peking duck, dapanji
+- Prices stay in a realistic band for each item, and every bundled spoken yuan amount (sparse ¥1–40 plus every yuan from ¥40–114) is practiced about equally
 - Bundled Chinese clips from `chinese_money_numbers.json` (base64 audio per number)
 - Wallet with every current paper denomination: ¥1, ¥5, ¥10, ¥20, ¥50, ¥100
 - Exact-tender scoring; replay the clip until it clicks
@@ -34,7 +34,7 @@ To regenerate spoken prices (only if you are replacing the bundled catalog):
 python3 scripts/generate_money_audio.py
 ```
 
-If a `chinese_money_numbers.json` already exists next to the script, it is copied into assets unchanged.
+If a listening-dataset `chinese_money_numbers.json` (numbers 1–114 with `items`) exists next to the script or at the repo root, missing amounts are merged into the app catalog. The dataset is not copied over the existing app-format JSON.
 
 ## Install / update
 
