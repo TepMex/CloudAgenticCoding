@@ -87,9 +87,12 @@ class ShopGame(
     }
 
     private fun newRound(avoidProductId: String?): Round {
-        val pool = products.filter { it.id != avoidProductId }.ifEmpty { products }
-        val product = pool.random(random)
-        val price = product.priceYuanOptions.random(random)
+        // Sample the spoken yuan amount first so cheap snacks cannot drown out
+        // 三十块 / 四十块 just because more stall photos sit in the 2–12 band.
+        val amounts = products.flatMap { it.priceYuanOptions }.distinct()
+        val price = amounts.random(random)
+        val matching = products.filter { price in it.priceYuanOptions }
+        val product = matching.filter { it.id != avoidProductId }.ifEmpty { matching }.random(random)
         return Round(product, price)
     }
 }

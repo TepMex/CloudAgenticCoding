@@ -4,8 +4,8 @@ Android listening game for tourist prices in China. See a snack or drink, tap **
 
 ## Features
 
-- Generated stall photos: water, soy milk, baozi, jianbing, fruit, milk tea, skewers, dumplings
-- Prices stay in a realistic band for each item
+- Generated stall photos: water, soy milk, tea egg, tanghulu, baozi, jianbing, fruit, milk tea, skewers, dumplings, fried rice, beef noodles, malatang, roast-duck rice
+- Prices stay in a realistic band for each item, and every bundled spoken yuan amount (¥1–40 in the audio catalog) is practiced about equally
 - Bundled Chinese clips from `chinese_money_numbers.json` (base64 audio per number)
 - Wallet with every current paper denomination: ¥1, ¥5, ¥10, ¥20, ¥50, ¥100
 - Exact-tender scoring; replay the clip until it clicks

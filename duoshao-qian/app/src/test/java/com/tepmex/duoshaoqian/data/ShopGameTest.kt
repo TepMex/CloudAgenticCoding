@@ -39,7 +39,9 @@ class ShopGameTest {
 
     @Test
     fun successAdvancesProduct() {
-        val game = ShopGame(listOf(water, dumplings), random = Random(2))
+        val mango = ProductCatalog.all.first { it.id == "mango" }
+        val jianbing = ProductCatalog.all.first { it.id == "jianbing" }
+        val game = ShopGame(listOf(mango, jianbing), random = Random(2))
         val firstId = game.snapshot.round.product.id
         game.markListened()
         makeChange(game, game.snapshot.round.priceYuan)
@@ -53,6 +55,27 @@ class ShopGameTest {
     @Test
     fun walletContainsEveryCirculatingNote() {
         assertEquals(listOf(1, 5, 10, 20, 50, 100), RmbWallet.notes.map { it.yuan })
+    }
+
+    @Test
+    fun spokenAmountsAreSampledEvenly() {
+        val products = ProductCatalog.all
+        val amounts = products.flatMap { it.priceYuanOptions }.toSet()
+        val game = ShopGame(products, random = Random(0))
+        val counts = amounts.associateWith { 0 }.toMutableMap()
+        val roundsPerAmount = 250
+        repeat(amounts.size * roundsPerAmount) {
+            val price = game.snapshot.round.priceYuan
+            counts[price] = counts.getValue(price) + 1
+            game.skip()
+        }
+        amounts.forEach { amount ->
+            val seen = counts.getValue(amount)
+            assertTrue(
+                "¥$amount appeared $seen times, expected about $roundsPerAmount",
+                seen in (roundsPerAmount * 3 / 5)..(roundsPerAmount * 7 / 5),
+            )
+        }
     }
 
     private fun makeChange(game: ShopGame, price: Int) {
