@@ -13,6 +13,8 @@ class ChineseMoneyTest {
         assertEquals("十二块", ChineseMoney.toSpokenKuai(12))
         assertEquals("二十块", ChineseMoney.toSpokenKuai(20))
         assertEquals("二十五块", ChineseMoney.toSpokenKuai(25))
+        assertEquals("一百块", ChineseMoney.toSpokenKuai(100))
         assertEquals("一百零一块", ChineseMoney.toSpokenKuai(101))
+        assertEquals("一百一十四块", ChineseMoney.toSpokenKuai(114))
     }
 }

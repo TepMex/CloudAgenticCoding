@@ -88,7 +88,7 @@ class ShopGame(
 
     private fun newRound(avoidProductId: String?): Round {
         // Sample the spoken yuan amount first so cheap snacks cannot drown out
-        // 三十块 / 四十块 just because more stall photos sit in the 2–12 band.
+        // 三十块 / 一百块 just because more stall photos sit in the 2–12 band.
         val amounts = products.flatMap { it.priceYuanOptions }.distinct()
         val price = amounts.random(random)
         val matching = products.filter { price in it.priceYuanOptions }
