@@ -35,6 +35,7 @@ ANDROID_APPS=(
   wo-de-luyou
   paizhao-unknown-hanzi
   duoshao-qian
+  hanzi-info-gf14
 )
 
 # Repo-root files copied onto the site on every publish.
