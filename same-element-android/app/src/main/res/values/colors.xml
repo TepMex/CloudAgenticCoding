@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="se_paper">#F3ECDF</color>
+    <color name="se_ink">#1C1612</color>
+    <color name="se_given">#2A5680</color>
+    <color name="se_cinnabar">#A33B32</color>
+    <color name="ic_launcher_background">#F3ECDF</color>
+</resources>

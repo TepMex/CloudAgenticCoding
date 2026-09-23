@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SameElement" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/se_given</item>
+        <item name="colorOnPrimary">@color/se_paper</item>
+        <item name="colorSurface">@color/se_paper</item>
+        <item name="android:statusBarColor">@color/se_paper</item>
+        <item name="android:navigationBarColor">@color/se_paper</item>
+        <item name="android:colorBackground">@color/se_paper</item>
+        <item name="android:windowBackground">@color/se_paper</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
