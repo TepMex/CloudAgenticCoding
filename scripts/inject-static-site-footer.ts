@@ -29,8 +29,9 @@ export async function injectStaticSiteFooter(htmlPath: string): Promise<void> {
   if (html.includes(MARKER)) {
     const start = html.indexOf(MARKER);
     const end = html.indexOf(MARKER, start + MARKER.length);
-    if (end === -1) throw new Error(`Unclosed deploy footer markers in ${htmlPath}`);
-    html = html.slice(0, start) + block + html.slice(end + MARKER.length);
+    // A lone marker is an insertion placeholder (opening and closing pair not required).
+    const after = end === -1 ? start + MARKER.length : end + MARKER.length;
+    html = html.slice(0, start) + block + html.slice(after);
   } else if (html.includes("</main>")) {
     html = html.replace("</main>", `${block}\n  </main>`);
   } else if (html.includes("</body>")) {
