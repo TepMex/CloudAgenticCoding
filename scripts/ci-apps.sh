@@ -36,6 +36,7 @@ ANDROID_APPS=(
   paizhao-unknown-hanzi
   instant-pinyin
   duoshao-qian
+  hanzi-info-gf14
 )
 
 # Repo-root files copied onto the site on every publish.

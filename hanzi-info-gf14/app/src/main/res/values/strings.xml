@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">汉字 GF14</string>
+    <string name="search_label">Иероглиф</string>
+    <string name="search_placeholder">Введите иероглиф</string>
+    <string name="loading">Загрузка базы компонентов…</string>
+    <string name="load_failed">Не удалось прочитать базу: %1$s</string>
+    <string name="missing">Нет в списке GF 0014</string>
+    <string name="no_neighbors">Нет иероглифов с заменой одного компонента</string>
+    <string name="hint_gestures">Сдвиньте поле и сведите пальцы, чтобы пройти вдоль ветки. Нажатие ставит иероглиф в центр.</string>
+    <string name="back">Назад</string>
+    <string name="copy_link">Ссылка</string>
+    <string name="link_copied">Ссылка скопирована</string>
+    <string name="empty_map">Введите иероглиф — он встанет в центр. Ветки покажут знаки, которые отличаются одним компонентом.</string>
+    <string name="map_description">Гексагональная карта для %1$s</string>
+    <string name="components_line">%1$s</string>
+</resources>
