@@ -34,6 +34,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `ideal-timing` | [ideal-timing](https://tepmex.github.io/CloudAgenticCoding/ideal-timing/) | ideal-timing · 16h day clock from Mi Fitness wake-up (APK) |
 | `wo-de-luyou` | [wo-de-luyou](https://tepmex.github.io/CloudAgenticCoding/wo-de-luyou/) | wo-de-luyou · 我的旅游 travel dictionary (APK) |
 | `paizhao-unknown-hanzi` | [paizhao-unknown-hanzi](https://tepmex.github.io/CloudAgenticCoding/paizhao-unknown-hanzi/) | 拍照未知汉字 · offline camera OCR for unknown hanzi (APK) |
+| `instant-pinyin` | [instant-pinyin](https://tepmex.github.io/CloudAgenticCoding/instant-pinyin/) | 即时拼音 · pinyin floating above hanzi in the camera (APK) |
 | `hanzi-info-gf14` | [hanzi-info-gf14](https://tepmex.github.io/CloudAgenticCoding/hanzi-info-gf14/) | 汉字 GF14 · hexagonal one-component neighbor map (APK) |
 | `duoshao-qian` | [duoshao-qian](https://tepmex.github.io/CloudAgenticCoding/duoshao-qian/) | 多少钱 · listen to Chinese prices and pay with RMB notes (APK) |
 | `same-element` | [same-element](https://tepmex.github.io/CloudAgenticCoding/same-element/) | Общий элемент · draw the part that distinguishes characters sharing 氵, 扌, 讠… |
@@ -42,4 +43,4 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
 
-Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `ideal-timing`, `han-count-android`, `rth-agriculture-android`, `wo-de-luyou`, `paizhao-unknown-hanzi`, `duoshao-qian`, `same-element-android`, `hanzi-info-gf14`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.
+Android APKs (`chesswatch`, `ankidroid-llm`, `anki-entertainer`, `local-tts`, `anki-dashboard-apk`, `zuo-tasks`, `ctx-calendar`, `wo-zai-naar`, `zou-lu-shang`, `zou-lu-shang-2`, `pair-comp-elo`, `running-log`, `ideal-timing`, `han-count-android`, `rth-agriculture-android`, `wo-de-luyou`, `paizhao-unknown-hanzi`, `instant-pinyin`, `duoshao-qian`, `same-element-android`, `hanzi-info-gf14`) are signed with a shared committed sideload keystore so GitHub Pages builds upgrade in place without wiping app data. See each app’s README for a one-time uninstall if you still have an older differently signed build.

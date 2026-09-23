@@ -34,6 +34,7 @@ ANDROID_APPS=(
   same-element-android
   wo-de-luyou
   paizhao-unknown-hanzi
+  instant-pinyin
   duoshao-qian
   hanzi-info-gf14
 )
