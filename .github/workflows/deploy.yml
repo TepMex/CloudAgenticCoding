@@ -15,8 +15,8 @@ permissions:
   contents: write
 
 env:
-  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou rth-agriculture
-  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android ideal-timing wo-de-luyou paizhao-unknown-hanzi duoshao-qian
+  WEB_APPS: socratus mandarin-koan hanzi-info hanzi-reading-roguelike han-count-me sense-of-text map-of-chinese mandarin-kanshu-pengyou rth-agriculture same-element
+  ANDROID_APPS: chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log han-count-android rth-agriculture-android ideal-timing wo-de-luyou paizhao-unknown-hanzi duoshao-qian same-element-android
 
 jobs:
   detect:
@@ -33,6 +33,7 @@ jobs:
       build_map_of_chinese: ${{ steps.plan.outputs.build_map_of_chinese }}
       build_mandarin_kanshu_pengyou: ${{ steps.plan.outputs.build_mandarin_kanshu_pengyou }}
       build_rth_agriculture: ${{ steps.plan.outputs.build_rth_agriculture }}
+      build_same_element: ${{ steps.plan.outputs.build_same_element }}
       build_chesswatch: ${{ steps.plan.outputs.build_chesswatch }}
       build_ankidroid_llm: ${{ steps.plan.outputs.build_ankidroid_llm }}
       build_anki_entertainer: ${{ steps.plan.outputs.build_anki_entertainer }}
@@ -48,6 +49,7 @@ jobs:
       build_ideal_timing: ${{ steps.plan.outputs.build_ideal_timing }}
       build_han_count_android: ${{ steps.plan.outputs.build_han_count_android }}
       build_rth_agriculture_android: ${{ steps.plan.outputs.build_rth_agriculture_android }}
+      build_same_element_android: ${{ steps.plan.outputs.build_same_element_android }}
       build_wo_de_luyou: ${{ steps.plan.outputs.build_wo_de_luyou }}
       build_paizhao_unknown_hanzi: ${{ steps.plan.outputs.build_paizhao_unknown_hanzi }}
       build_duoshao_qian: ${{ steps.plan.outputs.build_duoshao_qian }}
@@ -85,6 +87,8 @@ jobs:
               - 'mandarin-kanshu-pengyou/**'
             rth-agriculture:
               - 'rth-agriculture/**'
+            same-element:
+              - 'same-element/**'
             chesswatch:
               - 'chesswatch/**'
             ankidroid-llm:
@@ -115,6 +119,8 @@ jobs:
               - 'han-count-android/**'
             rth-agriculture-android:
               - 'rth-agriculture-android/**'
+            same-element-android:
+              - 'same-element-android/**'
             wo-de-luyou:
               - 'wo-de-luyou/**'
             paizhao-unknown-hanzi:
@@ -155,6 +161,7 @@ jobs:
           CHANGED_MAP_OF_CHINESE: ${{ steps.changes.outputs.map-of-chinese }}
           CHANGED_MANDARIN_KANSHU_PENGYOU: ${{ steps.changes.outputs.mandarin-kanshu-pengyou }}
           CHANGED_RTH_AGRICULTURE: ${{ steps.changes.outputs.rth-agriculture }}
+          CHANGED_SAME_ELEMENT: ${{ steps.changes.outputs.same-element }}
           CHANGED_CHESSWATCH: ${{ steps.changes.outputs.chesswatch }}
           CHANGED_ANKIDROID_LLM: ${{ steps.changes.outputs.ankidroid-llm }}
           CHANGED_ANKI_ENTERTAINER: ${{ steps.changes.outputs.anki-entertainer }}
@@ -170,6 +177,7 @@ jobs:
           CHANGED_IDEAL_TIMING: ${{ steps.changes.outputs.ideal-timing }}
           CHANGED_HAN_COUNT_ANDROID: ${{ steps.changes.outputs.han-count-android }}
           CHANGED_RTH_AGRICULTURE_ANDROID: ${{ steps.changes.outputs.rth-agriculture-android }}
+          CHANGED_SAME_ELEMENT_ANDROID: ${{ steps.changes.outputs.same-element-android }}
           CHANGED_WO_DE_LUYOU: ${{ steps.changes.outputs.wo-de-luyou }}
           CHANGED_PAIZHAO_UNKNOWN_HANZI: ${{ steps.changes.outputs.paizhao-unknown-hanzi }}
           CHANGED_DUOSHAO_QIAN: ${{ steps.changes.outputs.duoshao-qian }}
@@ -202,6 +210,7 @@ jobs:
           build_map_of_chinese=false
           build_mandarin_kanshu_pengyou=false
           build_rth_agriculture=false
+          build_same_element=false
           build_chesswatch=false
           build_ankidroid_llm=false
           build_anki_entertainer=false
@@ -217,6 +226,7 @@ jobs:
           build_ideal_timing=false
           build_han_count_android=false
           build_rth_agriculture_android=false
+          build_same_element_android=false
           build_wo_de_luyou=false
           build_paizhao_unknown_hanzi=false
           build_duoshao_qian=false
@@ -232,6 +242,7 @@ jobs:
             build_map_of_chinese=true
             build_mandarin_kanshu_pengyou=true
             build_rth_agriculture=true
+            build_same_element=true
             build_chesswatch=true
             build_ankidroid_llm=true
             build_anki_entertainer=true
@@ -247,6 +258,7 @@ jobs:
             build_ideal_timing=true
             build_han_count_android=true
             build_rth_agriculture_android=true
+            build_same_element_android=true
             build_wo_de_luyou=true
             build_paizhao_unknown_hanzi=true
             build_duoshao_qian=true
@@ -260,6 +272,7 @@ jobs:
             is_true "$CHANGED_MAP_OF_CHINESE" && build_map_of_chinese=true
             is_true "$CHANGED_MANDARIN_KANSHU_PENGYOU" && build_mandarin_kanshu_pengyou=true
             is_true "$CHANGED_RTH_AGRICULTURE" && build_rth_agriculture=true
+            is_true "$CHANGED_SAME_ELEMENT" && build_same_element=true
             is_true "$CHANGED_CHESSWATCH" && build_chesswatch=true
             is_true "$CHANGED_ANKIDROID_LLM" && build_ankidroid_llm=true
             is_true "$CHANGED_ANKI_ENTERTAINER" && build_anki_entertainer=true
@@ -275,12 +288,14 @@ jobs:
             is_true "$CHANGED_IDEAL_TIMING" && build_ideal_timing=true
             is_true "$CHANGED_HAN_COUNT_ANDROID" && build_han_count_android=true
             is_true "$CHANGED_RTH_AGRICULTURE_ANDROID" && build_rth_agriculture_android=true
+            is_true "$CHANGED_SAME_ELEMENT_ANDROID" && build_same_element_android=true
             is_true "$CHANGED_WO_DE_LUYOU" && build_wo_de_luyou=true
             is_true "$CHANGED_PAIZHAO_UNKNOWN_HANZI" && build_paizhao_unknown_hanzi=true
             is_true "$CHANGED_DUOSHAO_QIAN" && build_duoshao_qian=true
             # Bundled assets must track the web game.
             is_true "$CHANGED_HAN_COUNT_ME" && build_han_count_android=true
             is_true "$CHANGED_RTH_AGRICULTURE" && build_rth_agriculture_android=true
+            is_true "$CHANGED_SAME_ELEMENT" && build_same_element_android=true
 
             if is_true "$CHANGED_ANDROID_SIGNING"; then
               build_chesswatch=true
@@ -298,6 +313,7 @@ jobs:
               build_ideal_timing=true
               build_han_count_android=true
               build_rth_agriculture_android=true
+              build_same_element_android=true
               build_wo_de_luyou=true
               build_paizhao_unknown_hanzi=true
               build_duoshao_qian=true
@@ -309,10 +325,10 @@ jobs:
           fi
 
           any_web_build=false
-          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou || $build_rth_agriculture && any_web_build=true
+          $build_socratus || $build_mandarin_koan || $build_hanzi_info || $build_hanzi_reading_roguelike || $build_han_count_me || $build_sense_of_text || $build_map_of_chinese || $build_mandarin_kanshu_pengyou || $build_rth_agriculture || $build_same_element && any_web_build=true
 
           any_android_apk_build=false
-          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_ideal_timing || $build_han_count_android || $build_rth_agriculture_android || $build_wo_de_luyou || $build_paizhao_unknown_hanzi || $build_duoshao_qian && any_android_apk_build=true
+          $build_chesswatch || $build_ankidroid_llm || $build_anki_entertainer || $build_local_tts || $build_anki_dashboard_apk || $build_zuo_tasks || $build_ctx_calendar || $build_wo_zai_naar || $build_zou_lu_shang || $build_zou_lu_shang_2 || $build_pair_comp_elo || $build_running_log || $build_ideal_timing || $build_han_count_android || $build_rth_agriculture_android || $build_same_element_android || $build_wo_de_luyou || $build_paizhao_unknown_hanzi || $build_duoshao_qian && any_android_apk_build=true
 
           any_android_landing=false
           $any_android_apk_build || $refresh_android_landings && any_android_landing=true
@@ -329,6 +345,7 @@ jobs:
             echo "build_map_of_chinese=$build_map_of_chinese"
             echo "build_mandarin_kanshu_pengyou=$build_mandarin_kanshu_pengyou"
             echo "build_rth_agriculture=$build_rth_agriculture"
+            echo "build_same_element=$build_same_element"
             echo "build_chesswatch=$build_chesswatch"
             echo "build_ankidroid_llm=$build_ankidroid_llm"
             echo "build_anki_entertainer=$build_anki_entertainer"
@@ -344,6 +361,7 @@ jobs:
             echo "build_ideal_timing=$build_ideal_timing"
             echo "build_han_count_android=$build_han_count_android"
             echo "build_rth_agriculture_android=$build_rth_agriculture_android"
+            echo "build_same_element_android=$build_same_element_android"
             echo "build_wo_de_luyou=$build_wo_de_luyou"
             echo "build_paizhao_unknown_hanzi=$build_paizhao_unknown_hanzi"
             echo "build_duoshao_qian=$build_duoshao_qian"
@@ -441,6 +459,11 @@ jobs:
         working-directory: rth-agriculture
         run: bun install --frozen-lockfile
 
+      - name: Install dependencies (same-element)
+        if: needs.detect.outputs.build_same_element == 'true' || needs.detect.outputs.build_same_element_android == 'true'
+        working-directory: same-element
+        run: bun install --frozen-lockfile
+
       - name: Set deployment timestamp
         if: needs.detect.outputs.any_web_build == 'true' || needs.detect.outputs.any_android_landing == 'true'
         run: echo "DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S UTC")" >> "$GITHUB_ENV"
@@ -506,6 +529,13 @@ jobs:
         working-directory: rth-agriculture
         env:
           GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/rth-agriculture/
+        run: bun run build
+
+      - name: Build (same-element)
+        if: needs.detect.outputs.build_same_element == 'true'
+        working-directory: same-element
+        env:
+          GH_PAGES_PUBLIC_PATH: /${{ github.event.repository.name }}/same-element/
         run: bun run build
 
       - name: Setup Java
@@ -606,6 +636,15 @@ jobs:
         working-directory: rth-agriculture-android
         run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Sync same-element into Android assets
+        if: needs.detect.outputs.build_same_element_android == 'true'
+        run: chmod +x same-element-android/scripts/sync-web-assets.sh && same-element-android/scripts/sync-web-assets.sh
+
+      - name: Build Same Element Android APK
+        if: needs.detect.outputs.build_same_element_android == 'true'
+        working-directory: same-element-android
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleRelease
+
       - name: Build wo-de-luyou APK
         if: needs.detect.outputs.build_wo_de_luyou == 'true'
         working-directory: wo-de-luyou
@@ -639,6 +678,7 @@ jobs:
           BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
+          BUILD_SAME_ELEMENT_ANDROID: ${{ needs.detect.outputs.build_same_element_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
           BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
@@ -664,6 +704,7 @@ jobs:
           if is_true "$BUILD_IDEAL_TIMING"; then verify ideal-timing; fi
           if is_true "$BUILD_HAN_COUNT_ANDROID"; then verify han-count-android; fi
           if is_true "$BUILD_RTH_AGRICULTURE_ANDROID"; then verify rth-agriculture-android; fi
+          if is_true "$BUILD_SAME_ELEMENT_ANDROID"; then verify same-element-android; fi
           if is_true "$BUILD_WO_DE_LUYOU"; then verify wo-de-luyou; fi
           if is_true "$BUILD_PAIZHAO_UNKNOWN_HANZI"; then verify paizhao-unknown-hanzi; fi
           if is_true "$BUILD_DUOSHAO_QIAN"; then verify duoshao-qian; fi
@@ -680,6 +721,7 @@ jobs:
           BUILD_MAP_OF_CHINESE: ${{ needs.detect.outputs.build_map_of_chinese }}
           BUILD_MANDARIN_KANSHU_PENGYOU: ${{ needs.detect.outputs.build_mandarin_kanshu_pengyou }}
           BUILD_RTH_AGRICULTURE: ${{ needs.detect.outputs.build_rth_agriculture }}
+          BUILD_SAME_ELEMENT: ${{ needs.detect.outputs.build_same_element }}
           BUILD_CHESSWATCH: ${{ needs.detect.outputs.build_chesswatch }}
           BUILD_ANKIDROID_LLM: ${{ needs.detect.outputs.build_ankidroid_llm }}
           BUILD_ANKI_ENTERTAINER: ${{ needs.detect.outputs.build_anki_entertainer }}
@@ -695,6 +737,7 @@ jobs:
           BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
+          BUILD_SAME_ELEMENT_ANDROID: ${{ needs.detect.outputs.build_same_element_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
           BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
@@ -751,6 +794,7 @@ jobs:
           if is_true "$BUILD_MAP_OF_CHINESE"; then copy_web_app map-of-chinese; else require_dir map-of-chinese; fi
           if is_true "$BUILD_MANDARIN_KANSHU_PENGYOU"; then copy_web_app mandarin-kanshu-pengyou; else require_dir mandarin-kanshu-pengyou; fi
           if is_true "$BUILD_RTH_AGRICULTURE"; then copy_web_app rth-agriculture; else require_dir rth-agriculture; fi
+          if is_true "$BUILD_SAME_ELEMENT"; then copy_web_app same-element; else require_dir same-element; fi
 
           android_should_build() {
             case "$1" in
@@ -769,6 +813,7 @@ jobs:
               ideal-timing) is_true "$BUILD_IDEAL_TIMING" ;;
               han-count-android) is_true "$BUILD_HAN_COUNT_ANDROID" ;;
               rth-agriculture-android) is_true "$BUILD_RTH_AGRICULTURE_ANDROID" ;;
+              same-element-android) is_true "$BUILD_SAME_ELEMENT_ANDROID" ;;
               wo-de-luyou) is_true "$BUILD_WO_DE_LUYOU" ;;
               paizhao-unknown-hanzi) is_true "$BUILD_PAIZHAO_UNKNOWN_HANZI" ;;
               duoshao-qian) is_true "$BUILD_DUOSHAO_QIAN" ;;
@@ -776,7 +821,7 @@ jobs:
             esac
           }
 
-          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log ideal-timing han-count-android rth-agriculture-android wo-de-luyou paizhao-unknown-hanzi duoshao-qian; do
+          for app in chesswatch ankidroid-llm anki-entertainer local-tts anki-dashboard-apk zuo-tasks ctx-calendar wo-zai-naar zou-lu-shang zou-lu-shang-2 pair-comp-elo running-log ideal-timing han-count-android rth-agriculture-android same-element-android wo-de-luyou paizhao-unknown-hanzi duoshao-qian; do
             if android_should_build "$app"; then
               copy_android_landing "$app"
               copy_android_apk "$app"
@@ -815,6 +860,7 @@ jobs:
           BUILD_IDEAL_TIMING: ${{ needs.detect.outputs.build_ideal_timing }}
           BUILD_HAN_COUNT_ANDROID: ${{ needs.detect.outputs.build_han_count_android }}
           BUILD_RTH_AGRICULTURE_ANDROID: ${{ needs.detect.outputs.build_rth_agriculture_android }}
+          BUILD_SAME_ELEMENT_ANDROID: ${{ needs.detect.outputs.build_same_element_android }}
           BUILD_WO_DE_LUYOU: ${{ needs.detect.outputs.build_wo_de_luyou }}
           BUILD_PAIZHAO_UNKNOWN_HANZI: ${{ needs.detect.outputs.build_paizhao_unknown_hanzi }}
           BUILD_DUOSHAO_QIAN: ${{ needs.detect.outputs.build_duoshao_qian }}
@@ -841,6 +887,7 @@ jobs:
           should_inject ideal-timing "$BUILD_IDEAL_TIMING" && pages+=(deploy/ideal-timing/index.html)
           should_inject han-count-android "$BUILD_HAN_COUNT_ANDROID" && pages+=(deploy/han-count-android/index.html)
           should_inject rth-agriculture-android "$BUILD_RTH_AGRICULTURE_ANDROID" && pages+=(deploy/rth-agriculture-android/index.html)
+          should_inject same-element-android "$BUILD_SAME_ELEMENT_ANDROID" && pages+=(deploy/same-element-android/index.html)
           should_inject wo-de-luyou "$BUILD_WO_DE_LUYOU" && pages+=(deploy/wo-de-luyou/index.html)
           should_inject paizhao-unknown-hanzi "$BUILD_PAIZHAO_UNKNOWN_HANZI" && pages+=(deploy/paizhao-unknown-hanzi/index.html)
           should_inject duoshao-qian "$BUILD_DUOSHAO_QIAN" && pages+=(deploy/duoshao-qian/index.html)

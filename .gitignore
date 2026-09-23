@@ -94,3 +94,11 @@ wo-de-luyou/local.properties
 duoshao-qian/.gradle/
 duoshao-qian/**/build/
 duoshao-qian/local.properties
+
+# Android (same-element)
+same-element-android/.gradle/
+same-element-android/**/build/
+same-element-android/local.properties
+same-element-android/app/src/main/assets/www/**
+!same-element-android/app/src/main/assets/www/.gitkeep
+!same-element-android/app/src/main/assets/www/.gitignore
