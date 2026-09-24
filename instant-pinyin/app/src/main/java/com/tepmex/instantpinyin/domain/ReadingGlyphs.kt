@@ -6,6 +6,8 @@ data class ReadingGlyph(
     val hanzi: String,
     val pinyin: String,
     val box: PxBox,
+    /** True when this glyph comes from a top-to-bottom text line. */
+    val vertical: Boolean = false,
 )
 
 object ReadingGlyphs {
@@ -55,7 +57,7 @@ object ReadingGlyphs {
                     bottom = (line.box.y + line.box.height).toFloat(),
                 )
             }
-            out.add(ReadingGlyph(hanzi, pinyin, box))
+            out.add(ReadingGlyph(hanzi, pinyin, box, vertical))
         }
         return out
     }

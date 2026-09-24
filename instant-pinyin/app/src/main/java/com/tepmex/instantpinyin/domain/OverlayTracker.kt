@@ -7,6 +7,7 @@ object OverlayTracker {
         val hanzi: String,
         val pinyin: String,
         val box: PxBox,
+        val vertical: Boolean = false,
         val misses: Int = 0,
     )
 
@@ -39,11 +40,12 @@ object OverlayTracker {
                         hanzi = glyph.hanzi,
                         pinyin = glyph.pinyin,
                         box = lerp(previous[best].box, glyph.box, smooth),
+                        vertical = glyph.vertical,
                         misses = 0,
                     ),
                 )
             } else {
-                next.add(Track(glyph.hanzi, glyph.pinyin, glyph.box, misses = 0))
+                next.add(Track(glyph.hanzi, glyph.pinyin, glyph.box, glyph.vertical, misses = 0))
             }
         }
         for (i in previous.indices) {
@@ -58,7 +60,7 @@ object OverlayTracker {
     }
 
     fun glyphsOf(tracks: List<Track>): List<ReadingGlyph> =
-        tracks.map { ReadingGlyph(it.hanzi, it.pinyin, it.box) }
+        tracks.map { ReadingGlyph(it.hanzi, it.pinyin, it.box, it.vertical) }
 
     private fun near(a: PxBox, b: PxBox): Boolean {
         val limit = max(max(a.width, b.width), max(max(a.height, b.height), 8f)) * 1.4f

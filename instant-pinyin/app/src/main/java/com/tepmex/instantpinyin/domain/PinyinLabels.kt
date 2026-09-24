@@ -9,6 +9,8 @@ data class PinyinLabel(
     val glyph: PxBox,
     val pill: PxBox,
     val textSizePx: Float,
+    /** Clockwise degrees so the baseline stays upright for how the phone is held. */
+    val textRotation: Int = 0,
 ) {
     fun hit(x: Float, y: Float): Boolean =
         pill.inflate(8f).contains(x, y) || glyph.inflate(8f).contains(x, y)
@@ -21,18 +23,19 @@ object PinyinLabels {
         imageHeight: Int,
         viewWidth: Float,
         viewHeight: Float,
+        textRotation: Int = 0,
     ): List<PinyinLabel> {
         if (viewWidth <= 0f || viewHeight <= 0f) return emptyList()
         return glyphs.map { glyph ->
             val viewBox = PreviewMap.centerCrop(glyph.box, imageWidth, imageHeight, viewWidth, viewHeight)
             val textSize = min(viewBox.width, viewBox.height).times(0.46f).coerceIn(11f, 40f)
-            val vertical = viewBox.height > viewBox.width * 1.15f
-            val pill = if (vertical) {
+            val placed = if (glyph.vertical) {
                 beside(viewBox, glyph.pinyin, textSize, viewWidth, viewHeight)
             } else {
                 above(viewBox, glyph.pinyin, textSize, viewWidth, viewHeight)
             }
-            PinyinLabel(glyph.hanzi, glyph.pinyin, viewBox, pill, textSize)
+            val pill = LabelFacing.face(placed, textRotation)
+            PinyinLabel(glyph.hanzi, glyph.pinyin, viewBox, pill, textSize, textRotation)
         }
     }
 

@@ -3,6 +3,7 @@ package com.tepmex.instantpinyin.domain
 import com.tepmex.instantpinyin.ocr.OcrLine
 import com.tepmex.instantpinyin.ocr.TextBox
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,6 +17,7 @@ class ReadingGlyphsTest {
         assertEquals(50f, glyphs[1].box.left, 0.01f)
         assertEquals(100f, glyphs[1].box.right, 0.01f)
         assertTrue(glyphs[0].pinyin.contains("ǐ") || glyphs[0].pinyin.contains("nǐ"))
+        assertFalse(glyphs[0].vertical)
     }
 
     @Test
@@ -44,6 +46,8 @@ class ReadingGlyphsTest {
         assertEquals(70f, glyphs[0].box.bottom, 0.01f)
         assertEquals(70f, glyphs[1].box.top, 0.01f)
         assertEquals(120f, glyphs[1].box.bottom, 0.01f)
+        assertTrue(glyphs[0].vertical)
+        assertTrue(glyphs[1].vertical)
     }
 
     @Test

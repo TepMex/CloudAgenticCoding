@@ -53,8 +53,8 @@ class GlossLabelsTest {
     fun verticalColumnPutsTheGlossBesideTheWord() {
         val labels = GlossLabels.layout(
             glyphs = listOf(
-                glyph("你", PxBox(180f, 20f, 210f, 80f)),
-                glyph("好", PxBox(180f, 80f, 210f, 140f)),
+                glyph("你", PxBox(180f, 20f, 210f, 80f), vertical = true),
+                glyph("好", PxBox(180f, 80f, 210f, 140f), vertical = true),
             ),
             lexicon = lexicon,
             imageWidth = 400,
@@ -80,5 +80,6 @@ class GlossLabelsTest {
         assertTrue(labels.isEmpty())
     }
 
-    private fun glyph(hanzi: String, box: PxBox) = ReadingGlyph(hanzi, hanzi, box)
+    private fun glyph(hanzi: String, box: PxBox, vertical: Boolean = false) =
+        ReadingGlyph(hanzi, hanzi, box, vertical)
 }

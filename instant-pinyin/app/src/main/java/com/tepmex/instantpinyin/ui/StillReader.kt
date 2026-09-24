@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -109,7 +110,7 @@ fun StillReader(
                 }
             }
             is StillState.Ready -> {
-                val hasReading = state.lines.any { line -> line.any { it.plecoQuery != null } }
+                val hasReading = state.lines.any { line -> line.any { it.glossQuery != null } }
                 if (!hasReading) {
                     Column(
                         modifier = Modifier
@@ -148,18 +149,27 @@ fun StillReader(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 for (token in line) {
-                                    if (token.plecoQuery == null) {
+                                    if (token.glossQuery == null) {
                                         Text(
                                             text = token.surface,
                                             style = MaterialTheme.typography.headlineSmall,
                                             modifier = Modifier.align(Alignment.CenterVertically),
                                         )
                                     } else {
-                                        WordCell(token) {
-                                            if (!openPleco(context, token.plecoQuery!!)) {
-                                                scope.launch { snackbar.showSnackbar(plecoMissing) }
-                                            }
-                                        }
+                                        WordCell(
+                                            token = token,
+                                            onCharacter = { query ->
+                                                if (!openPleco(context, query)) {
+                                                    scope.launch { snackbar.showSnackbar(plecoMissing) }
+                                                }
+                                            },
+                                            onGloss = {
+                                                val query = token.glossQuery ?: return@WordCell
+                                                if (!openPleco(context, query)) {
+                                                    scope.launch { snackbar.showSnackbar(plecoMissing) }
+                                                }
+                                            },
+                                        )
                                     }
                                 }
                             }
@@ -172,12 +182,15 @@ fun StillReader(
 }
 
 @Composable
-private fun WordCell(token: TextToken, onClick: () -> Unit) {
+private fun WordCell(
+    token: TextToken,
+    onCharacter: (String) -> Unit,
+    onGloss: () -> Unit,
+) {
     val russian = token.russian.ifBlank { stringResource(R.string.gloss_missing) }
+    val characters = token.characters
     Card(
-        modifier = Modifier
-            .widthIn(min = 72.dp, max = 280.dp)
-            .clickable(onClick = onClick),
+        modifier = Modifier.widthIn(min = 72.dp, max = 280.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -187,18 +200,29 @@ private fun WordCell(token: TextToken, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = token.pinyin,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = token.surface,
-                fontSize = 28.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(vertical = 2.dp),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                characters.forEachIndexed { index, hanzi ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable {
+                            token.characterQuery(index)?.let(onCharacter)
+                        },
+                    ) {
+                        Text(
+                            text = token.readings.getOrElse(index) { "" },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = hanzi,
+                            fontSize = 28.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 2.dp),
+                        )
+                    }
+                }
+            }
             Text(
                 text = russian,
                 style = MaterialTheme.typography.bodySmall,
@@ -206,6 +230,7 @@ private fun WordCell(token: TextToken, onClick: () -> Unit) {
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(onClick = onGloss),
             )
         }
     }

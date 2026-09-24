@@ -29,12 +29,13 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 6. Tapping a character or its label opens Pleco via `plecoapi://x-callback-url/s?q={hanzi}&x-source=instant-pinyin`. If Pleco is missing, show a snackbar instead of crashing.
 7. A torch control toggles the back-camera flashlight.
 8. **Сфотографировать** takes one still with CameraX `ImageCapture`. **Из галереи** opens the system photo picker. Either path leaves the live overlay and runs OCR once on that image (static reading, not a stream of frames). Gallery works without the camera permission. The back control returns to the live reader.
-9. The still result is the recognized text in reading order, not a grid of unique characters. Each OCR line is a wrapping row. Consecutive hanzi are grouped by forward maximum matching against the bundled lexicon: a match of two or more characters is one word cell; everything else is a single-character cell. Cells are as wide as their text. Punctuation stays between cells and is not tappable.
-10. A word or character cell shows toned pinyin above the surface and a short Russian gloss below (an em dash when the lexicon has no gloss). Tapping a word cell opens Pleco with that word. Tapping a character cell opens Pleco with that character.
-11. The APK works fully offline after install: models, dictionary, and pinyin data are bundled. No runtime download. No `INTERNET` permission.
-12. minSdk 34, compile/targetSdk 36; Kotlin + Jetpack Compose + Material 3.
-13. First camera use requests `CAMERA`. Denial explains why and offers another request plus a control that opens app settings. Gallery stays available.
-14. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/instant-pinyin/` with `instant-pinyin.apk`.
+9. The still result is the recognized text in reading order, not a grid of unique characters. Each OCR line is a wrapping row. Consecutive hanzi are grouped with the same greedy match as the live overlay (`dict/words.txt`, at most 4 hanzi, then `dict/chars.txt`). A match of two or more characters is one word cell; everything else is a single-character cell. Cells are as wide as their text. Punctuation stays between cells and is not tappable.
+10. A cell shows each character's toned pinyin above that character and one short Russian gloss under the word (an em dash when the lexicon has no gloss). Tapping a character or its pinyin opens that character in Pleco. Tapping the gloss opens the whole word, or that character when the cell is a single hanzi.
+11. The window follows the device sensor (`fullSensor`), including when system rotation lock is on. A horizontal text line keeps pinyin above and the gloss below even when a single character slice is taller than it is wide. A vertical column keeps pinyin beside the column. Label text is rotated by the difference between that hold and the current window, so a landscape hold does not leave pinyin and Russian written vertically.
+12. The APK works fully offline after install: models, dictionary, and pinyin data are bundled. No runtime download. No `INTERNET` permission.
+13. minSdk 34, compile/targetSdk 36; Kotlin + Jetpack Compose + Material 3.
+14. First camera use requests `CAMERA`. Denial explains why and offers another request plus a control that opens app settings. Gallery stays available.
+15. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/instant-pinyin/` with `instant-pinyin.apk`.
 
 ## Interfaces
 
@@ -43,10 +44,9 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 | Launcher activity | `com.tepmex.instantpinyin.MainActivity` |
 | OCR models | `assets/ocr/ppocr_det_fp16.tflite`, `assets/ocr/ppocr_rec_fp16.tflite` |
 | OCR charset | `assets/ocr/ppocrv5_dict.txt` (CTC: blank + dict lines + space) |
-| Word glosses | `assets/dict/words.txt` — 12 500 entries, `hanzi<TAB>russian` (live overlay) |
-| Character glosses | `assets/dict/chars.txt` — 6 500 entries, `hanzi<TAB>russian` (live overlay) |
-| Still lexicon | `assets/lexicon/words.tsv` — simplified word, toned pinyin, Russian gloss (may be empty). Built by `scripts/build-lexicon.py`. See `NOTICE.md`. |
-| Pleco search | `plecoapi://x-callback-url/s?q={query}&x-source=instant-pinyin` (character, or the whole word on a still) |
+| Word glosses | `assets/dict/words.txt` — 12 500 entries, `hanzi<TAB>russian` (live overlay and still) |
+| Character glosses | `assets/dict/chars.txt` — 6 500 entries, `hanzi<TAB>russian` (live overlay and still) |
+| Pleco search | `plecoapi://x-callback-url/s?q={query}&x-source=instant-pinyin` (one character, or the whole word when the gloss is tapped) |
 | Camera | `android.permission.CAMERA`; CameraX `Preview` + `ImageAnalysis` (`STRATEGY_KEEP_ONLY_LATEST`, RGBA) + `ImageCapture` |
 | Gallery | `ActivityResultContracts.PickVisualMedia` (images only); no extra storage permission |
 | Preview | `PreviewView` `FILL_CENTER`, `COMPATIBLE` (so the overlay draws above the camera) |
@@ -64,7 +64,7 @@ No accounts, no persistence, no incoming URL scheme in v1.
 - **Gloss** — Russian text for one greedy word (or one leftover character) and the pill under that span (beside it when the span is vertical).
 - **Track** — a Reading Glyph kept across frames. A matched detection eases the box toward the new one. One missed frame keeps the track; the next miss drops it.
 - **Still** — one captured or gallery image plus the OCR lines read from it once. It replaces the live overlay until the user goes back. The photo is not stored.
-- **Text Token** — one word, one hanzi, or one punctuation mark from a Still line, in reading order. A word token is a lexicon match of two or more characters (forward maximum matching). Its Pleco query is the whole surface. A character token’s query is that character. Pinyin sits above the surface; the Russian gloss sits below.
+- **Text Token** — one word of at most four hanzi, one hanzi, or one punctuation mark from a Still line, in reading order. The word match is the same greedy lexicon as the live overlay. Pinyin sits above each character. The Russian gloss sits under the word. Tapping a character opens that character; tapping the gloss opens the word surface.
 
 Nothing is stored. Closing the app drops the overlay and the still.
 
@@ -74,8 +74,9 @@ Nothing is stored. Closing the app drops the overlay and the still.
 2. With permission → camera fills the screen. While the model loads, a bottom chip says **Загружаю модель…**. With no characters in frame, **Наведите камеру на иероглифы**.
 3. Recognized hanzi keep the real character visible. Pinyin is a light-on-dark pill just above it (or beside it for a vertical column). The Russian gloss is a warm pill under the word (or on the other side of a vertical column).
 4. Torch button at the top end. Tap a character to open Pleco. Bottom of the live reader: **Сфотографировать** and **Из галереи**.
-5. Still reading: title **Текст**. Each line wraps. Word cells are wider than character cells. Pinyin is on top, Russian under the characters. Tap opens Pleco for the word when the cell is a word, otherwise for the character. Empty result: **Текст не найден**.
-6. Landing page: brand 即时拼音 / instant-pinyin, APK download, update note.
+5. Still reading: title **Текст**. Each line wraps. Word cells are wider than character cells. Pinyin is above each character, Russian under the word. Tap a character for that character; tap the translation for the word. Empty result: **Текст не найден**.
+6. Live labels stay upright for the way the phone is held. Horizontal text keeps horizontal pinyin and Russian; turning the phone sideways does not leave those labels written vertically.
+7. Landing page: brand 即时拼音 / instant-pinyin, APK download, update note.
 
 ## Out of scope
 
@@ -94,12 +95,13 @@ Nothing is stored. Closing the app drops the overlay and the still.
 1. OCR line `你好` in a 100×40 box yields two Reading Glyphs, `你` then `好`, each half the width, each with toned pinyin.
 2. OCR line `你，好` keeps three slots so `好` occupies the last third. A space in `你 好` does not take a slot.
 3. A tall box splits top to bottom in recognition order.
-4. A horizontal glyph with room above it gets a label whose bottom edge is at or above the glyph top. A tall glyph gets a label to its right.
+4. A horizontal line's glyph with room above it gets a label whose bottom edge is at or above the glyph top, even when that slice is taller than it is wide. A glyph from a vertical line gets a label to its right.
 5. Center-crop mapping sends frame pixels onto the view the way `FILL_CENTER` does. A 90° buffer crop maps into the upright bitmap (a top-left buffer quarter becomes the top-right of the upright image).
 6. One empty detection keeps the previous glyph; the next empty detection drops it. A matched box moves partway toward the new rectangle.
 7. A tap target for `汉` builds `plecoapi://x-callback-url/s?q=%E6%B1%89&x-source=instant-pinyin`. Pinyin uses tone marks; third tone is a caron (`你` → `nǐ`), not the breve pinyin4j emits.
 8. Greedy gloss on the live overlay: `你好世界` is one 4-hanzi hit when that word is in the lexicon; `中国人` is one 3-hanzi hit even if `中国` is also present; `我们` plus a following character uses the 2-hanzi word and then that character's own gloss. A wide gap does not join `你` and `好`. A horizontal word's gloss pill starts at or below the word. A character missing from both lists draws no gloss.
-9. Forward maximum matching on a still of `你好朋友` with lexicon entries `你好` and `朋友` yields two word tokens. Pleco for the first is `plecoapi://x-callback-url/s?q=%E4%BD%A0%E5%A5%BD&x-source=instant-pinyin`. `研究生命` with both `研究生` and `生命` present keeps `研究生` and then `命`. A comma between words is not a Pleco target. The word cell’s pinyin is the lexicon reading (`nǐ hǎo`) and the caption under it is the Russian gloss (`привет`).
-10. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
-11. The release APK contains the two `.tflite` models, `ppocrv5_dict.txt`, `dict/words.txt`, `dict/chars.txt`, and `lexicon/words.tsv`; the app declares no `INTERNET` permission.
-12. Deploy workflow includes `instant-pinyin` in `ANDROID_APPS` and rebuilds when `instant-pinyin/**` changes.
+9. Forward maximum matching on a still of `你好朋友` with dictionary entries `你好` and `朋友` yields two word tokens. The gloss opens `plecoapi://x-callback-url/s?q=%E4%BD%A0%E5%A5%BD&x-source=instant-pinyin`; the first character opens `你`. `研究生命` with both `研究生` and `生命` present keeps `研究生` and then `命`. A five-hanzi dictionary entry is not one cell. A comma between words is not a Pleco target. Pinyin is per character; the caption under the word is the Russian gloss (`привет`).
+10. A horizontal OCR line marks its glyphs horizontal even when each slice is taller than it is wide, so pinyin sits above. A portrait window with the phone held so its left side is up rotates label text 270°. When the window already matches that hold, label text stays at 0°.
+11. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
+12. The release APK contains the two `.tflite` models, `ppocrv5_dict.txt`, `dict/words.txt`, and `dict/chars.txt`; the app declares no `INTERNET` permission.
+13. Deploy workflow includes `instant-pinyin` in `ANDROID_APPS` and rebuilds when `instant-pinyin/**` changes.
