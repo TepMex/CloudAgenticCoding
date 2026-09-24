@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">即时拼音</string>
     <string name="permission_title">Нужна камера</string>
-    <string name="permission_body">Телефон работает как очки: пиньинь появляется прямо над иероглифами, пока камера на них смотрит.</string>
+    <string name="permission_body">Телефон работает как очки: пиньинь появляется над иероглифами, короткий перевод — под словом.</string>
     <string name="permission_button">Разрешить камеру</string>
     <string name="permission_settings">Открыть настройки</string>
     <string name="hint_loading">Загружаю модель…</string>

@@ -15,7 +15,7 @@ Audience: someone preparing for shops and street stalls in China who already kno
    3. Assemble the heard amount from all currently circulating RMB banknotes and tap **付款**.
 3. Prices must be plausible for the product (a water bottle is a few yuan, not ¥100). Every whole-yuan amount in the bundled audio catalog must appear on at least one product, including 1–9, teens, 20–40 takeaway meals, and sit-down dishes through ¥114. Rounds pick a spoken amount uniformly from those catalog numbers, then a matching product, so cheap snacks do not dominate listening practice.
 4. Banknote picker includes every current paper denomination: **¥1, ¥5, ¥10, ¥20, ¥50, ¥100**. Designs are stylized but color/layout-similar to the fifth-series notes. Tapping a note adds it to the tender; tapping a tendered note removes it. Show the running total in yuan.
-5. **付款** succeeds only on an exact match with the spoken price. Wrong amounts stay on the same product so the player can listen again. After a correct payment, score updates and a new product appears.
+5. **付款** succeeds only on an exact match with the spoken price. Wrong amounts stay on the same product so the player can listen again. After a correct payment, score updates and a new product appears. A correct payment plays `res/raw/sfx_success.mp3`. A wrong amount plays `res/raw/sfx_error.mp3`. Paying before the price has been heard plays neither effect.
 6. Bundle spoken numbers from `chinese_money_numbers.json` (base64 audio fields). The app plays those clips; it does not call a network TTS API at runtime. Only prices that have an audio entry may be asked.
 7. minSdk 34, compile/targetSdk 36; Kotlin + Jetpack Compose + Material 3. Offline after install.
 8. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/duoshao-qian/` with `duoshao-qian.apk`.
@@ -28,6 +28,7 @@ Audience: someone preparing for shops and street stalls in China who already kno
 | Audio catalog | `file:///android_asset/chinese_money_numbers.json` (UTF-8 JSON; number keys or list entries with base64 audio) |
 | Product catalog | in-code catalog + `assets/products/*.jpg` |
 | Audio playback | `MediaPlayer` from a decoded temp file / in-memory source |
+| Answer effects | `res/raw/sfx_success.mp3` on an exact **付款**, `res/raw/sfx_error.mp3` on a wrong sum |
 | Gradle | `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk` |
 | Pages download | `https://<host>/<repo>/duoshao-qian/duoshao-qian.apk` |
 
@@ -50,7 +51,7 @@ Persistence: none in v1. Uninstall loses score; that is acceptable.
 1. Cold start → shop screen: title **多少钱**, product photo, names, **多少钱?** (replayable), banknote wallet, tender tray, total, **清空**, **付款**.
 2. Listening: tapping **多少钱?** plays the clip; no Arabic price is revealed.
 3. Paying: tap wallet notes to add; tap notes in the tray to remove; **付款** checks the sum.
-4. Feedback: short Chinese + Russian snackbar (`对了!` / `不对，再听一次`). After success, the next goods appear.
+4. Feedback: short Chinese + Russian snackbar (`对了!` / `不对，再听一次`) plus a success or error sting. After success, the next goods appear.
 5. Landing page: brand 多少钱 / duoshao-qian, APK download, update note.
 
 ## Out of scope
@@ -66,6 +67,6 @@ Persistence: none in v1. Uninstall loses score; that is acceptable.
 1. A round shows a product image and never prints the secret price before a correct **付款**.
 2. **多少钱?** plays Chinese audio from the bundled JSON for that price.
 3. Water-class drinks are priced in a low single-digit yuan band; sit-down meals can reach about ¥114, never ¥100 for a bottle of water. Playable products jointly cover every amount in `chinese_money_numbers.json`.
-4. Wallet shows ¥1, ¥5, ¥10, ¥20, ¥50, and ¥100 notes. Exact tender pays; a wrong sum keeps the same product.
+4. Wallet shows ¥1, ¥5, ¥10, ¥20, ¥50, and ¥100 notes. Exact tender pays and plays `sfx_success.mp3`; a wrong sum keeps the same product and plays `sfx_error.mp3`. Paying before **多少钱?** plays no effect.
 5. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
 6. Deploy workflow includes `duoshao-qian` in `ANDROID_APPS` and rebuilds when `duoshao-qian/**` changes.

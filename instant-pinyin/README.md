@@ -1,12 +1,13 @@
 # instant-pinyin (即时拼音)
 
-Offline Android camera that works like reading glasses for Chinese. Point the back camera at a sign, menu, or page and toned pinyin floats directly above each character. Tap a character to open it in **Pleco**.
+Offline Android camera that works like reading glasses for Chinese. Point the back camera at a sign, menu, or page and toned pinyin floats directly above each character, with a short Russian gloss under the word. Tap a character to open it in **Pleco**.
 
 Same on-device PP-OCRv5 stack as [paizhao-unknown-hanzi](../paizhao-unknown-hanzi). This app does not build a flashcard grid; it keeps the pinyin on the camera image.
 
 ## Features
 
-- **Live overlay** — CameraX preview, pinyin pill above each horizontal hanzi and beside each vertical one.
+- **Live overlay** — CameraX preview, pinyin pill above each horizontal hanzi and beside each vertical one. A Russian gloss sits under the word (beside a vertical column).
+- **Greedy words** — bundled 12 500 common words, longest first (4, then 3, then 2). Leftover characters use the bundled 6 500 single-character glosses.
 - **Hold still** — one missed frame keeps the last labels so they do not flicker off.
 - **Pleco** — tap a character: `plecoapi://x-callback-url/s?q=…&x-source=instant-pinyin`.
 - **Still reading** — photograph or pick a gallery image. OCR runs once. The text is grouped into words (forward maximum match). Each cell is as wide as the word: pinyin on top, Russian gloss below. A tap opens the word in Pleco when a word was found, otherwise the character.

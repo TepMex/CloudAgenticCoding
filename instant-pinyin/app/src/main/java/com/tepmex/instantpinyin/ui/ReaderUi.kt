@@ -11,6 +11,7 @@ import com.tepmex.instantpinyin.R
 import com.tepmex.instantpinyin.domain.Lexicon
 import com.tepmex.instantpinyin.domain.OverlaySession
 import com.tepmex.instantpinyin.domain.PinyinLookup
+import com.tepmex.instantpinyin.domain.RuGlossLexicon
 import com.tepmex.instantpinyin.domain.ReadingGlyph
 import com.tepmex.instantpinyin.domain.TextToken
 import com.tepmex.instantpinyin.domain.WordSegmenter
@@ -53,9 +54,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _still = MutableStateFlow<StillState>(StillState.Idle)
     val still: StateFlow<StillState> = _still.asStateFlow()
 
-    private var lexicon: Lexicon? = null
+    private var stillLexicon: Lexicon? = null
 
     val ocr get() = getApplication<InstantPinyinApp>().ocr
+
+    val lexicon: RuGlossLexicon get() = getApplication<InstantPinyinApp>().lexicon
 
     fun markReady() {
         _ui.update { current ->
@@ -110,9 +113,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val result = withContext(Dispatchers.Default) {
             runCatching {
                 val lines = app.ocr.recognize(bitmap, maxBoxes = 64)
-                val words = lexicon ?: Lexicon.parse(
+                val words = stillLexicon ?: Lexicon.parse(
                     app.assets.open("lexicon/words.tsv").bufferedReader(Charsets.UTF_8).use { it.readText() },
-                ).also { lexicon = it }
+                ).also { stillLexicon = it }
                 WordSegmenter.lines(lines, words, PinyinLookup::of)
             }.also {
                 if (!bitmap.isRecycled) bitmap.recycle()

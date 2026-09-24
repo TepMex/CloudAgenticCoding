@@ -79,6 +79,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.instantpinyin.R
+import com.tepmex.instantpinyin.domain.GlossLabel
+import com.tepmex.instantpinyin.domain.GlossLabels
 import com.tepmex.instantpinyin.domain.PinyinLabel
 import com.tepmex.instantpinyin.domain.PinyinLabels
 import com.tepmex.instantpinyin.domain.PlecoLinks
@@ -224,9 +226,20 @@ private fun LiveReader(
     val alive = remember { AtomicBoolean(true) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
+    val lexicon = viewModel.lexicon
     val labels = remember(ui.glyphs, ui.imageWidth, ui.imageHeight, viewSize) {
         PinyinLabels.layout(
             glyphs = ui.glyphs,
+            imageWidth = ui.imageWidth,
+            imageHeight = ui.imageHeight,
+            viewWidth = viewSize.width.toFloat(),
+            viewHeight = viewSize.height.toFloat(),
+        )
+    }
+    val glosses = remember(ui.glyphs, ui.imageWidth, ui.imageHeight, viewSize, lexicon) {
+        GlossLabels.layout(
+            glyphs = ui.glyphs,
+            lexicon = lexicon,
             imageWidth = ui.imageWidth,
             imageHeight = ui.imageHeight,
             viewWidth = viewSize.width.toFloat(),
@@ -351,13 +364,16 @@ private fun LiveReader(
 
         PinyinArOverlay(
             labels = labels,
+            glosses = glosses,
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(labels) {
+                .pointerInput(labels, glosses) {
                     detectTapGestures { offset ->
-                        val hit = labels.asReversed().firstOrNull { it.hit(offset.x, offset.y) }
+                        val gloss = glosses.asReversed().firstOrNull { it.hit(offset.x, offset.y) }
+                        val hanzi = gloss?.text
+                            ?: labels.asReversed().firstOrNull { it.hit(offset.x, offset.y) }?.hanzi
                             ?: return@detectTapGestures
-                        if (!openPleco(context, hit.hanzi)) {
+                        if (!openPleco(context, hanzi)) {
                             scope.launch { snackbar.showSnackbar(plecoMissing) }
                         }
                     }
@@ -458,6 +474,7 @@ private fun LiveReader(
 @Composable
 private fun PinyinArOverlay(
     labels: List<PinyinLabel>,
+    glosses: List<GlossLabel>,
     modifier: Modifier = Modifier,
 ) {
     val textPaint = remember {
@@ -472,28 +489,50 @@ private fun PinyinArOverlay(
             color = android.graphics.Color.argb(200, 10, 14, 18)
         }
     }
+    val glossPaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(255, 224, 138)
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        }
+    }
+    val glossBgPaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(210, 28, 22, 8)
+        }
+    }
     Canvas(modifier) {
         val native = drawContext.canvas.nativeCanvas
         for (label in labels) {
-            textPaint.textSize = label.textSizePx
-            val measured = textPaint.measureText(label.pinyin)
-            val padX = label.textSizePx * 0.38f
-            val width = max(measured + padX * 2f, label.pill.width)
-            val maxLeft = (size.width - width).coerceAtLeast(0f)
-            val left = (label.pill.centerX - width / 2f).coerceIn(0f, maxLeft)
-            val pill = android.graphics.RectF(
-                left,
-                label.pill.top,
-                left + width,
-                label.pill.bottom,
-            )
-            val radius = label.textSizePx * 0.38f
-            native.drawRoundRect(pill, radius, radius, bgPaint)
-            val metrics = textPaint.fontMetrics
-            val baseline = pill.centerY() - (metrics.ascent + metrics.descent) / 2f
-            native.drawText(label.pinyin, pill.centerX(), baseline, textPaint)
+            drawPill(native, textPaint, bgPaint, label.pinyin, label.textSizePx, label.pill, size.width)
+        }
+        for (gloss in glosses) {
+            drawPill(native, glossPaint, glossBgPaint, gloss.gloss, gloss.textSizePx, gloss.pill, size.width)
         }
     }
+}
+
+private fun drawPill(
+    native: android.graphics.Canvas,
+    textPaint: Paint,
+    bgPaint: Paint,
+    text: String,
+    textSizePx: Float,
+    box: com.tepmex.instantpinyin.domain.PxBox,
+    viewWidth: Float,
+) {
+    textPaint.textSize = textSizePx
+    val measured = textPaint.measureText(text)
+    val padX = textSizePx * 0.38f
+    val width = max(measured + padX * 2f, box.width)
+    val maxLeft = (viewWidth - width).coerceAtLeast(0f)
+    val left = (box.centerX - width / 2f).coerceIn(0f, maxLeft)
+    val pill = android.graphics.RectF(left, box.top, left + width, box.bottom)
+    val radius = textSizePx * 0.38f
+    native.drawRoundRect(pill, radius, radius, bgPaint)
+    val metrics = textPaint.fontMetrics
+    val baseline = pill.centerY() - (metrics.ascent + metrics.descent) / 2f
+    native.drawText(text, pill.centerX(), baseline, textPaint)
 }
 
 private fun openPleco(context: android.content.Context, hanzi: String): Boolean {
