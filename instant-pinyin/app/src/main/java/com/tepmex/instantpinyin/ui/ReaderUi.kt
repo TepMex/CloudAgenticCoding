@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tepmex.instantpinyin.InstantPinyinApp
 import com.tepmex.instantpinyin.domain.OverlaySession
+import com.tepmex.instantpinyin.domain.RuGlossLexicon
 import com.tepmex.instantpinyin.domain.ReadingGlyph
 import com.tepmex.instantpinyin.ocr.OcrLine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<ReaderUi> = _ui.asStateFlow()
 
     val ocr get() = getApplication<InstantPinyinApp>().ocr
+
+    val lexicon: RuGlossLexicon get() = getApplication<InstantPinyinApp>().lexicon
 
     fun markReady() {
         _ui.update { current ->

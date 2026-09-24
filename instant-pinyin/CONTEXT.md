@@ -20,6 +20,10 @@ _Avoid_: card, token, word
 A Reading Glyph drawn in view pixels. On a horizontal character the pill sits above it. On a vertical character the pill sits beside it.
 _Avoid_: subtitle, caption bar
 
+**Gloss**:
+The short Russian reading of one greedy word, or of one character when no 4-, 3-, or 2-hanzi word claimed it. On a horizontal word the pill sits under the word. On a vertical word it sits on the other side from the pinyin.
+_Avoid_: definition, subtitle, sense list
+
 **Track**:
 A Reading Glyph kept from the previous Live Frame so a single missed detection does not blink the label off.
 _Avoid_: cache, anchor
