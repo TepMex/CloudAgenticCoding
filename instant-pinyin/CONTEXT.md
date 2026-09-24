@@ -32,6 +32,14 @@ _Avoid_: cache, anchor
 One photograph or gallery image, read once. The live overlay is not updating while the Still is open.
 _Avoid_: scan, session, online mode
 
+**Known Hanzi**:
+One ideograph saved from Settings. It is already familiar, so its pinyin is not drawn. A word made only of these has no Russian gloss.
+_Avoid_: known word, vocabulary item
+
+**Only Known**:
+The main-screen checkbox. When it is on, the reader keeps Known Hanzi and leaves the rest out.
+_Avoid_: show known, hide unknown filter
+
 **Text Token**:
 A word of at most four hanzi, a single hanzi, or a punctuation mark taken from one OCR line of a Still, in reading order. The match uses the same glossary as the live overlay. Pinyin is above each character; Russian is under the word. Pleco receives one character from a character tap, and the whole word from a gloss tap.
 _Avoid_: card, equal cell, unique-hanzi tile

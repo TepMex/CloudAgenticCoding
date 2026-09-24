@@ -30,6 +30,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -48,7 +49,10 @@ import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +89,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.instantpinyin.R
 import com.tepmex.instantpinyin.domain.GlossLabel
 import com.tepmex.instantpinyin.domain.GlossLabels
+import com.tepmex.instantpinyin.domain.KnownReading
 import com.tepmex.instantpinyin.domain.LabelFacing
 import com.tepmex.instantpinyin.domain.PinyinLabel
 import com.tepmex.instantpinyin.domain.PinyinLabels
@@ -118,6 +123,10 @@ fun ReaderScreen(
     }
 
     val still by viewModel.still.collectAsStateWithLifecycle()
+    val knownText by viewModel.knownText.collectAsStateWithLifecycle()
+    val onlyKnown by viewModel.onlyKnown.collectAsStateWithLifecycle()
+    val known = remember(knownText) { KnownReading.knownSet(knownText) }
+    var settingsOpen by remember { mutableStateOf(false) }
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
@@ -129,10 +138,23 @@ fun ReaderScreen(
         )
     }
 
+    if (settingsOpen) {
+        SettingsScreen(
+            initialText = knownText,
+            onBack = { settingsOpen = false },
+            onSave = viewModel::saveKnownText,
+            modifier = modifier,
+        )
+        return
+    }
+
     if (still !is StillState.Idle) {
         StillReader(
             state = still,
+            known = known,
+            onlyKnown = onlyKnown,
             onBack = viewModel::closeStill,
+            onOpenSettings = { settingsOpen = true },
             modifier = modifier,
         )
         return
@@ -143,6 +165,7 @@ fun ReaderScreen(
             asked = asked,
             onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) },
             onGallery = openGallery,
+            onOpenSettings = { settingsOpen = true },
             modifier = modifier,
         )
         return
@@ -150,6 +173,10 @@ fun ReaderScreen(
 
     LiveReader(
         viewModel = viewModel,
+        known = known,
+        onlyKnown = onlyKnown,
+        onOnlyKnownChange = viewModel::setOnlyKnown,
+        onOpenSettings = { settingsOpen = true },
         onGallery = openGallery,
         modifier = modifier,
     )
@@ -160,6 +187,7 @@ private fun PermissionGate(
     asked: Boolean,
     onRequest: () -> Unit,
     onGallery: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -194,6 +222,9 @@ private fun PermissionGate(
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
+        TextButton(onClick = onOpenSettings, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.settings))
+        }
         if (asked) {
             TextButton(
                 onClick = {
@@ -214,6 +245,10 @@ private fun PermissionGate(
 @Composable
 private fun LiveReader(
     viewModel: ReaderViewModel,
+    known: Set<String>,
+    onlyKnown: Boolean,
+    onOnlyKnownChange: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
     onGallery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -243,26 +278,29 @@ private fun LiveReader(
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     val lexicon = viewModel.lexicon
-    val labels = remember(ui.glyphs, ui.imageWidth, ui.imageHeight, viewSize, textRotation) {
+    val glyphs = remember(ui.glyphs, known, onlyKnown) {
+        KnownReading.visibleGlyphs(ui.glyphs, known, onlyKnown)
+    }
+    val labels = remember(glyphs, ui.imageWidth, ui.imageHeight, viewSize, textRotation, known) {
         PinyinLabels.layout(
-            glyphs = ui.glyphs,
+            glyphs = glyphs,
             imageWidth = ui.imageWidth,
             imageHeight = ui.imageHeight,
             viewWidth = viewSize.width.toFloat(),
             viewHeight = viewSize.height.toFloat(),
             textRotation = textRotation,
-        )
+        ).map { KnownReading.mutePinyin(it, known) }
     }
-    val glosses = remember(ui.glyphs, ui.imageWidth, ui.imageHeight, viewSize, lexicon, textRotation) {
+    val glosses = remember(glyphs, ui.imageWidth, ui.imageHeight, viewSize, lexicon, textRotation, known) {
         GlossLabels.layout(
-            glyphs = ui.glyphs,
+            glyphs = glyphs,
             lexicon = lexicon,
             imageWidth = ui.imageWidth,
             imageHeight = ui.imageHeight,
             viewWidth = viewSize.width.toFloat(),
             viewHeight = viewSize.height.toFloat(),
             textRotation = textRotation,
-        )
+        ).filter { KnownReading.keepGloss(it.text, known) }
     }
 
     LaunchedEffect(Unit) {
@@ -461,6 +499,44 @@ private fun LiveReader(
             }
         }
 
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(start = 4.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = Color.White,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .background(Color(0xCC101418), RoundedCornerShape(20.dp))
+                    .clickable { onOnlyKnownChange(!onlyKnown) }
+                    .padding(end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = onlyKnown,
+                    onCheckedChange = null,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = Color.White,
+                        uncheckedColor = Color.White,
+                        checkmarkColor = Color(0xFF101418),
+                    ),
+                )
+                Text(
+                    text = stringResource(R.string.only_known),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+
         IconButton(
             onClick = {
                 torchOn = !torchOn
@@ -522,6 +598,7 @@ private fun PinyinArOverlay(
     Canvas(modifier) {
         val native = drawContext.canvas.nativeCanvas
         for (label in labels) {
+            if (label.pinyin.isEmpty()) continue
             drawPill(
                 native,
                 textPaint,

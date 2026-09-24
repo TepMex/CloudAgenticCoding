@@ -22,4 +22,11 @@
     <string name="ocr_engine_failed">Не удалось запустить чтение на устройстве</string>
     <string name="ocr_failed">Не удалось прочитать текст: %1$s</string>
     <string name="gloss_missing">—</string>
+    <string name="settings">Настройки</string>
+    <string name="save">Сохранить</string>
+    <string name="known_hint">Вставьте или наберите текст. Каждый китайский иероглиф в этом поле считается известным. У известного иероглифа нет пиньиня. Если слово состоит только из известных, русский перевод тоже скрыт.</string>
+    <string name="known_field_label">Известные иероглифы</string>
+    <string name="known_count">Уникальных известных: %1$d</string>
+    <string name="known_saved">Сохранено</string>
+    <string name="only_known">Только известные</string>
 </resources>

@@ -13,6 +13,8 @@ Same on-device PP-OCRv5 stack as [paizhao-unknown-hanzi](../paizhao-unknown-hanz
 - **Still reading** — photograph or pick a gallery image. OCR runs once and groups words with the same dictionary as the live overlay (at most four hanzi). Pinyin sits above each character; the Russian gloss sits under the word. Tap a character for that character, or the translation for the word.
 - **Hold** — the screen follows the phone, and pinyin and Russian stay upright. Horizontal text keeps labels above and below; a sideways hold does not turn them into vertical writing.
 - **Фонарик** — torch toggle for dim text.
+- **Настройки** — paste any text; every Chinese character in the field is known. **Сохранить** writes it. Known characters have no pinyin. A word made only of known characters has no Russian gloss.
+- **Только известные** — off by default. When on, unknown characters drop out of the overlay and the still.
 - **Offline** — LiteRT runtime + bundled PP-OCRv5 detector/recognizer. No `INTERNET` permission.
 
 ## Requirements
