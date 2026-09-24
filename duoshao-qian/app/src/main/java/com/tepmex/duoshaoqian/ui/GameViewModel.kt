@@ -3,6 +3,7 @@ package com.tepmex.duoshaoqian.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tepmex.duoshaoqian.DuoShaoQianApp
+import com.tepmex.duoshaoqian.data.AnswerFeedback
 import com.tepmex.duoshaoqian.data.ChineseMoney
 import com.tepmex.duoshaoqian.data.ProductCatalog
 import com.tepmex.duoshaoqian.data.ShopGame
@@ -63,7 +64,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pay() {
         val currentGame = game ?: return
-        when (currentGame.pay()) {
+        val result = currentGame.pay()
+        AnswerFeedback.toneFor(result)?.let { tone ->
+            app.audioPlayer.stop()
+            app.answerSfx.play(tone)
+        }
+        when (result) {
             ShopGame.PayResult.NeedListen -> publish(GameMessage.NeedListen)
             ShopGame.PayResult.Incorrect -> publish(GameMessage.Incorrect)
             ShopGame.PayResult.Correct -> {
@@ -101,6 +107,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         app.audioPlayer.stop()
+        app.answerSfx.stop()
         super.onCleared()
     }
 }

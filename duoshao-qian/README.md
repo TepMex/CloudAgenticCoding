@@ -9,6 +9,7 @@ Android listening game for tourist prices in China. See a snack or drink, tap **
 - Bundled Chinese clips from `chinese_money_numbers.json` (base64 audio per number)
 - Wallet with every current paper denomination: ¥1, ¥5, ¥10, ¥20, ¥50, ¥100
 - Exact-tender scoring; replay the clip until it clicks
+- `sfx_success.mp3` on a correct payment, `sfx_error.mp3` on a wrong amount
 - Offline after install
 
 ## Requirements
