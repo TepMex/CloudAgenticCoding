@@ -27,3 +27,11 @@ _Avoid_: definition, subtitle, sense list
 **Track**:
 A Reading Glyph kept from the previous Live Frame so a single missed detection does not blink the label off.
 _Avoid_: cache, anchor
+
+**Still**:
+One photograph or gallery image, read once. The live overlay is not updating while the Still is open.
+_Avoid_: scan, session, online mode
+
+**Text Token**:
+A word, a single hanzi, or a punctuation mark taken from one OCR line of a Still, in reading order. A word is a lexicon match of at least two characters. Pinyin is above the surface; Russian is below. Pleco receives the word when the token is a word, and the character otherwise.
+_Avoid_: card, equal cell, unique-hanzi tile

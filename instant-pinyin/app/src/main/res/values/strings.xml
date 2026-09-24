@@ -11,4 +11,15 @@
     <string name="pleco_missing">Pleco не установлен</string>
     <string name="torch_on">Включить фонарик</string>
     <string name="torch_off">Выключить фонарик</string>
+    <string name="take_photo">Сфотографировать</string>
+    <string name="pick_gallery">Из галереи</string>
+    <string name="still_title">Текст</string>
+    <string name="still_hint">Пиньинь сверху, перевод снизу. Нажатие открывает слово в Pleco, если оно нашлось, иначе иероглиф.</string>
+    <string name="still_empty">Текст не найден</string>
+    <string name="back">Назад</string>
+    <string name="ocr_working">Читаю текст…</string>
+    <string name="gallery_failed">Не удалось открыть изображение</string>
+    <string name="ocr_engine_failed">Не удалось запустить чтение на устройстве</string>
+    <string name="ocr_failed">Не удалось прочитать текст: %1$s</string>
+    <string name="gloss_missing">—</string>
 </resources>

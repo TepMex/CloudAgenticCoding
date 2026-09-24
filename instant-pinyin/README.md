@@ -10,6 +10,7 @@ Same on-device PP-OCRv5 stack as [paizhao-unknown-hanzi](../paizhao-unknown-hanz
 - **Greedy words** — bundled 12 500 common words, longest first (4, then 3, then 2). Leftover characters use the bundled 6 500 single-character glosses.
 - **Hold still** — one missed frame keeps the last labels so they do not flicker off.
 - **Pleco** — tap a character: `plecoapi://x-callback-url/s?q=…&x-source=instant-pinyin`.
+- **Still reading** — photograph or pick a gallery image. OCR runs once. The text is grouped into words (forward maximum match). Each cell is as wide as the word: pinyin on top, Russian gloss below. A tap opens the word in Pleco when a word was found, otherwise the character.
 - **Фонарик** — torch toggle for dim text.
 - **Offline** — LiteRT runtime + bundled PP-OCRv5 detector/recognizer. No `INTERNET` permission.
 
