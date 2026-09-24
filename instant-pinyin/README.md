@@ -9,6 +9,7 @@ Same on-device PP-OCRv5 stack as [paizhao-unknown-hanzi](../paizhao-unknown-hanz
 - **Live overlay** — CameraX preview, pinyin pill above each horizontal hanzi and beside each vertical one.
 - **Hold still** — one missed frame keeps the last labels so they do not flicker off.
 - **Pleco** — tap a character: `plecoapi://x-callback-url/s?q=…&x-source=instant-pinyin`.
+- **Still reading** — photograph or pick a gallery image. OCR runs once. The text is grouped into words (forward maximum match). Each cell is as wide as the word: pinyin on top, Russian gloss below. A tap opens the word in Pleco when a word was found, otherwise the character.
 - **Фонарик** — torch toggle for dim text.
 - **Offline** — LiteRT runtime + bundled PP-OCRv5 detector/recognizer. No `INTERNET` permission.
 

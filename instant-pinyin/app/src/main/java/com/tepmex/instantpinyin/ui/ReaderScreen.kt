@@ -13,10 +13,14 @@ import android.util.Size
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -29,6 +33,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
@@ -39,7 +44,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -102,10 +110,32 @@ fun ReaderScreen(
         granted = it
     }
 
+    val still by viewModel.still.collectAsStateWithLifecycle()
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) viewModel.onGallery(uri)
+    }
+    val openGallery = {
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
+    }
+
+    if (still !is StillState.Idle) {
+        StillReader(
+            state = still,
+            onBack = viewModel::closeStill,
+            modifier = modifier,
+        )
+        return
+    }
+
     if (!granted) {
         PermissionGate(
             asked = asked,
             onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onGallery = openGallery,
             modifier = modifier,
         )
         return
@@ -113,6 +143,7 @@ fun ReaderScreen(
 
     LiveReader(
         viewModel = viewModel,
+        onGallery = openGallery,
         modifier = modifier,
     )
 }
@@ -121,6 +152,7 @@ fun ReaderScreen(
 private fun PermissionGate(
     asked: Boolean,
     onRequest: () -> Unit,
+    onGallery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -145,6 +177,16 @@ private fun PermissionGate(
         Button(onClick = onRequest) {
             Text(stringResource(R.string.permission_button))
         }
+        FilledTonalButton(
+            onClick = onGallery,
+            modifier = Modifier.padding(top = 12.dp),
+        ) {
+            Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
+            Text(
+                text = stringResource(R.string.pick_gallery),
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
         if (asked) {
             TextButton(
                 onClick = {
@@ -165,6 +207,7 @@ private fun PermissionGate(
 @Composable
 private fun LiveReader(
     viewModel: ReaderViewModel,
+    onGallery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -176,6 +219,7 @@ private fun LiveReader(
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var torchOn by remember { mutableStateOf(false) }
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val alive = remember { AtomicBoolean(true) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
@@ -274,9 +318,13 @@ private fun LiveReader(
                                         viewport.recycle()
                                     }
                                 }
+                                val capture = ImageCapture.Builder()
+                                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                    .build()
                                 val group = UseCaseGroup.Builder()
                                     .addUseCase(preview)
                                     .addUseCase(analysis)
+                                    .addUseCase(capture)
                                 viewPort?.let { group.setViewPort(it) }
                                 cameraProvider.unbindAll()
                                 val camera = try {
@@ -291,6 +339,7 @@ private fun LiveReader(
                                     return@addListener
                                 }
                                 cameraControl = camera.cameraControl
+                                imageCapture = capture
                                 if (torchOn) camera.cameraControl.enableTorch(true)
                             },
                             ContextCompat.getMainExecutor(ctx),
@@ -330,10 +379,52 @@ private fun LiveReader(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
+                    .padding(start = 24.dp, end = 24.dp, bottom = 88.dp)
                     .background(Color(0xCC101418), RoundedCornerShape(20.dp))
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             )
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FilledTonalButton(onClick = onGallery) {
+                Icon(Icons.Filled.PhotoLibrary, contentDescription = stringResource(R.string.pick_gallery))
+                Text(
+                    text = stringResource(R.string.pick_gallery),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            Button(
+                onClick = {
+                    val capture = imageCapture ?: return@Button
+                    capture.takePicture(
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageCapturedCallback() {
+                            override fun onCaptureSuccess(image: ImageProxy) {
+                                val bmp = image.toBitmap()
+                                image.close()
+                                viewModel.onPhoto(bmp)
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                Log.w(TAG, "still capture failed", exception)
+                            }
+                        },
+                    )
+                },
+                enabled = imageCapture != null,
+            ) {
+                Icon(Icons.Filled.PhotoCamera, contentDescription = stringResource(R.string.take_photo))
+                Text(
+                    text = stringResource(R.string.take_photo),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         IconButton(
