@@ -11,6 +11,8 @@ data class GlossLabel(
     val textSizePx: Float,
     /** True when the pill sits under the word (horizontal text, pinyin above). */
     val below: Boolean,
+    /** Clockwise degrees so the baseline stays upright for how the phone is held. */
+    val textRotation: Int = 0,
 ) {
     fun hit(x: Float, y: Float): Boolean = pill.inflate(8f).contains(x, y)
 }
@@ -23,6 +25,7 @@ object GlossLabels {
         imageHeight: Int,
         viewWidth: Float,
         viewHeight: Float,
+        textRotation: Int = 0,
     ): List<GlossLabel> {
         if (viewWidth <= 0f || viewHeight <= 0f || glyphs.isEmpty()) return emptyList()
         val labels = ArrayList<GlossLabel>()
@@ -35,7 +38,9 @@ object GlossLabels {
                     val slice = run.subList(index, index + piece.text.length)
                     index += piece.text.length
                     if (gloss.isNullOrBlank()) continue
-                    labels.add(place(slice, piece.text, gloss, imageWidth, imageHeight, viewWidth, viewHeight))
+                    labels.add(
+                        place(slice, piece.text, gloss, imageWidth, imageHeight, viewWidth, viewHeight, textRotation),
+                    )
                 }
             }
         }
@@ -50,17 +55,26 @@ object GlossLabels {
         imageHeight: Int,
         viewWidth: Float,
         viewHeight: Float,
+        textRotation: Int,
     ): GlossLabel {
         val union = unionBox(slice.map { it.box })
         val viewBox = PreviewMap.centerCrop(union, imageWidth, imageHeight, viewWidth, viewHeight)
-        val vertical = viewBox.height > viewBox.width * 1.15f
+        val vertical = slice.any { it.vertical }
         val textSize = min(viewBox.width, viewBox.height).times(if (vertical) 0.34f else 0.38f).coerceIn(10f, 28f)
-        val pill = if (vertical) {
+        val placed = if (vertical) {
             beside(viewBox, gloss, textSize, viewWidth, viewHeight)
         } else {
             below(viewBox, gloss, textSize, viewWidth, viewHeight)
         }
-        return GlossLabel(text, gloss, viewBox, pill, textSize, below = !vertical)
+        return GlossLabel(
+            text,
+            gloss,
+            viewBox,
+            LabelFacing.face(placed, textRotation),
+            textSize,
+            below = !vertical,
+            textRotation = textRotation,
+        )
     }
 
     private fun below(
@@ -110,7 +124,7 @@ object GlossLabels {
         val lines = ArrayList<List<ReadingGlyph>>()
         while (remaining.isNotEmpty()) {
             val seed = remaining.minWith(compareBy({ it.box.top }, { it.box.left }))
-            val vertical = seed.box.height > seed.box.width * 1.15f
+            val vertical = seed.vertical
             val group = remaining.filter { sameBand(seed, it, vertical) }
             remaining.removeAll(group.toSet())
             val sorted = if (vertical) group.sortedBy { it.box.top } else group.sortedBy { it.box.left }
@@ -121,7 +135,7 @@ object GlossLabels {
 
     internal fun runsOf(line: List<ReadingGlyph>): List<List<ReadingGlyph>> {
         if (line.isEmpty()) return emptyList()
-        val vertical = line.first().box.height > line.first().box.width * 1.15f
+        val vertical = line.first().vertical
         val runs = ArrayList<List<ReadingGlyph>>()
         val current = ArrayList<ReadingGlyph>()
         for (glyph in line) {
@@ -137,7 +151,7 @@ object GlossLabels {
     }
 
     private fun sameBand(seed: ReadingGlyph, other: ReadingGlyph, vertical: Boolean): Boolean {
-        val otherVertical = other.box.height > other.box.width * 1.15f
+        val otherVertical = other.vertical
         if (vertical != otherVertical) return false
         val overlap = if (vertical) {
             overlap(seed.box.left, seed.box.right, other.box.left, other.box.right)

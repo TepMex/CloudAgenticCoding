@@ -7,15 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WordSegmenterTest {
-    private val lexicon = Lexicon.parse(
-        """
-        你好	nǐ hǎo	привет
-        朋友	péng you	друг
-        研究生	yán jiū shēng	аспирант
-        生命	shēng mìng	жизнь
-        研究	yán jiū	исследовать
-        你	nǐ	ты
-        """.trimIndent(),
+    private val lexicon = RuGlossLexicon(
+        words = mapOf(
+            "你好" to "привет",
+            "朋友" to "друг",
+            "研究生" to "аспирант",
+            "生命" to "жизнь",
+            "研究" to "исследовать",
+            "你好世界人" to "не должно склеиться",
+        ),
+        chars = mapOf("你" to "ты"),
     )
 
     @Test
@@ -23,10 +24,12 @@ class WordSegmenterTest {
         val tokens = WordSegmenter.segment("你好朋友", lexicon) { "x" }
         assertEquals(listOf("你好", "朋友"), tokens.map { it.surface })
         assertTrue(tokens.all { it.word })
-        assertEquals("nǐ hǎo", tokens[0].pinyin)
+        assertEquals(listOf("x", "x"), tokens[0].readings)
         assertEquals("привет", tokens[0].russian)
         assertEquals("друг", tokens[1].russian)
-        assertEquals(listOf("你好", "朋友"), tokens.map { it.plecoQuery })
+        assertEquals("你好", tokens[0].glossQuery)
+        assertEquals("你", tokens[0].characterQuery(0))
+        assertEquals("好", tokens[0].characterQuery(1))
     }
 
     @Test
@@ -36,8 +39,9 @@ class WordSegmenterTest {
         assertFalse(tokens[0].word)
         assertEquals("py:你", tokens[0].pinyin)
         assertEquals("ты", tokens[0].russian)
-        assertNull(tokens[1].plecoQuery)
-        assertEquals("好", tokens[2].plecoQuery)
+        assertNull(tokens[1].glossQuery)
+        assertEquals("好", tokens[2].glossQuery)
+        assertEquals("好", tokens[2].characterQuery(0))
         assertFalse(tokens[2].word)
     }
 
@@ -45,12 +49,13 @@ class WordSegmenterTest {
     fun punctuationSeparatesWordsWithoutACellQuery() {
         val tokens = WordSegmenter.segment("你好，朋友", lexicon) { "x" }
         assertEquals(listOf("你好", "，", "朋友"), tokens.map { it.surface })
-        assertNull(tokens[1].plecoQuery)
-        assertEquals("你好", tokens[0].plecoQuery)
+        assertNull(tokens[1].glossQuery)
+        assertNull(tokens[1].characterQuery(0))
+        assertEquals("你好", tokens[0].glossQuery)
     }
 
     @Test
-    fun forwardMaximumMatchPrefersTheLongerWord() {
+    fun forwardMaximumMatchPrefersTheLongerWordUpToFour() {
         val tokens = WordSegmenter.segment("研究生命", lexicon) { "x" }
         assertEquals(listOf("研究生", "命"), tokens.map { it.surface })
         assertTrue(tokens[0].word)
@@ -59,11 +64,23 @@ class WordSegmenterTest {
     }
 
     @Test
-    fun wordQueryOpensPlecoOnTheWholeWord() {
+    fun aWordLongerThanFourStaysSplit() {
+        val tokens = WordSegmenter.segment("你好世界人", lexicon) { "x" }
+        assertEquals(listOf("你好", "世", "界", "人"), tokens.map { it.surface })
+        assertEquals("привет", tokens[0].russian)
+        assertTrue(tokens.drop(1).all { !it.word })
+    }
+
+    @Test
+    fun glossOpensTheWordAndACharacterOpensThatCharacter() {
         val word = WordSegmenter.segment("你好", lexicon) { "x" }.single()
         assertEquals(
             "plecoapi://x-callback-url/s?q=%E4%BD%A0%E5%A5%BD&x-source=instant-pinyin",
-            PlecoLinks.searchUri(word.plecoQuery!!),
+            PlecoLinks.searchUri(word.glossQuery!!),
+        )
+        assertEquals(
+            "plecoapi://x-callback-url/s?q=%E4%BD%A0&x-source=instant-pinyin",
+            PlecoLinks.searchUri(word.characterQuery(0)!!),
         )
     }
 }
