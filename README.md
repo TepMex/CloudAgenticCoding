@@ -39,6 +39,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `duoshao-qian` | [duoshao-qian](https://tepmex.github.io/CloudAgenticCoding/duoshao-qian/) | 多少钱 · listen to Chinese prices and pay with RMB notes (APK) |
 | `same-element` | [same-element](https://tepmex.github.io/CloudAgenticCoding/same-element/) | Общий элемент · draw the part that distinguishes characters sharing 氵, 扌, 讠… |
 | `same-element-android` | [same-element-android](https://tepmex.github.io/CloudAgenticCoding/same-element-android/) | Общий элемент · Android WebView wrapper (APK) |
+| `mock-br-lk` | [mock-br-lk](https://tepmex.github.io/CloudAgenticCoding/mock-br-lk/) | BRY Chinese · mock student cabinet: hero choice, map of China, quizzes (IndexedDB) |
 | `china-railways-map` | [china-railways-map](https://tepmex.github.io/CloudAgenticCoding/china_rail_interactive_map.html) | Chinese Railways map with pinyin and hanzi |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.

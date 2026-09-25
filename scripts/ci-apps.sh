@@ -13,6 +13,7 @@ WEB_APPS=(
   mandarin-kanshu-pengyou
   rth-agriculture
   same-element
+  mock-br-lk
 )
 
 ANDROID_APPS=(
