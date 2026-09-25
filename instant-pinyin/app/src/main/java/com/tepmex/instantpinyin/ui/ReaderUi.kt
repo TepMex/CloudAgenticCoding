@@ -19,8 +19,10 @@ import com.tepmex.instantpinyin.ocr.OcrLine
 import com.tepmex.instantpinyin.ocr.ScanImages
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,6 +58,28 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val ocr get() = getApplication<InstantPinyinApp>().ocr
 
     val lexicon: RuGlossLexicon get() = getApplication<InstantPinyinApp>().lexicon
+
+    private val knownStore = getApplication<InstantPinyinApp>().knownHanziStore
+
+    val knownText: StateFlow<String> = knownStore.knownText.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        "",
+    )
+
+    val onlyKnown: StateFlow<Boolean> = knownStore.onlyKnown.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        false,
+    )
+
+    suspend fun saveKnownText(text: String) {
+        knownStore.save(text)
+    }
+
+    fun setOnlyKnown(value: Boolean) {
+        viewModelScope.launch { knownStore.setOnlyKnown(value) }
+    }
 
     fun markReady() {
         _ui.update { current ->

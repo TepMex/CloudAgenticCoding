@@ -12,8 +12,10 @@ data class PinyinLabel(
     /** Clockwise degrees so the baseline stays upright for how the phone is held. */
     val textRotation: Int = 0,
 ) {
-    fun hit(x: Float, y: Float): Boolean =
-        pill.inflate(8f).contains(x, y) || glyph.inflate(8f).contains(x, y)
+    fun hit(x: Float, y: Float): Boolean {
+        if (pinyin.isNotEmpty() && pill.inflate(8f).contains(x, y)) return true
+        return glyph.inflate(8f).contains(x, y)
+    }
 }
 
 object PinyinLabels {

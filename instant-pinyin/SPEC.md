@@ -36,6 +36,9 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 13. minSdk 34, compile/targetSdk 36; Kotlin + Jetpack Compose + Material 3.
 14. First camera use requests `CAMERA`. Denial explains why and offers another request plus a control that opens app settings. Gallery stays available.
 15. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/instant-pinyin/` with `instant-pinyin.apk`.
+16. **Настройки** holds one multiline field. Every hanzi in that field is a Known Hanzi. **Сохранить** writes the field. Punctuation and other letters in the field do not count.
+17. A Known Hanzi does not show pinyin, on the live overlay or on a still. The character stays visible and still opens Pleco. A Russian gloss is omitted when every hanzi in that word (or leftover character) is known. A mixed word keeps the gloss and hides pinyin only on the known characters.
+18. The live reader has a **Только известные** checkbox, unchecked by default and remembered. When it is on, unknown hanzi are left out of the overlay and out of the still. Punctuation stays.
 
 ## Interfaces
 
@@ -52,8 +55,10 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 | Preview | `PreviewView` `FILL_CENTER`, `COMPATIBLE` (so the overlay draws above the camera) |
 | Gradle | `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk` |
 | Pages download | `https://<host>/<repo>/instant-pinyin/instant-pinyin.apk` |
+| Known Hanzi | DataStore `instant_pinyin`, key `known_hanzi_text` |
+| Only Known | DataStore `instant_pinyin`, key `only_known` (boolean, default `false`) |
 
-No accounts, no persistence, no incoming URL scheme in v1.
+No accounts, no incoming URL scheme in v1. Known Hanzi and the Only Known checkbox are the only persisted state.
 
 ## Data model
 
@@ -66,21 +71,25 @@ No accounts, no persistence, no incoming URL scheme in v1.
 - **Still** — one captured or gallery image plus the OCR lines read from it once. It replaces the live overlay until the user goes back. The photo is not stored.
 - **Text Token** — one word of at most four hanzi, one hanzi, or one punctuation mark from a Still line, in reading order. The word match is the same greedy lexicon as the live overlay. Pinyin sits above each character. The Russian gloss sits under the word. Tapping a character opens that character; tapping the gloss opens the word surface.
 
-Nothing is stored. Closing the app drops the overlay and the still.
+- **Known Text** — the raw string saved from Settings. Only the hanzi in it are Known Hanzi.
+- **Known Hanzi** — one ideograph from Known Text. Its pinyin is not drawn. A word made only of Known Hanzi has no Russian gloss.
+- **Only Known** — the main-screen checkbox. When on, the overlay and the still keep Known Hanzi and drop the rest.
+
+Closing the app drops the overlay and the still. Known Text and Only Known stay.
 
 ## UI / UX
 
 1. Cold start without camera permission → short explanation and **Разрешить камеру**. After a denial, **Открыть настройки** is also shown. **Из галереи** stays available.
 2. With permission → camera fills the screen. While the model loads, a bottom chip says **Загружаю модель…**. With no characters in frame, **Наведите камеру на иероглифы**.
 3. Recognized hanzi keep the real character visible. Pinyin is a light-on-dark pill just above it (or beside it for a vertical column). The Russian gloss is a warm pill under the word (or on the other side of a vertical column).
-4. Torch button at the top end. Tap a character to open Pleco. Bottom of the live reader: **Сфотографировать** and **Из галереи**.
+4. Torch button at the top end. Settings at the top start, with **Только известные** beside it. Tap a character to open Pleco. Bottom of the live reader: **Сфотографировать** and **Из галереи**.
 5. Still reading: title **Текст**. Each line wraps. Word cells are wider than character cells. Pinyin is above each character, Russian under the word. Tap a character for that character; tap the translation for the word. Empty result: **Текст не найден**.
 6. Live labels stay upright for the way the phone is held. Horizontal text keeps horizontal pinyin and Russian; turning the phone sideways does not leave those labels written vertically.
 7. Landing page: brand 即时拼音 / instant-pinyin, APK download, update note.
 
 ## Out of scope
 
-- Known-hanzi lists and share sheets (those stay in paizhao-unknown-hanzi)
+- Share sheets (those stay in paizhao-unknown-hanzi)
 - Full dictionary senses, examples, or traditional-character glosses (the overlay and the still view show one short Russian phrase; Pleco remains the full dictionary)
 - Segmenting across separate OCR lines
 - An in-app dictionary browser
@@ -105,3 +114,4 @@ Nothing is stored. Closing the app drops the overlay and the still.
 11. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
 12. The release APK contains the two `.tflite` models, `ppocrv5_dict.txt`, `dict/words.txt`, and `dict/chars.txt`; the app declares no `INTERNET` permission.
 13. Deploy workflow includes `instant-pinyin` in `ANDROID_APPS` and rebuilds when `instant-pinyin/**` changes.
+14. Known Text `你好世界` marks those four characters. On a still of `你好朋友`, `你` and `好` have no pinyin and `你好` has no Russian gloss; `朋` and `友` keep pinyin and `朋友` keeps its gloss. With Only Known on, `朋友` is left out and `你好` remains, still without pinyin or gloss. A known live glyph keeps a tap on the character and draws no pinyin pill.

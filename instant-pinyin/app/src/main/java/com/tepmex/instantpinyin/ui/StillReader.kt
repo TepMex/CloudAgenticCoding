@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,15 +45,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.instantpinyin.R
+import com.tepmex.instantpinyin.domain.KnownReading
 import com.tepmex.instantpinyin.domain.PlecoLinks
-import com.tepmex.instantpinyin.domain.TextToken
+import com.tepmex.instantpinyin.domain.ShownToken
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StillReader(
     state: StillState,
+    known: Set<String>,
+    onlyKnown: Boolean,
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -71,6 +76,14 @@ fun StillReader(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.settings),
                         )
                     }
                 },
@@ -110,7 +123,10 @@ fun StillReader(
                 }
             }
             is StillState.Ready -> {
-                val hasReading = state.lines.any { line -> line.any { it.glossQuery != null } }
+                val lines = remember(state.lines, known, onlyKnown) {
+                    KnownReading.present(state.lines, known, onlyKnown)
+                }
+                val hasReading = lines.any { line -> line.any { it.glossQuery != null || it.chars.isNotEmpty() } }
                 if (!hasReading) {
                     Column(
                         modifier = Modifier
@@ -142,14 +158,14 @@ fun StillReader(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        for (line in state.lines) {
+                        for (line in lines) {
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 for (token in line) {
-                                    if (token.glossQuery == null) {
+                                    if (token.chars.isEmpty()) {
                                         Text(
                                             text = token.surface,
                                             style = MaterialTheme.typography.headlineSmall,
@@ -183,12 +199,11 @@ fun StillReader(
 
 @Composable
 private fun WordCell(
-    token: TextToken,
+    token: ShownToken,
     onCharacter: (String) -> Unit,
     onGloss: () -> Unit,
 ) {
-    val russian = token.russian.ifBlank { stringResource(R.string.gloss_missing) }
-    val characters = token.characters
+    val russian = token.russian?.ifBlank { stringResource(R.string.gloss_missing) }
     Card(
         modifier = Modifier.widthIn(min = 72.dp, max = 280.dp),
         shape = RoundedCornerShape(16.dp),
@@ -201,21 +216,21 @@ private fun WordCell(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                characters.forEachIndexed { index, hanzi ->
+                for (char in token.chars) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable {
-                            token.characterQuery(index)?.let(onCharacter)
-                        },
+                        modifier = Modifier.clickable { onCharacter(char.hanzi) },
                     ) {
+                        if (char.pinyin.isNotEmpty()) {
+                            Text(
+                                text = char.pinyin,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                         Text(
-                            text = token.readings.getOrElse(index) { "" },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            text = hanzi,
+                            text = char.hanzi,
                             fontSize = 28.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 2.dp),
@@ -223,15 +238,17 @@ private fun WordCell(
                     }
                 }
             }
-            Text(
-                text = russian,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(onClick = onGloss),
-            )
+            if (russian != null) {
+                Text(
+                    text = russian,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(onClick = onGloss),
+                )
+            }
         }
     }
 }
