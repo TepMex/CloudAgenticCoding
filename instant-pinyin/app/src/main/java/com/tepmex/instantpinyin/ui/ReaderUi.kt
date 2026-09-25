@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tepmex.instantpinyin.InstantPinyinApp
 import com.tepmex.instantpinyin.R
+import com.tepmex.instantpinyin.domain.NormRect
 import com.tepmex.instantpinyin.domain.OverlaySession
 import com.tepmex.instantpinyin.domain.PinyinLookup
 import com.tepmex.instantpinyin.domain.RuGlossLexicon
@@ -73,12 +74,32 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         false,
     )
 
+    val pinyinOnly: StateFlow<Boolean> = knownStore.pinyinOnly.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        false,
+    )
+
+    val zone: StateFlow<NormRect> = knownStore.zone.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        NormRect.Default,
+    )
+
     suspend fun saveKnownText(text: String) {
         knownStore.save(text)
     }
 
     fun setOnlyKnown(value: Boolean) {
         viewModelScope.launch { knownStore.setOnlyKnown(value) }
+    }
+
+    fun setPinyinOnly(value: Boolean) {
+        viewModelScope.launch { knownStore.setPinyinOnly(value) }
+    }
+
+    fun setZone(zone: NormRect) {
+        viewModelScope.launch { knownStore.setZone(zone) }
     }
 
     fun markReady() {

@@ -40,6 +40,18 @@ _Avoid_: known word, vocabulary item
 The main-screen checkbox. When it is on, the reader keeps Known Hanzi and leaves the rest out.
 _Avoid_: show known, hide unknown filter
 
+**Pinyin only**:
+The main-screen checkbox. When it is on, Russian glosses are hidden and pinyin stays.
+_Avoid_: hide translation, no dictionary
+
+**Recognition zone**:
+The adjustable frame on the live preview. OCR reads only the text inside it.
+_Avoid_: crop tool, viewport, scan box
+
+**Pinyin tier**:
+One of two rows (or columns) of pinyin on a single text line. Odd characters in reading order sit on the near tier; even characters sit one step further out, so neighboring pills do not cover each other.
+_Avoid_: ruby line, subtitle row
+
 **Text Token**:
 A word of at most four hanzi, a single hanzi, or a punctuation mark taken from one OCR line of a Still, in reading order. The match uses the same glossary as the live overlay. Pinyin is above each character; Russian is under the word. Pleco receives one character from a character tap, and the whole word from a gloss tap.
 _Avoid_: card, equal cell, unique-hanzi tile

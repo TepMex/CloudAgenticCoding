@@ -29,4 +29,7 @@
     <string name="known_count">Уникальных известных: %1$d</string>
     <string name="known_saved">Сохранено</string>
     <string name="only_known">Только известные</string>
+    <string name="pinyin_only">Только пиньинь</string>
+    <string name="zone_move">Переместить зону распознавания</string>
+    <string name="zone_resize">Изменить зону распознавания</string>
 </resources>
