@@ -1,0 +1,4 @@
+-keep class net.sourceforge.pinyin4j.** { *; }
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
