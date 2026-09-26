@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
@@ -32,14 +33,18 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -64,6 +69,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,14 +78,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size as GeometrySize
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -91,13 +104,18 @@ import com.tepmex.instantpinyin.domain.GlossLabel
 import com.tepmex.instantpinyin.domain.GlossLabels
 import com.tepmex.instantpinyin.domain.KnownReading
 import com.tepmex.instantpinyin.domain.LabelFacing
+import com.tepmex.instantpinyin.domain.NormRect
 import com.tepmex.instantpinyin.domain.PinyinLabel
 import com.tepmex.instantpinyin.domain.PinyinLabels
 import com.tepmex.instantpinyin.domain.PlecoLinks
+import com.tepmex.instantpinyin.domain.RecognitionZone
+import com.tepmex.instantpinyin.domain.ZoneDrag
 import com.tepmex.instantpinyin.ocr.FrameBitmaps
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,6 +143,7 @@ fun ReaderScreen(
     val still by viewModel.still.collectAsStateWithLifecycle()
     val knownText by viewModel.knownText.collectAsStateWithLifecycle()
     val onlyKnown by viewModel.onlyKnown.collectAsStateWithLifecycle()
+    val pinyinOnly by viewModel.pinyinOnly.collectAsStateWithLifecycle()
     val known = remember(knownText) { KnownReading.knownSet(knownText) }
     var settingsOpen by remember { mutableStateOf(false) }
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -153,6 +172,7 @@ fun ReaderScreen(
             state = still,
             known = known,
             onlyKnown = onlyKnown,
+            pinyinOnly = pinyinOnly,
             onBack = viewModel::closeStill,
             onOpenSettings = { settingsOpen = true },
             modifier = modifier,
@@ -175,7 +195,10 @@ fun ReaderScreen(
         viewModel = viewModel,
         known = known,
         onlyKnown = onlyKnown,
+        pinyinOnly = pinyinOnly,
         onOnlyKnownChange = viewModel::setOnlyKnown,
+        onPinyinOnlyChange = viewModel::setPinyinOnly,
+        onZoneChange = viewModel::setZone,
         onOpenSettings = { settingsOpen = true },
         onGallery = openGallery,
         modifier = modifier,
@@ -247,7 +270,10 @@ private fun LiveReader(
     viewModel: ReaderViewModel,
     known: Set<String>,
     onlyKnown: Boolean,
+    pinyinOnly: Boolean,
     onOnlyKnownChange: (Boolean) -> Unit,
+    onPinyinOnlyChange: (Boolean) -> Unit,
+    onZoneChange: (NormRect) -> Unit,
     onOpenSettings: () -> Unit,
     onGallery: () -> Unit,
     modifier: Modifier = Modifier,
@@ -259,6 +285,18 @@ private fun LiveReader(
     val scope = rememberCoroutineScope()
     val plecoMissing = stringResource(R.string.pleco_missing)
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
+    val savedZone by viewModel.zone.collectAsStateWithLifecycle()
+    var zone by remember { mutableStateOf(savedZone) }
+    var zoneDragging by remember { mutableStateOf(false) }
+    LaunchedEffect(savedZone, zoneDragging) {
+        if (!zoneDragging) zone = savedZone
+    }
+    val zoneRef = remember { AtomicReference(NormRect.Default) }
+    val viewRef = remember { AtomicReference(IntSize.Zero) }
+    SideEffect {
+        zoneRef.set(zone)
+        viewRef.set(viewSize)
+    }
     val configuration = LocalConfiguration.current
     var textRotation by remember { mutableIntStateOf(0) }
     DisposableEffect(configuration.orientation) {
@@ -291,16 +329,20 @@ private fun LiveReader(
             textRotation = textRotation,
         ).map { KnownReading.mutePinyin(it, known) }
     }
-    val glosses = remember(glyphs, ui.imageWidth, ui.imageHeight, viewSize, lexicon, textRotation, known) {
-        GlossLabels.layout(
-            glyphs = glyphs,
-            lexicon = lexicon,
-            imageWidth = ui.imageWidth,
-            imageHeight = ui.imageHeight,
-            viewWidth = viewSize.width.toFloat(),
-            viewHeight = viewSize.height.toFloat(),
-            textRotation = textRotation,
-        ).filter { KnownReading.keepGloss(it.text, known) }
+    val glosses = remember(glyphs, ui.imageWidth, ui.imageHeight, viewSize, lexicon, textRotation, known, pinyinOnly) {
+        if (pinyinOnly) {
+            emptyList()
+        } else {
+            GlossLabels.layout(
+                glyphs = glyphs,
+                lexicon = lexicon,
+                imageWidth = ui.imageWidth,
+                imageHeight = ui.imageHeight,
+                viewWidth = viewSize.width.toFloat(),
+                viewHeight = viewSize.height.toFloat(),
+                textRotation = textRotation,
+            ).filter { KnownReading.keepGloss(it.text, known) }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -378,12 +420,32 @@ private fun LiveReader(
                                     } finally {
                                         image.close()
                                     } ?: return@setAnalyzer
+                                    val crop = RecognitionZone.bitmapCrop(
+                                        zoneRef.get(),
+                                        viewport.width,
+                                        viewport.height,
+                                        viewRef.get().width.toFloat(),
+                                        viewRef.get().height.toFloat(),
+                                    )
+                                    val ocrBitmap = if (crop == null) {
+                                        viewport
+                                    } else {
+                                        Bitmap.createBitmap(viewport, crop.left, crop.top, crop.width, crop.height)
+                                    }
                                     try {
-                                        val lines = viewModel.ocr.recognize(viewport, maxBoxes = 32)
-                                        viewModel.publish(lines, viewport.width, viewport.height)
+                                        val lines = viewModel.ocr.recognize(ocrBitmap, maxBoxes = 32)
+                                        val shifted = if (crop == null) {
+                                            lines
+                                        } else {
+                                            lines.map { line ->
+                                                line.copy(box = line.box.copy(x = line.box.x + crop.left, y = line.box.y + crop.top))
+                                            }
+                                        }
+                                        viewModel.publish(shifted, viewport.width, viewport.height)
                                     } catch (error: Exception) {
                                         Log.w(TAG, "ocr failed", error)
                                     } finally {
+                                        if (ocrBitmap !== viewport) ocrBitmap.recycle()
                                         viewport.recycle()
                                     }
                                 }
@@ -418,6 +480,8 @@ private fun LiveReader(
             },
         )
 
+        RecognitionScrim(zone)
+
         PinyinArOverlay(
             labels = labels,
             glosses = glosses,
@@ -434,6 +498,27 @@ private fun LiveReader(
                         }
                     }
                 },
+        )
+
+        ZoneHandles(
+            zone = zone,
+            onDragStart = { zoneDragging = true },
+            onDrag = { mode, dx, dy ->
+                if (viewSize.width > 0 && viewSize.height > 0) {
+                    zone = RecognitionZone.drag(
+                        zone,
+                        mode,
+                        dx,
+                        dy,
+                        viewSize.width.toFloat(),
+                        viewSize.height.toFloat(),
+                    )
+                }
+            },
+            onDragEnd = {
+                zoneDragging = false
+                onZoneChange(zone)
+            },
         )
 
         val hint = when {
@@ -499,12 +584,11 @@ private fun LiveReader(
             }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(start = 4.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onOpenSettings) {
                 Icon(
@@ -513,28 +597,17 @@ private fun LiveReader(
                     tint = Color.White,
                 )
             }
-            Row(
-                modifier = Modifier
-                    .background(Color(0xCC101418), RoundedCornerShape(20.dp))
-                    .clickable { onOnlyKnownChange(!onlyKnown) }
-                    .padding(end = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = onlyKnown,
-                    onCheckedChange = null,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = Color.White,
-                        uncheckedColor = Color.White,
-                        checkmarkColor = Color(0xFF101418),
-                    ),
-                )
-                Text(
-                    text = stringResource(R.string.only_known),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
+            ReaderCheck(
+                checked = onlyKnown,
+                label = stringResource(R.string.only_known),
+                onToggle = { onOnlyKnownChange(!onlyKnown) },
+            )
+            ReaderCheck(
+                checked = pinyinOnly,
+                label = stringResource(R.string.pinyin_only),
+                onToggle = { onPinyinOnlyChange(!pinyinOnly) },
+                modifier = Modifier.padding(top = 6.dp),
+            )
         }
 
         IconButton(
@@ -562,6 +635,120 @@ private fun LiveReader(
                 .align(Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         )
+    }
+}
+
+@Composable
+private fun ReaderCheck(
+    checked: Boolean,
+    label: String,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(Color(0xCC101418), RoundedCornerShape(20.dp))
+            .clickable(onClick = onToggle)
+            .padding(end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null,
+            colors = CheckboxDefaults.colors(
+                checkedColor = Color.White,
+                uncheckedColor = Color.White,
+                checkmarkColor = Color(0xFF101418),
+            ),
+        )
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun RecognitionScrim(zone: NormRect) {
+    Canvas(Modifier.fillMaxSize()) {
+        val l = zone.left * size.width
+        val t = zone.top * size.height
+        val r = zone.right * size.width
+        val b = zone.bottom * size.height
+        val dim = Color(0x99000000)
+        drawRect(dim, size = GeometrySize(size.width, t))
+        drawRect(dim, topLeft = Offset(0f, b), size = GeometrySize(size.width, size.height - b))
+        drawRect(dim, topLeft = Offset(0f, t), size = GeometrySize(l, b - t))
+        drawRect(dim, topLeft = Offset(r, t), size = GeometrySize(size.width - r, b - t))
+        drawRect(
+            color = Color.White,
+            topLeft = Offset(l, t),
+            size = GeometrySize((r - l).coerceAtLeast(0f), (b - t).coerceAtLeast(0f)),
+            style = Stroke(width = 3f),
+        )
+    }
+}
+
+@Composable
+private fun ZoneHandles(
+    zone: NormRect,
+    onDragStart: () -> Unit,
+    onDrag: (ZoneDrag, Float, Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val handle = 28.dp
+    val handlePx = with(density) { handle.toPx() }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val widthPx = constraints.maxWidth.toFloat()
+        val heightPx = constraints.maxHeight.toFloat()
+        for (mode in ZoneDrag.entries) {
+            val (cx, cy) = handleCenter(mode, zone, widthPx, heightPx)
+            val description = stringResource(
+                if (mode == ZoneDrag.MOVE) R.string.zone_move else R.string.zone_resize,
+            )
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset((cx - handlePx / 2f).roundToInt(), (cy - handlePx / 2f).roundToInt()) }
+                    .size(handle)
+                    .semantics { contentDescription = description }
+                    .pointerInput(mode) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDragEnd = { onDragEnd() },
+                            onDragCancel = { onDragEnd() },
+                        ) { change, drag ->
+                            change.consume()
+                            onDrag(mode, drag.x, drag.y)
+                        }
+                    }
+                    .background(
+                        if (mode == ZoneDrag.MOVE) Color(0xFFFFE08A) else Color.White,
+                        RoundedCornerShape(50),
+                    ),
+            )
+        }
+    }
+}
+
+private fun handleCenter(mode: ZoneDrag, zone: NormRect, width: Float, height: Float): Pair<Float, Float> {
+    val l = zone.left * width
+    val t = zone.top * height
+    val r = zone.right * width
+    val b = zone.bottom * height
+    val cx = (l + r) / 2f
+    val cy = (t + b) / 2f
+    return when (mode) {
+        ZoneDrag.TOP_LEFT -> l to t
+        ZoneDrag.TOP_RIGHT -> r to t
+        ZoneDrag.BOTTOM_LEFT -> l to b
+        ZoneDrag.BOTTOM_RIGHT -> r to b
+        ZoneDrag.LEFT -> l to cy
+        ZoneDrag.RIGHT -> r to cy
+        ZoneDrag.TOP -> cx to t
+        ZoneDrag.BOTTOM -> cx to b
+        ZoneDrag.MOVE -> cx to t - 22f
     }
 }
 

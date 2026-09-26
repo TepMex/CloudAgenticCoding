@@ -17,6 +17,7 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 5. Pinyin is drawn as a small label registered to the camera image:
    - Horizontal characters: the label sits **above** the character.
    - Vertical characters: the label sits **beside** the character (to the right, or to the left if the right edge has no room).
+   - Neighbors alternate **two tiers** so the pills do not cover each other. On a horizontal line, the 1st, 3rd, 5th… readings sit on the near tier (just above the ink) and the 2nd, 4th, 6th… sit one row higher. On a vertical column the far tier is one column further out. A reading that is still wider than the gap to the next same-tier neighbor is drawn smaller until the pills no longer overlap. If two pills still meet, the one farther from its character is pushed further out.
 5a. A Russian gloss is drawn for recognized hanzi, from the bundled lexicon:
    - Inside one text line, matching is greedy: a 4-hanzi dictionary word wins, then 3, then 2. A gap (punctuation slot or a wide space between glyphs) starts a new run.
    - A matched word gets one gloss under the whole word when the line is horizontal (pinyin stays above each character).
@@ -39,6 +40,8 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 16. **Настройки** holds one multiline field. Every hanzi in that field is a Known Hanzi. **Сохранить** writes the field. Punctuation and other letters in the field do not count.
 17. A Known Hanzi does not show pinyin, on the live overlay or on a still. The character stays visible and still opens Pleco. A Russian gloss is omitted when every hanzi in that word (or leftover character) is known. A mixed word keeps the gloss and hides pinyin only on the known characters.
 18. The live reader has a **Только известные** checkbox, unchecked by default and remembered. When it is on, unknown hanzi are left out of the overlay and out of the still. Punctuation stays.
+19. The live reader has a **Только пиньинь** checkbox, unchecked by default and remembered. When it is on, Russian glosses are hidden on the live overlay and on a still. Pinyin, known-hanzi hiding, and Pleco taps on characters stay.
+20. The live reader draws a recognition frame. The area outside the frame is dimmed. White handles resize the frame; the amber handle on the top edge moves it. The frame cannot shrink below 18% of the preview on either axis. OCR runs only on the upright-bitmap slice that matches the frame (the same center-crop the preview uses). Dragging is remembered. Default inset: 6% from the left and right, 14% from the top, 22% from the bottom.
 
 ## Interfaces
 
@@ -57,8 +60,10 @@ Built on the same on-device PP-OCRv5 stack as **paizhao-unknown-hanzi**. This ap
 | Pages download | `https://<host>/<repo>/instant-pinyin/instant-pinyin.apk` |
 | Known Hanzi | DataStore `instant_pinyin`, key `known_hanzi_text` |
 | Only Known | DataStore `instant_pinyin`, key `only_known` (boolean, default `false`) |
+| Pinyin only | DataStore `instant_pinyin`, key `pinyin_only` (boolean, default `false`) |
+| Recognition zone | DataStore `instant_pinyin`, keys `zone_left`, `zone_top`, `zone_right`, `zone_bottom` (view fractions, default inset) |
 
-No accounts, no incoming URL scheme in v1. Known Hanzi and the Only Known checkbox are the only persisted state.
+No accounts, no incoming URL scheme in v1. Known Hanzi, Only Known, Pinyin only, and the recognition zone are the persisted state.
 
 ## Data model
 
@@ -74,15 +79,17 @@ No accounts, no incoming URL scheme in v1. Known Hanzi and the Only Known checkb
 - **Known Text** — the raw string saved from Settings. Only the hanzi in it are Known Hanzi.
 - **Known Hanzi** — one ideograph from Known Text. Its pinyin is not drawn. A word made only of Known Hanzi has no Russian gloss.
 - **Only Known** — the main-screen checkbox. When on, the overlay and the still keep Known Hanzi and drop the rest.
+- **Pinyin only** — the main-screen checkbox. When on, Russian glosses are not drawn.
+- **Recognition zone** — a rectangle in preview fractions. Live OCR sees only the matching slice of the upright frame.
 
-Closing the app drops the overlay and the still. Known Text and Only Known stay.
+Closing the app drops the overlay and the still. Known Text, Only Known, Pinyin only, and the recognition zone stay.
 
 ## UI / UX
 
 1. Cold start without camera permission → short explanation and **Разрешить камеру**. After a denial, **Открыть настройки** is also shown. **Из галереи** stays available.
 2. With permission → camera fills the screen. While the model loads, a bottom chip says **Загружаю модель…**. With no characters in frame, **Наведите камеру на иероглифы**.
 3. Recognized hanzi keep the real character visible. Pinyin is a light-on-dark pill just above it (or beside it for a vertical column). The Russian gloss is a warm pill under the word (or on the other side of a vertical column).
-4. Torch button at the top end. Settings at the top start, with **Только известные** beside it. Tap a character to open Pleco. Bottom of the live reader: **Сфотографировать** and **Из галереи**.
+4. Torch button at the top end. Settings at the top start, with **Только известные** and **Только пиньинь** under it. A white frame marks the recognition zone; drag a handle to change it. Tap a character to open Pleco. Bottom of the live reader: **Сфотографировать** and **Из галереи**.
 5. Still reading: title **Текст**. Each line wraps. Word cells are wider than character cells. Pinyin is above each character, Russian under the word. Tap a character for that character; tap the translation for the word. Empty result: **Текст не найден**.
 6. Live labels stay upright for the way the phone is held. Horizontal text keeps horizontal pinyin and Russian; turning the phone sideways does not leave those labels written vertically.
 7. Landing page: brand 即时拼音 / instant-pinyin, APK download, update note.
@@ -115,3 +122,5 @@ Closing the app drops the overlay and the still. Known Text and Only Known stay.
 12. The release APK contains the two `.tflite` models, `ppocrv5_dict.txt`, `dict/words.txt`, and `dict/chars.txt`; the app declares no `INTERNET` permission.
 13. Deploy workflow includes `instant-pinyin` in `ANDROID_APPS` and rebuilds when `instant-pinyin/**` changes.
 14. Known Text `你好世界` marks those four characters. On a still of `你好朋友`, `你` and `好` have no pinyin and `你好` has no Russian gloss; `朋` and `友` keep pinyin and `朋友` keeps its gloss. With Only Known on, `朋友` is left out and `你好` remains, still without pinyin or gloss. A known live glyph keeps a tap on the character and draws no pinyin pill.
+15. On one horizontal line, `你` `好` `吗` place `好` on the upper tier and `你` / `吗` on the lower tier, and no two pills intersect. Two long readings on the same tier shrink until their pills no longer meet. A vertical column puts the middle reading one column farther out.
+16. Dragging the recognition frame keeps it inside the preview and at least 18% wide. A full-frame window does not crop the bitmap. A left-half window on a center-cropped preview maps to the visible left half of the upright image.

@@ -56,6 +56,7 @@ fun StillReader(
     state: StillState,
     known: Set<String>,
     onlyKnown: Boolean,
+    pinyinOnly: Boolean,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -174,6 +175,7 @@ fun StillReader(
                                     } else {
                                         WordCell(
                                             token = token,
+                                            showGloss = !pinyinOnly,
                                             onCharacter = { query ->
                                                 if (!openPleco(context, query)) {
                                                     scope.launch { snackbar.showSnackbar(plecoMissing) }
@@ -200,6 +202,7 @@ fun StillReader(
 @Composable
 private fun WordCell(
     token: ShownToken,
+    showGloss: Boolean,
     onCharacter: (String) -> Unit,
     onGloss: () -> Unit,
 ) {
@@ -238,7 +241,7 @@ private fun WordCell(
                     }
                 }
             }
-            if (russian != null) {
+            if (showGloss && russian != null) {
                 Text(
                     text = russian,
                     style = MaterialTheme.typography.bodySmall,
