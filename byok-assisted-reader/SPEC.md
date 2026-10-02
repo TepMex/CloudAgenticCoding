@@ -14,13 +14,14 @@ Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB 
    - model name
    - a list of known words
    - a switch for volume-key layer changes (on by default)
+   - characters per line. `0` keeps the largest type. The largest type is the current comfort size: each slot is at least the width of `zhuāng` at 12sp and at least the measured hanzi, and the hanzi does not grow past that size. The smallest type is the most characters per line whose pinyin stays at or above 8sp. The value is clamped to what the screen can actually fit.
 4. Known words are split on whitespace and on `,` `，` `、` `;` `；`. A token that contains at least one hanzi is a known word. Known hanzi are every CJK ideograph that appears in that text, in first-seen order. The settings screen shows the count and the derived characters.
 5. The shelf opens a local EPUB (`ACTION_OPEN_DOCUMENT` and `ACTION_VIEW` for `application/epub+zip`). The URI permission is persisted. The last book and page index are restored.
 6. EPUB reading: `META-INF/container.xml` → OPF spine order → XHTML/HTML documents. Scripts, styles, and ruby `<rt>`/`<rp>` are dropped. Chapter text becomes paragraphs, then sentences.
 7. A sentence ends at `。`. Pages contain whole sentences only. A sentence taller than the screen is its own scrollable page. The trailing fragment with no `。` is kept and is not sent to STPVO.
-8. Page capacity is the pinyin layout, so switching layers does not change which sentences are on the page. Layer 0 draws those sentences in the same large hanzi size, without ruby.
-9. **Layer 0 — Текст.** The page text only, large hanzi.
-10. **Layer 1 — Пиньинь.** Each hanzi has toned Hanyu pinyin above it (first reading). The hanzi em-square is at least as wide as the six-letter syllable `zhuāng` set at 12sp, so that pinyin stays at 12sp, does not exceed the hanzi width, and stays readable. Punctuation keeps an empty ruby slot. Non-hanzi have no pinyin.
+8. Every layer draws the same character grid: the same columns, the same slot width, and a reserved pinyin band, so switching layers does not move the hanzi. Columns are counted on the width inside the page padding. A row contains only as many slots as fit, and each hanzi is sized to stay inside its slot. Page capacity uses that grid and the passage height (75% of the reader body), so the sentences on the page do not change with the layer.
+9. **Layer 0 — Текст.** The shared grid, with the pinyin band left empty.
+10. **Layer 1 — Пиньинь.** Toned Hanyu pinyin (first reading) in the reserved band above each hanzi. At the largest type, pinyin stays 12sp and does not exceed the slot. Smaller type scales pinyin down with the slot, not below 8sp. Punctuation keeps an empty ruby slot. Non-hanzi have no pinyin. Pinyin does not change the column count.
 11. **Layer 2 — Структура.** Each complete sentence on the page is sent to the LLM and painted in five roles:
     - subject / Кто
     - time / Когда
@@ -30,10 +31,11 @@ Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB 
     Spans must be exact substrings. Overlapping characters keep the first accepted span. A legend names the five colors.
 12. **Layer 3 — 简单.** The LLM explains words on the page that are not in the known-word list, in the simplest Chinese. Chengyu present on the page are listed with explanations even when the word is known.
 13. **Layer 4 — По-русски.** The same glossary shape as layer 3, with Russian explanations.
-14. Volume Up moves to the next layer, Volume Down to the previous, wrapping 0↔4, only while the reader is open and the switch is on. Those keys are consumed. With the switch off, they change the system volume.
-15. Swipe or **Назад** / **Дальше** turns pages. The top bar shows the book title, the layer name, and the page index, plus settings and open-file actions.
-16. LLM calls use `POST {base}/v1/chat/completions` (or `{base}/chat/completions` when the base URL already ends at one of those suffixes). Results are cached in memory by layer, endpoint, model, known words, and page text. Missing base URL or model shows an error and does not call the network. Failures stay on screen with **Повторить**.
-17. Sign release and debug (when the keystore is present) with the shared sideload keystore. GitHub Pages landing at `/byok-assisted-reader/` serves `byok-assisted-reader.apk`.
+14. Layers 3 and 4 keep the passage at 75% of the reader body (more than 70%) and scroll the glossary in the remaining band. That split is the same height on every layer, so opening the glossary does not reflow the hanzi.
+15. Volume Up moves to the next layer, Volume Down to the previous, wrapping 0↔4, only while the reader is open and the switch is on. Those keys are consumed. With the switch off, they change the system volume.
+16. Swipe or **Назад** / **Дальше** turns pages. The top bar shows the book title, the layer name, and the page index, plus settings and open-file actions.
+17. LLM calls use `POST {base}/v1/chat/completions` (or `{base}/chat/completions` when the base URL already ends at one of those suffixes). Results are cached in memory by layer, endpoint, model, known words, and page text. Missing base URL or model shows an error and does not call the network. Failures stay on screen with **Повторить**.
+18. Sign release and debug (when the keystore is present) with the shared sideload keystore. GitHub Pages landing at `/byok-assisted-reader/` serves `byok-assisted-reader.apk`.
 
 ## Interfaces
 
@@ -75,7 +77,7 @@ The book text lives in memory. The EPUB file is not copied. The API token is sto
 
 ## UI / UX
 
-Paper background, large black hanzi, a thin top bar. Layer 2 colors: Кто blue, Когда amber, Где green, Что делает red, С чем purple, each as a light background behind the span. Layers 3 and 4 split the screen between the passage and the glossary (unknown words, then 成语).
+Paper background, large black hanzi, a thin top bar. The passage is one character grid on every layer. Layer 2 colors the hanzi cell: Кто blue, Когда amber, Где green, Что делает red, С чем purple. The bottom band is 25% of the reader body. Layers 3 and 4 scroll the glossary there (unknown words, then 成语). Settings includes **Символов в строке**, from the largest type down to the smallest readable pinyin.
 
 ## Out of scope
 
@@ -92,7 +94,7 @@ Paper background, large black hanzi, a thin top bar. Layer 2 colors: Кто blue
 1. Known text `我\n你好，猫` yields words `我`, `你好`, `猫` and hanzi `我`, `你`, `好`, `猫`.
 2. `昨天我看书。今天` splits into a complete sentence `昨天我看书。` and an incomplete `今天`. Pages never cut a sentence in half; an oversized sentence is a one-sentence page.
 3. Ruby layout of `你好` at 4 columns is one row of two cells. A newline starts a new row. `你` has pinyin and `。` does not.
-4. `装` is `zhuāng` (caron, six letters). The hanzi slot width equals the measured width of `zhuāng` at 12sp, so the pinyin size stays 12sp.
+4. `装` is `zhuāng` (caron, six letters). A content width of 1000px with a comfort cell of 180px and a minimum cell of 120px allows 5..8 characters per line. Every count in that range places slots that fit in the width, and pinyin stays within 8sp..12sp without exceeding the slot. Preferred 0 selects 5. When the hanzi glyph is wider than `zhuāng` at 12sp, the comfort cell grows to the glyph, so the extra character is not placed on the row. The passage height is 75% of the reader body.
 5. STPVO parts align onto exact substrings; a part that overlaps an earlier part is skipped; a part missing from the sentence is skipped.
 6. Glossary parsing drops a known word, keeps an unknown word that occurs in the page, and keeps a chengyu that occurs in the page.
 7. A minimal EPUB zip yields its spine text in order, without ruby pronunciation dumped into the paragraph.

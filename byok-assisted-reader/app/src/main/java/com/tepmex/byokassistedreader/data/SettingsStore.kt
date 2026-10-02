@@ -18,6 +18,8 @@ data class ReaderSettings(
     val volumeKeys: Boolean = true,
     val bookUri: String = "",
     val pageIndex: Int = 0,
+    /** Characters per line. Zero keeps the largest type that still fits. */
+    val charsPerLine: Int = 0,
 ) {
     val endpointReady: Boolean get() = baseUrl.isNotBlank() && model.isNotBlank()
 }
@@ -27,13 +29,21 @@ private val Context.dataStore by preferencesDataStore("byok_reader")
 class SettingsStore(private val context: Context) {
     val settings: Flow<ReaderSettings> = context.dataStore.data.map { prefs -> prefs.toSettings() }
 
-    suspend fun saveConnection(baseUrl: String, token: String, model: String, knownWords: String, volumeKeys: Boolean) {
+    suspend fun saveConnection(
+        baseUrl: String,
+        token: String,
+        model: String,
+        knownWords: String,
+        volumeKeys: Boolean,
+        charsPerLine: Int,
+    ) {
         context.dataStore.edit { prefs ->
             prefs[BASE_URL] = baseUrl.trim()
             prefs[TOKEN] = token.trim()
             prefs[MODEL] = model.trim()
             prefs[KNOWN] = knownWords
             prefs[VOLUME] = volumeKeys
+            prefs[CHARS] = charsPerLine.coerceAtLeast(0)
         }
     }
 
@@ -52,6 +62,7 @@ class SettingsStore(private val context: Context) {
         volumeKeys = this[VOLUME] ?: true,
         bookUri = this[BOOK].orEmpty(),
         pageIndex = this[PAGE] ?: 0,
+        charsPerLine = (this[CHARS] ?: 0).coerceAtLeast(0),
     )
 
     private companion object {
@@ -62,5 +73,6 @@ class SettingsStore(private val context: Context) {
         val VOLUME = booleanPreferencesKey("volume_keys")
         val BOOK = stringPreferencesKey("book_uri")
         val PAGE = intPreferencesKey("page_index")
+        val CHARS = intPreferencesKey("chars_per_line")
     }
 }

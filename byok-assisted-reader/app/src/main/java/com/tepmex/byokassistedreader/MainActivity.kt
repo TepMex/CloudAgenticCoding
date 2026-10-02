@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                                 pages = pages,
                                 pageIndex = pageIndex,
                                 layer = layer,
+                                charsPerLine = settings.charsPerLine,
                                 assist = assist,
                                 onLayout = model::relayout,
                                 onTurn = model::turnPage,
