@@ -36,19 +36,80 @@ class ReaderLogicTest {
         assertEquals(listOf("你", "好"), rows[0].map { it.glyph })
         assertEquals("nǐ", rows[0][0].pinyin)
         assertEquals("", rows[0][1].pinyin)
+        assertEquals(listOf(0, 1), rows[0].map { it.index })
         val broken = rubyRows("你\n好。", columns = 4) { "x" }
         assertEquals(2, broken.size)
         assertEquals("", broken[1][1].pinyin)
         assertEquals("。", broken[1][1].glyph)
+        assertEquals(listOf(0), broken[0].map { it.index })
+        assertEquals(listOf(2, 3), broken[1].map { it.index })
     }
 
     @Test
     fun rubyFitKeepsSixLetterPinyinReadable() {
-        val widest = 72
-        val hanzi = RubyFit.hanziPx(widest)
-        assertTrue(hanzi >= widest)
-        assertEquals(12f, RubyFit.pinyinSp(12f, widest.toFloat(), hanzi.toFloat()))
+        val sample = 180
+        val hanzi = 160
+        val cell = RubyFit.cellPx(sample, hanzi)
+        assertTrue(cell >= sample)
+        assertEquals(12f, RubyFit.pinyinSp(12f, sample.toFloat(), cell.toFloat(), 8f))
         assertEquals("zhuāng", RubyFit.SAMPLE)
+        assertEquals(8f, RubyFit.MIN_PINYIN_SP)
+    }
+
+    @Test
+    fun widerHanziDoesNotAddAnOverlappingColumn() {
+        val content = 1080
+        val pinyinSample = 180
+        val hanzi = 216
+        val comfort = RubyFit.cellPx(pinyinSample, hanzi)
+        assertEquals(216, comfort)
+        val range = RubyFit.columnRange(content, comfort, RubyFit.cellPx(120, 144))
+        assertEquals(5, range.first)
+        assertTrue(range.first < content / pinyinSample)
+        val slot = RubyFit.slotPx(content, range.first, comfort, range.first)
+        assertEquals(comfort, slot)
+        assertTrue(range.first * slot <= content)
+        assertEquals(12f, RubyFit.pinyinSp(12f, pinyinSample.toFloat(), slot.toFloat(), 8f))
+    }
+
+    @Test
+    fun columnCountFitsAndKeepsPinyinReadable() {
+        val content = 1000
+        val sample = 180
+        val comfort = RubyFit.cellPx(sample, sample)
+        val minCell = RubyFit.cellPx(120, 120)
+        val range = RubyFit.columnRange(content, comfort, minCell)
+        assertEquals(5..8, range)
+        assertEquals(5, RubyFit.resolveColumns(0, range))
+        assertEquals(5, RubyFit.resolveColumns(1, range))
+        assertEquals(8, RubyFit.resolveColumns(99, range))
+        assertEquals(6, RubyFit.resolveColumns(6, range))
+        for (columns in range) {
+            val slot = RubyFit.slotPx(content, columns, comfort, range.first)
+            assertTrue("$columns slots of $slot overflow $content", columns * slot <= content)
+            val pinyin = RubyFit.pinyinSp(12f, sample.toFloat(), slot.toFloat(), 8f)
+            assertTrue(pinyin in 8f..12f)
+            val drawn = sample * (pinyin / 12f)
+            assertTrue("pinyin $drawn exceeds slot $slot", drawn <= slot + 0.01f)
+        }
+    }
+
+    @Test
+    fun hanziStaysInsideTheSlotAndDoesNotGrowPastComfort() {
+        assertEquals(72f, RubyFit.hanziSp(72f, slotPx = 180f, probeWidthPx = 250f, probeSp = 100f), 0.01f)
+        val shrunk = RubyFit.hanziSp(72f, slotPx = 150f, probeWidthPx = 280f, probeSp = 100f)
+        assertTrue(shrunk < 72f)
+        assertEquals(150f, 280f * (shrunk / 100f), 0.01f)
+        val capped = RubyFit.hanziSp(72f, slotPx = 202f, probeWidthPx = 280f, probeSp = 100f)
+        assertEquals(72f, capped, 0.01f)
+        assertTrue(280f * (capped / 100f) <= 202f)
+    }
+
+    @Test
+    fun passageKeepsMostOfTheBodyForTheMainText() {
+        assertTrue(RubyFit.PASSAGE_FRACTION > 0.70f)
+        assertTrue(1f - RubyFit.PASSAGE_FRACTION < 0.30f)
+        assertEquals(750, RubyFit.passagePx(1000))
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,24 +27,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tepmex.byokassistedreader.domain.ColoredSpan
+import com.tepmex.byokassistedreader.domain.PinyinSyllable
 import com.tepmex.byokassistedreader.domain.ReadingLayer
 import com.tepmex.byokassistedreader.domain.RubyFit
 import com.tepmex.byokassistedreader.domain.Sentence
 import com.tepmex.byokassistedreader.domain.StpvoRole
 import com.tepmex.byokassistedreader.domain.rubyRows
-import com.tepmex.byokassistedreader.domain.PinyinSyllable
+
+internal val ReaderHorizontalPadding = 12.dp
+
+private val GridFont = FontFamily.SansSerif
 
 @Composable
 fun ReaderScreen(
@@ -51,6 +57,7 @@ fun ReaderScreen(
     pages: List<List<Sentence>>,
     pageIndex: Int,
     layer: ReadingLayer,
+    charsPerLine: Int,
     assist: AssistState,
     onLayout: (columns: Int, rowHeightPx: Int, viewportPx: Int) -> Unit,
     onTurn: (forward: Boolean) -> Unit,
@@ -94,49 +101,32 @@ fun ReaderScreen(
             TextButton(onClick = onOpen) { Text("Файл") }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val measurer = rememberTextMeasurer()
             val density = LocalDensity.current
-            val pinyinStyle = TextStyle(fontSize = RubyFit.READABLE_PINYIN_SP.sp, fontFamily = FontFamily.SansSerif)
-            val widest = measurer.measure(RubyFit.SAMPLE, pinyinStyle).size.width
-            val hanziPx = RubyFit.hanziPx(widest)
-            val hanziSp = with(density) { hanziPx.toSp() }
-            val pinyinSize = RubyFit.pinyinSp(RubyFit.READABLE_PINYIN_SP, widest.toFloat(), hanziPx.toFloat()).sp
-            val pinyinHeight = measurer.measure(RubyFit.SAMPLE, TextStyle(fontSize = pinyinSize)).size.height
-            val hanziHeight = measurer.measure("字", TextStyle(fontSize = hanziSp)).size.height
-            val rowHeight = (pinyinHeight + hanziHeight + with(density) { 2.dp.roundToPx() }).coerceAtLeast(1)
-            val columns = (constraints.maxWidth / hanziPx).coerceAtLeast(1)
-            val viewport = constraints.maxHeight
-            LaunchedEffect(columns, rowHeight, viewport, text.length) {
-                onLayout(columns, rowHeight, viewport)
+            val padPx = with(density) { ReaderHorizontalPadding.roundToPx() }
+            val contentWidth = (constraints.maxWidth - padPx * 2).coerceAtLeast(1)
+            val metrics = gridMetrics(contentWidth, charsPerLine)
+            val passagePx = RubyFit.passagePx(constraints.maxHeight)
+            LaunchedEffect(metrics.columns, metrics.rowHeightPx, passagePx, text.length) {
+                onLayout(metrics.columns, metrics.rowHeightPx, passagePx)
             }
-            val passage: @Composable (Modifier) -> Unit = { modifier ->
-                Passage(
+            Column(Modifier.fillMaxSize()) {
+                GlyphGrid(
                     text = text,
                     layer = layer,
                     assist = assist,
-                    columns = columns,
-                    hanziSp = hanziSp,
-                    pinyinSize = pinyinSize,
-                    modifier = modifier,
+                    metrics = metrics,
+                    modifier = Modifier
+                        .weight(RubyFit.PASSAGE_FRACTION)
+                        .verticalScroll(rememberScrollState()),
                 )
-            }
-            if (layer == ReadingLayer.GLOSS_ZH || layer == ReadingLayer.GLOSS_RU) {
-                Column(Modifier.fillMaxSize()) {
-                    passage(Modifier.weight(1f).verticalScroll(rememberScrollState()))
-                    GlossaryPane(
-                        assist = assist,
-                        onRetry = onRetry,
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-                    )
-                }
-            } else {
-                Column(Modifier.fillMaxSize()) {
-                    passage(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp))
-                    if (layer == ReadingLayer.STRUCTURE) {
-                        StructureLegend()
-                        AssistNote(assist, onRetry)
-                    }
-                }
+                BottomBand(
+                    layer = layer,
+                    assist = assist,
+                    onRetry = onRetry,
+                    modifier = Modifier
+                        .weight(1f - RubyFit.PASSAGE_FRACTION)
+                        .verticalScroll(rememberScrollState()),
+                )
             }
         }
         Row(
@@ -151,98 +141,161 @@ fun ReaderScreen(
     }
 }
 
+internal data class GridMetrics(
+    val columns: Int,
+    val range: IntRange,
+    val slotPx: Int,
+    val hanziStyle: TextStyle,
+    val pinyinStyle: TextStyle,
+    val pinyinHeightPx: Int,
+    val hanziHeightPx: Int,
+    val rowHeightPx: Int,
+)
+
 @Composable
-private fun Passage(
+internal fun gridMetrics(contentWidthPx: Int, preferredColumns: Int): GridMetrics {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val comfortPinyin = gridStyle(RubyFit.COMFORT_PINYIN_SP.sp)
+    val minPinyin = gridStyle(RubyFit.MIN_PINYIN_SP.sp)
+    val comfortSamplePx = measurer.measure(RubyFit.SAMPLE, comfortPinyin).size.width.coerceAtLeast(1)
+    val minSamplePx = measurer.measure(RubyFit.SAMPLE, minPinyin).size.width.coerceAtLeast(1)
+    val hanziComfortPx = measurer.measure(
+        "字",
+        gridStyle(with(density) { comfortSamplePx.toSp() }),
+    ).size.width.coerceAtLeast(1)
+    val hanziMinPx = measurer.measure(
+        "字",
+        gridStyle(with(density) { minSamplePx.toSp() }),
+    ).size.width.coerceAtLeast(1)
+    val comfortCell = RubyFit.cellPx(comfortSamplePx, hanziComfortPx)
+    val minCell = RubyFit.cellPx(minSamplePx, hanziMinPx)
+    val range = RubyFit.columnRange(contentWidthPx, comfortCell, minCell)
+    val columns = RubyFit.resolveColumns(preferredColumns, range)
+    val slot = RubyFit.slotPx(contentWidthPx, columns, comfortCell, range.first)
+    val pinyinSp = RubyFit.pinyinSp(
+        RubyFit.COMFORT_PINYIN_SP,
+        comfortSamplePx.toFloat(),
+        slot.toFloat(),
+        RubyFit.MIN_PINYIN_SP,
+    )
+    val probe = measurer.measure("字", gridStyle(100.sp))
+    val naturalSp = with(density) { comfortSamplePx.toSp().value }
+    val hanziSp = RubyFit.hanziSp(naturalSp, slot.toFloat(), probe.size.width.toFloat(), 100f)
+    val hanziStyle = gridStyle(hanziSp.sp)
+    val pinyinStyle = gridStyle(pinyinSp.sp)
+    val pinyinHeight = measurer.measure(RubyFit.SAMPLE, pinyinStyle).size.height.coerceAtLeast(1)
+    val hanziHeight = measurer.measure("字", hanziStyle).size.height.coerceAtLeast(1)
+    val gap = with(density) { 2.dp.roundToPx() }
+    return GridMetrics(
+        columns = columns,
+        range = range,
+        slotPx = slot,
+        hanziStyle = hanziStyle,
+        pinyinStyle = pinyinStyle,
+        pinyinHeightPx = pinyinHeight,
+        hanziHeightPx = hanziHeight,
+        rowHeightPx = (pinyinHeight + hanziHeight + gap).coerceAtLeast(1),
+    )
+}
+
+private fun gridStyle(size: TextUnit) = TextStyle(
+    fontSize = size,
+    fontFamily = GridFont,
+)
+
+@Composable
+private fun GlyphGrid(
     text: String,
     layer: ReadingLayer,
     assist: AssistState,
-    columns: Int,
-    hanziSp: androidx.compose.ui.unit.TextUnit,
-    pinyinSize: androidx.compose.ui.unit.TextUnit,
+    metrics: GridMetrics,
     modifier: Modifier,
 ) {
-    val color = MaterialTheme.colorScheme.onBackground
-    when (layer) {
-        ReadingLayer.PINYIN -> RubyText(text, columns, hanziSp, pinyinSize, modifier)
-        ReadingLayer.STRUCTURE -> {
-            val spans = (assist as? AssistState.Structure)?.spans.orEmpty()
-            val dark = isSystemInDarkTheme()
-            val annotated = buildAnnotatedString {
-                var i = 0
-                while (i < text.length) {
-                    val span = spans.firstOrNull { i >= it.start && i < it.end }
-                    if (span == null) {
-                        append(text[i])
-                        i += 1
-                    } else {
-                        withStyle(SpanStyle(background = roleColor(span.role, dark))) {
-                            append(text.substring(span.start, span.end))
-                        }
-                        i = span.end
-                    }
-                }
-            }
-            Text(
-                annotated,
-                modifier = modifier.padding(12.dp),
-                fontSize = hanziSp,
-                lineHeight = (hanziSp.value * 1.4f).sp,
-                color = color,
-            )
-        }
-        else -> Text(
-            text,
-            modifier = modifier.padding(12.dp),
-            fontSize = hanziSp,
-            lineHeight = (hanziSp.value * 1.35f).sp,
-            color = color,
-        )
-    }
-}
-
-@Composable
-private fun RubyText(
-    text: String,
-    columns: Int,
-    hanziSp: androidx.compose.ui.unit.TextUnit,
-    pinyinSize: androidx.compose.ui.unit.TextUnit,
-    modifier: Modifier,
-) {
-    val rows = rubyRows(text, columns, PinyinSyllable::of)
-    val hanziWidth = with(LocalDensity.current) { hanziSp.toDp() }
-    val pinyinHeight = with(LocalDensity.current) { (pinyinSize.value * 1.4f).sp.toDp() }
-    Column(modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+    val rows = rubyRows(text, metrics.columns, PinyinSyllable::of)
+    val spans = (assist as? AssistState.Structure)?.spans.orEmpty()
+    val dark = isSystemInDarkTheme()
+    val density = LocalDensity.current
+    val slotDp = with(density) { metrics.slotPx.toDp() }
+    val pinyinHeight = with(density) { metrics.pinyinHeightPx.toDp() }
+    val hanziHeight = with(density) { metrics.hanziHeightPx.toDp() }
+    val ink = MaterialTheme.colorScheme.onBackground
+    val ruby = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier.padding(horizontal = ReaderHorizontalPadding)) {
         for (row in rows) {
             Row {
                 for (cell in row) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(hanziWidth)) {
-                        Box(Modifier.width(hanziWidth).height(pinyinHeight), contentAlignment = Alignment.BottomCenter) {
+                    val role = if (layer == ReadingLayer.STRUCTURE) roleAt(spans, cell.index) else null
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(slotDp).clipToBounds(),
+                    ) {
+                        Box(
+                            Modifier.width(slotDp).height(pinyinHeight).clipToBounds(),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            if (layer == ReadingLayer.PINYIN && cell.pinyin.isNotEmpty()) {
+                                Text(
+                                    cell.pinyin,
+                                    style = metrics.pinyinStyle,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip,
+                                    textAlign = TextAlign.Center,
+                                    color = ruby,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Box(
+                            Modifier
+                                .width(slotDp)
+                                .height(hanziHeight)
+                                .clipToBounds()
+                                .background(role?.let { roleColor(it, dark) } ?: Color.Transparent),
+                            contentAlignment = Alignment.Center,
+                        ) {
                             Text(
-                                cell.pinyin,
-                                fontSize = pinyinSize,
+                                cell.glyph,
+                                style = metrics.hanziStyle,
                                 maxLines = 1,
                                 softWrap = false,
+                                overflow = TextOverflow.Clip,
                                 textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = ink,
                             )
                         }
-                        Text(
-                            cell.glyph,
-                            fontSize = hanziSp,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
                     }
                 }
             }
         }
+    }
+}
+
+private fun roleAt(spans: List<ColoredSpan>, index: Int): StpvoRole? =
+    spans.firstOrNull { index >= it.start && index < it.end }?.role
+
+@Composable
+private fun BottomBand(
+    layer: ReadingLayer,
+    assist: AssistState,
+    onRetry: () -> Unit,
+    modifier: Modifier,
+) {
+    when (layer) {
+        ReadingLayer.GLOSS_ZH, ReadingLayer.GLOSS_RU -> GlossaryPane(assist, onRetry, modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        ReadingLayer.STRUCTURE -> Column(modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+            StructureLegend()
+            AssistNote(assist, onRetry)
+        }
+        else -> Box(modifier)
     }
 }
 
 @Composable
 private fun StructureLegend() {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val dark = isSystemInDarkTheme()
@@ -259,9 +312,9 @@ private fun StructureLegend() {
 @Composable
 private fun AssistNote(assist: AssistState, onRetry: () -> Unit) {
     when (assist) {
-        AssistState.Loading -> Text("Разбираю предложения…", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        AssistState.Loading -> Text("Разбираю предложения…", modifier = Modifier.padding(vertical = 4.dp))
         is AssistState.Failed -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(assist.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f).padding(start = 16.dp))
+            Text(assist.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
             TextButton(onClick = onRetry) { Text("Повторить") }
         }
         else -> Unit

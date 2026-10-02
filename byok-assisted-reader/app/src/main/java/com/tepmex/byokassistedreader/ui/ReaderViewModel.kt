@@ -78,9 +78,16 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         route.value = if (settingsReturn == Route.READER && book.value != null) Route.READER else Route.SHELF
     }
 
-    fun saveSettings(baseUrl: String, token: String, model: String, knownWords: String, volumeKeys: Boolean) {
+    fun saveSettings(
+        baseUrl: String,
+        token: String,
+        model: String,
+        knownWords: String,
+        volumeKeys: Boolean,
+        charsPerLine: Int,
+    ) {
         viewModelScope.launch {
-            store.saveConnection(baseUrl, token, model, knownWords, volumeKeys)
+            store.saveConnection(baseUrl, token, model, knownWords, volumeKeys, charsPerLine)
             cache.clear()
             closeSettings()
             refreshAssist()

@@ -80,7 +80,7 @@ fun packPages(
     return pages
 }
 
-data class RubyCell(val glyph: String, val pinyin: String)
+data class RubyCell(val glyph: String, val pinyin: String, val index: Int)
 
 fun rubyRows(
     text: String,
@@ -93,6 +93,7 @@ fun rubyRows(
     var i = 0
     while (i < text.length) {
         val cp = text.codePointAt(i)
+        val start = i
         i += Character.charCount(cp)
         if (cp == '\n'.code || cp == '\r'.code) {
             if (row.isNotEmpty()) {
@@ -108,7 +109,7 @@ fun rubyRows(
             rows.add(row.toList())
             row = ArrayList()
         }
-        row.add(RubyCell(glyph, pinyin))
+        row.add(RubyCell(glyph, pinyin, start))
     }
     if (row.isNotEmpty()) rows.add(row.toList())
     return rows
@@ -139,15 +140,77 @@ enum class ReadingLayer {
 }
 
 object RubyFit {
-    const val READABLE_PINYIN_SP = 12f
+    /** Pinyin size at the largest hanzi. `zhuāng` at this size is the comfort slot. */
+    const val COMFORT_PINYIN_SP = 12f
+
+    /** Smallest pinyin that stays readable when more characters are placed on a line. */
+    const val MIN_PINYIN_SP = 8f
+
     const val SAMPLE = "zhuāng"
 
-    /** Hanzi em-square in px. Wide enough that [SAMPLE] at 12sp stays inside the character. */
-    fun hanziPx(widestPinyinPx: Int): Int = widestPinyinPx.coerceAtLeast(1)
+    /**
+     * Passage share of the reader body on every layer.
+     * Glossary layers use the rest, so the main text keeps more than 70%.
+     */
+    const val PASSAGE_FRACTION = 0.75f
 
-    fun pinyinSp(readableSp: Float, widestPx: Float, hanziPx: Float): Float {
-        if (widestPx <= 0f || hanziPx <= 0f) return readableSp
-        if (widestPx <= hanziPx) return readableSp
-        return readableSp * (hanziPx / widestPx)
+    fun passagePx(bodyPx: Int): Int =
+        (bodyPx.coerceAtLeast(1) * PASSAGE_FRACTION).toInt().coerceAtLeast(1)
+
+    /** Slot wide enough for the pinyin sample and for the hanzi measured at that budget. */
+    fun cellPx(pinyinSamplePx: Int, hanziPx: Int): Int =
+        maxOf(pinyinSamplePx, hanziPx).coerceAtLeast(1)
+
+    /**
+     * Characters per line from the largest type ([comfortCellPx], the current size)
+     * through the smallest type whose pinyin is still readable ([minCellPx]).
+     */
+    fun columnRange(contentWidthPx: Int, comfortCellPx: Int, minCellPx: Int): IntRange {
+        val width = contentWidthPx.coerceAtLeast(1)
+        val fewest = columnsThatFit(width, comfortCellPx)
+        val most = columnsThatFit(width, minCellPx.coerceAtMost(comfortCellPx)).coerceAtLeast(fewest)
+        return fewest..most
+    }
+
+    fun columnsThatFit(contentWidthPx: Int, cellPx: Int): Int =
+        (contentWidthPx.coerceAtLeast(1) / cellPx.coerceAtLeast(1)).coerceAtLeast(1)
+
+    /** Zero keeps the largest type. Any other value is clamped into [range]. */
+    fun resolveColumns(preferred: Int, range: IntRange): Int =
+        if (preferred <= 0) range.first else preferred.coerceIn(range.first, range.last)
+
+    /**
+     * Width of one character slot. The largest type keeps [comfortCellPx],
+     * so a full row never runs past [contentWidthPx]. Smaller type divides the width evenly.
+     */
+    fun slotPx(contentWidthPx: Int, columns: Int, comfortCellPx: Int, fewestColumns: Int): Int {
+        val cols = columns.coerceAtLeast(1)
+        val width = contentWidthPx.coerceAtLeast(1)
+        val comfort = comfortCellPx.coerceAtLeast(1)
+        val slot = if (cols <= fewestColumns) comfort.coerceAtMost(width) else width / cols
+        return slot.coerceAtLeast(1)
+    }
+
+    fun pinyinSp(comfortSp: Float, comfortSamplePx: Float, slotPx: Float, minSp: Float): Float {
+        if (comfortSamplePx <= 0f || slotPx <= 0f) return comfortSp
+        val scaled = comfortSp * (slotPx / comfortSamplePx)
+        val floor = minSp.coerceAtMost(comfortSp)
+        return scaled.coerceIn(floor, comfortSp)
+    }
+
+    /** sp that draws a probed glyph at [slotPx], so the ink stays inside the slot. */
+    fun glyphSp(slotPx: Float, probeWidthPx: Float, probeSp: Float): Float {
+        if (probeWidthPx <= 0f || probeSp <= 0f || slotPx <= 0f) return probeSp
+        return probeSp * (slotPx / probeWidthPx)
+    }
+
+    /**
+     * Hanzi size for a slot. Never larger than [naturalSp] (the current comfort size)
+     * and never wider than the slot.
+     */
+    fun hanziSp(naturalSp: Float, slotPx: Float, probeWidthPx: Float, probeSp: Float): Float {
+        val fitted = glyphSp(slotPx, probeWidthPx, probeSp)
+        if (naturalSp <= 0f) return fitted
+        return minOf(naturalSp, fitted)
     }
 }
