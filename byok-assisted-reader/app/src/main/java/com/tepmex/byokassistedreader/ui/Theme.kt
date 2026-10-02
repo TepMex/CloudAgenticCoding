@@ -15,13 +15,25 @@ import com.tepmex.byokassistedreader.domain.StpvoRole
 
 private val Ink = Color(0xFF1C1915)
 private val Paper = Color(0xFFF6F1E7)
+private val Night = Color(0xFF141311)
+
+/** Passage background: the system paper, light or dark. */
+fun pageBackground(dark: Boolean): Color = if (dark) Night else Paper
+
+/** Unknown-word glossary. Cooler than the page, distinct from chengyu. */
+fun dictionaryBackground(dark: Boolean): Color =
+    if (dark) Color(0xFF243844) else Color(0xFFD5E6F0)
+
+/** Chengyu block. Warmer than the page and the dictionary. */
+fun chengyuBackground(dark: Boolean): Color =
+    if (dark) Color(0xFF3A2E1C) else Color(0xFFF4D7B0)
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF1B3A4B),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFD5E3EA),
     onPrimaryContainer = Color(0xFF0E2430),
-    background = Paper,
+    background = pageBackground(dark = false),
     onBackground = Ink,
     surface = Color(0xFFFFFBF5),
     onSurface = Ink,
@@ -36,7 +48,7 @@ private val DarkColors = darkColorScheme(
     onPrimary = Color(0xFF08303A),
     primaryContainer = Color(0xFF1B3A4B),
     onPrimaryContainer = Color(0xFFD5E3EA),
-    background = Color(0xFF141311),
+    background = pageBackground(dark = true),
     onBackground = Color(0xFFF3EDE3),
     surface = Color(0xFF1C1B19),
     onSurface = Color(0xFFF3EDE3),

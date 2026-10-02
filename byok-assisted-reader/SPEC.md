@@ -12,7 +12,7 @@ Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB 
    - LLM base URL
    - access token (optional; sent as `Authorization: Bearer` when non-blank)
    - model name
-   - a list of known words
+   - a list of known words. The editor is at most half the settings screen tall and scrolls inside the field. **Копировать** copies that text. The derived-character preview under the count is capped and scrolls on its own, so one or two thousand words do not take over the settings screen.
    - a switch for volume-key layer changes (on by default)
    - characters per line. `0` keeps the largest type. The largest type is the current comfort size: each slot is at least the width of `zhuāng` at 12sp and at least the measured hanzi, and the hanzi does not grow past that size. The smallest type is the most characters per line whose pinyin stays at or above 8sp. The value is clamped to what the screen can actually fit.
 4. Known words are split on whitespace and on `,` `，` `、` `;` `；`. A token that contains at least one hanzi is a known word. Known hanzi are every CJK ideograph that appears in that text, in first-seen order. The settings screen shows the count and the derived characters.
@@ -21,17 +21,17 @@ Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB 
 7. A sentence ends at `。`. Pages contain whole sentences only. A sentence taller than the screen is its own scrollable page. The trailing fragment with no `。` is kept and is not sent to STPVO.
 8. Every layer draws the same character grid: the same columns, the same slot width, and a reserved pinyin band, so switching layers does not move the hanzi. Columns are counted on the width inside the page padding. A row contains only as many slots as fit, and each hanzi is sized to stay inside its slot. Page capacity uses that grid and the passage height (75% of the reader body), so the sentences on the page do not change with the layer.
 9. **Layer 0 — Текст.** The shared grid, with the pinyin band left empty.
-10. **Layer 1 — Пиньинь.** Toned Hanyu pinyin (first reading) in the reserved band above each hanzi. At the largest type, pinyin stays 12sp and does not exceed the slot. Smaller type scales pinyin down with the slot, not below 8sp. Punctuation keeps an empty ruby slot. Non-hanzi have no pinyin. Pinyin does not change the column count.
+10. **Layer 1 — Пиньинь.** Toned Hanyu pinyin (first reading) in the reserved band, only above hanzi that do not occur in a known word. A hanzi is familiar when it appears inside a known word; familiar hanzi keep an empty ruby slot. At the largest type, pinyin stays 12sp and does not exceed the slot. Smaller type scales pinyin down with the slot, not below 8sp. Punctuation keeps an empty ruby slot. Non-hanzi have no pinyin. Pinyin does not change the column count.
 11. **Layer 2 — Структура.** Each complete sentence on the page is sent to the LLM and painted in five roles:
     - subject / Кто
     - time / Когда
     - place / Где
     - verb / Что делает
     - object / С чем
-    Spans must be exact substrings. Overlapping characters keep the first accepted span. A legend names the five colors.
+    Spans must be exact substrings. Overlapping characters keep the first accepted span. A legend names the five colors on two rows: Кто, Когда, Где, then Что делает and С чем. Each name stays on one line. A row scrolls sideways instead of splitting «С чем» into letters.
 12. **Layer 3 — 简单.** The LLM explains words on the page that are not in the known-word list, in the simplest Chinese. Chengyu present on the page are listed with explanations even when the word is known.
 13. **Layer 4 — По-русски.** The same glossary shape as layer 3, with Russian explanations.
-14. Layers 3 and 4 keep the passage at 75% of the reader body (more than 70%) and scroll the glossary in the remaining band. That split is the same height on every layer, so opening the glossary does not reflow the hanzi.
+14. Layers 3 and 4 keep the passage at 75% of the reader body (more than 70%) and scroll the glossary in the remaining band. That split is the same height on every layer, so opening the glossary does not reflow the hanzi. The passage keeps the system background. Unknown-word entries use a second background shade, and chengyu use a third.
 15. Volume Up moves to the next layer, Volume Down to the previous, wrapping 0↔4, only while the reader is open and the switch is on. Those keys are consumed. With the switch off, they change the system volume.
 16. Swipe or **Назад** / **Дальше** turns pages. The top bar shows the book title, the layer name, and the page index, plus settings and open-file actions.
 17. LLM calls use `POST {base}/v1/chat/completions` (or `{base}/chat/completions` when the base URL already ends at one of those suffixes). Results are cached in memory by layer, endpoint, model, known words, and page text. Missing base URL or model shows an error and does not call the network. Failures stay on screen with **Повторить**.
@@ -77,7 +77,7 @@ The book text lives in memory. The EPUB file is not copied. The API token is sto
 
 ## UI / UX
 
-Paper background, large black hanzi, a thin top bar. The passage is one character grid on every layer. Layer 2 colors the hanzi cell: Кто blue, Когда amber, Где green, Что делает red, С чем purple. The bottom band is 25% of the reader body. Layers 3 and 4 scroll the glossary there (unknown words, then 成语). Settings includes **Символов в строке**, from the largest type down to the smallest readable pinyin.
+Paper background, large black hanzi, a thin top bar. The passage is one character grid on every layer and keeps that system background. Layer 2 colors the hanzi cell: Кто blue, Когда amber, Где green, Что делает red, С чем purple. The legend is two rows, so «С чем» stays intact. The bottom band is 25% of the reader body. Layers 3 and 4 scroll the glossary there: unknown words on one background shade, then 成语 on another. Settings includes **Символов в строке**, from the largest type down to the smallest readable pinyin. The known-words field is at most half the screen, scrolls inside itself, and has **Копировать**.
 
 ## Out of scope
 
@@ -101,3 +101,5 @@ Paper background, large black hanzi, a thin top bar. The passage is one characte
 8. Volume-key stepping wraps `TEXT → … → GLOSS_RU → TEXT`.
 9. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
 10. Deploy workflow includes `byok-assisted-reader` in `ANDROID_APPS`.
+11. Known words `你好，猫` mark `你`, `好`, and `猫` as familiar. Pinyin for those glyphs is blank; the reading for `看` is kept. With no known words, `你` still shows its reading.
+12. Page, dictionary, and chengyu backgrounds are three different colors in both light and dark themes.
