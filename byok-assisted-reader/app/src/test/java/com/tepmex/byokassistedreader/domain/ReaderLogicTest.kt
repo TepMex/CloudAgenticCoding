@@ -1,7 +1,12 @@
 package com.tepmex.byokassistedreader.domain
 
+import com.tepmex.byokassistedreader.ui.KnownWordsFieldMaxFraction
+import com.tepmex.byokassistedreader.ui.chengyuBackground
+import com.tepmex.byokassistedreader.ui.dictionaryBackground
+import com.tepmex.byokassistedreader.ui.pageBackground
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -14,6 +19,47 @@ class ReaderLogicTest {
         val raw = "我\n你好，猫"
         assertEquals(listOf("我", "你好", "猫"), KnownLexicon.words(raw))
         assertEquals(listOf("我", "你", "好", "猫"), KnownLexicon.hanzi(raw))
+        assertEquals(setOf("我", "你", "好", "猫"), KnownLexicon.familiarHanzi(raw))
+    }
+
+    @Test
+    fun pinyinOnlyForHanziOutsideKnownWords() {
+        val familiar = KnownLexicon.familiarHanzi("你好，猫")
+        assertEquals(setOf("你", "好", "猫"), familiar)
+        assertEquals("", pinyinToShow("你", familiar, "nǐ"))
+        assertEquals("", pinyinToShow("好", familiar, "hǎo"))
+        assertEquals("", pinyinToShow("猫", familiar, "māo"))
+        assertEquals("kàn", pinyinToShow("看", familiar, "kàn"))
+        assertEquals("nǐ", pinyinToShow("你", emptySet(), "nǐ"))
+        assertEquals("", pinyinToShow("。", familiar, ""))
+        assertEquals(emptySet<String>(), KnownLexicon.familiarHanzi("hello, 123"))
+    }
+
+    @Test
+    fun knownWordsEditorIsCappedAtHalfTheScreen() {
+        assertEquals(0.5f, KnownWordsFieldMaxFraction)
+    }
+
+    @Test
+    fun structureLegendKeepsObjectLabelWhole() {
+        assertEquals("С чем", StpvoRole.OBJECT.ru)
+        assertFalse(StpvoRole.OBJECT.ru.contains('\n'))
+        assertEquals(
+            listOf("Кто", "Когда", "Где", "Что делает", "С чем"),
+            StpvoRole.entries.map { it.ru },
+        )
+    }
+
+    @Test
+    fun glossaryBackgroundsAreThreeDistinctShades() {
+        for (dark in listOf(false, true)) {
+            val page = pageBackground(dark)
+            val words = dictionaryBackground(dark)
+            val chengyu = chengyuBackground(dark)
+            assertNotEquals(page, words)
+            assertNotEquals(page, chengyu)
+            assertNotEquals(words, chengyu)
+        }
     }
 
     @Test

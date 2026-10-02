@@ -36,6 +36,9 @@ object KnownLexicon {
         }
         return seen.toList()
     }
+
+    /** Ideographs that occur inside a known word. A character is familiar when it is in this set. */
+    fun familiarHanzi(raw: String): Set<String> = hanzi(words(raw).joinToString("\n")).toSet()
 }
 
 data class Sentence(val text: String, val complete: Boolean)
@@ -81,6 +84,13 @@ fun packPages(
 }
 
 data class RubyCell(val glyph: String, val pinyin: String, val index: Int)
+
+/**
+ * Pinyin drawn above one glyph.
+ * A hanzi that already occurs in a known word keeps an empty ruby slot.
+ */
+fun pinyinToShow(glyph: String, familiarHanzi: Set<String>, reading: String): String =
+    if (glyph in familiarHanzi) "" else reading
 
 fun rubyRows(
     text: String,

@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                                 pageIndex = pageIndex,
                                 layer = layer,
                                 charsPerLine = settings.charsPerLine,
+                                knownWords = settings.knownWords,
                                 assist = assist,
                                 onLayout = model::relayout,
                                 onTurn = model::turnPage,

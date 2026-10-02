@@ -2,6 +2,7 @@ package com.tepmex.byokassistedreader.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,11 +41,14 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.byokassistedreader.domain.ColoredSpan
+import com.tepmex.byokassistedreader.domain.GlossEntry
+import com.tepmex.byokassistedreader.domain.KnownLexicon
 import com.tepmex.byokassistedreader.domain.PinyinSyllable
 import com.tepmex.byokassistedreader.domain.ReadingLayer
 import com.tepmex.byokassistedreader.domain.RubyFit
 import com.tepmex.byokassistedreader.domain.Sentence
 import com.tepmex.byokassistedreader.domain.StpvoRole
+import com.tepmex.byokassistedreader.domain.pinyinToShow
 import com.tepmex.byokassistedreader.domain.rubyRows
 
 internal val ReaderHorizontalPadding = 12.dp
@@ -58,6 +62,7 @@ fun ReaderScreen(
     pageIndex: Int,
     layer: ReadingLayer,
     charsPerLine: Int,
+    knownWords: String,
     assist: AssistState,
     onLayout: (columns: Int, rowHeightPx: Int, viewportPx: Int) -> Unit,
     onTurn: (forward: Boolean) -> Unit,
@@ -112,6 +117,7 @@ fun ReaderScreen(
             Column(Modifier.fillMaxSize()) {
                 GlyphGrid(
                     text = text,
+                    knownWords = knownWords,
                     layer = layer,
                     assist = assist,
                     metrics = metrics,
@@ -207,12 +213,16 @@ private fun gridStyle(size: TextUnit) = TextStyle(
 @Composable
 private fun GlyphGrid(
     text: String,
+    knownWords: String,
     layer: ReadingLayer,
     assist: AssistState,
     metrics: GridMetrics,
     modifier: Modifier,
 ) {
-    val rows = rubyRows(text, metrics.columns, PinyinSyllable::of)
+    val familiar = remember(knownWords) { KnownLexicon.familiarHanzi(knownWords) }
+    val rows = rubyRows(text, metrics.columns) { glyph ->
+        pinyinToShow(glyph, familiar, PinyinSyllable.of(glyph))
+    }
     val spans = (assist as? AssistState.Structure)?.spans.orEmpty()
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
@@ -283,7 +293,7 @@ private fun BottomBand(
     modifier: Modifier,
 ) {
     when (layer) {
-        ReadingLayer.GLOSS_ZH, ReadingLayer.GLOSS_RU -> GlossaryPane(assist, onRetry, modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        ReadingLayer.GLOSS_ZH, ReadingLayer.GLOSS_RU -> GlossaryPane(assist, onRetry, modifier)
         ReadingLayer.STRUCTURE -> Column(modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
             StructureLegend()
             AssistNote(assist, onRetry)
@@ -294,16 +304,29 @@ private fun BottomBand(
 
 @Composable
 private fun StructureLegend() {
-    Row(
+    val dark = isSystemInDarkTheme()
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val dark = isSystemInDarkTheme()
-        StpvoRole.entries.forEach { role ->
+        LegendRow(dark, StpvoRole.SUBJECT, StpvoRole.TIME, StpvoRole.PLACE)
+        LegendRow(dark, StpvoRole.VERB, StpvoRole.OBJECT)
+    }
+}
+
+@Composable
+private fun LegendRow(dark: Boolean, vararg roles: StpvoRole) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        roles.forEach { role ->
             Text(
                 role.ru,
                 modifier = Modifier.background(roleColor(role, dark)).padding(horizontal = 6.dp, vertical = 2.dp),
                 style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
             )
         }
     }
@@ -323,29 +346,62 @@ private fun AssistNote(assist: AssistState, onRetry: () -> Unit) {
 
 @Composable
 private fun GlossaryPane(assist: AssistState, onRetry: () -> Unit, modifier: Modifier) {
+    val dark = isSystemInDarkTheme()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (assist) {
-            AssistState.Loading -> Text("Собираю словарь…")
-            is AssistState.Failed -> {
+            AssistState.Loading -> Text(
+                "Собираю словарь…",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            is AssistState.Failed -> Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(assist.message, color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = onRetry) { Text("Повторить") }
             }
             is AssistState.Gloss -> {
-                Text("Незнакомые слова", style = MaterialTheme.typography.labelLarge)
-                if (assist.page.words.isEmpty()) Text("Нет незнакомых слов на этой странице.")
-                assist.page.words.forEach { entry ->
-                    Text(entry.word, fontFamily = FontFamily.SansSerif, style = MaterialTheme.typography.titleLarge)
-                    Text(entry.explanation)
-                }
-                Text("成语", style = MaterialTheme.typography.labelLarge)
-                if (assist.page.chengyu.isEmpty()) Text("На этой странице нет чэнъюев.")
-                assist.page.chengyu.forEach { entry ->
-                    Text(entry.word, style = MaterialTheme.typography.titleLarge)
-                    Text(entry.explanation)
-                }
+                GlossaryBlock(
+                    title = "Незнакомые слова",
+                    entries = assist.page.words,
+                    empty = "Нет незнакомых слов на этой странице.",
+                    background = dictionaryBackground(dark),
+                )
+                GlossaryBlock(
+                    title = "成语",
+                    entries = assist.page.chengyu,
+                    empty = "На этой странице нет чэнъюев.",
+                    background = chengyuBackground(dark),
+                )
             }
-            AssistState.Idle -> Text("Словарь появится после ответа модели.")
+            AssistState.Idle -> Text(
+                "Словарь появится после ответа модели.",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
             is AssistState.Structure -> Unit
+        }
+    }
+}
+
+@Composable
+private fun GlossaryBlock(
+    title: String,
+    entries: List<GlossEntry>,
+    empty: String,
+    background: Color,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(background)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        if (entries.isEmpty()) {
+            Text(empty)
+        } else {
+            entries.forEach { entry ->
+                Text(entry.word, style = MaterialTheme.typography.titleLarge)
+                Text(entry.explanation)
+            }
         }
     }
 }

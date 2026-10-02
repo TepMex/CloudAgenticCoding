@@ -1,11 +1,13 @@
 package com.tepmex.byokassistedreader.ui
 
+import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,10 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -34,6 +39,10 @@ import com.tepmex.byokassistedreader.data.ReaderSettings
 import com.tepmex.byokassistedreader.domain.KnownLexicon
 import com.tepmex.byokassistedreader.domain.RubyFit
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
+
+/** The known-words editor never grows past this share of the settings viewport. */
+internal const val KnownWordsFieldMaxFraction = 0.5f
 
 @Composable
 fun SettingsScreen(
@@ -50,6 +59,8 @@ fun SettingsScreen(
     var showToken by rememberSaveable { mutableStateOf(false) }
     val hanzi = KnownLexicon.hanzi(known)
     val words = KnownLexicon.words(known)
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -57,77 +68,101 @@ fun SettingsScreen(
         val contentWidth = (constraints.maxWidth - padPx * 2).coerceAtLeast(1)
         val range = gridMetrics(contentWidth, chars).range
         val shown = RubyFit.resolveColumns(chars, range)
+        val knownFieldMax = maxHeight * KnownWordsFieldMaxFraction
+        val knownFieldMin = 160.dp.coerceAtMost(knownFieldMax)
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Настройки", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Base URL") },
-                placeholder = { Text("https://api.openai.com/v1") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-            )
-            OutlinedTextField(
-                value = token,
-                onValueChange = { token = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Токен доступа") },
-                singleLine = true,
-                visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            )
-            TextButton(onClick = { showToken = !showToken }) {
-                Text(if (showToken) "Скрыть токен" else "Показать токен")
+            Column(
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Настройки", style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Base URL") },
+                    placeholder = { Text("https://api.openai.com/v1") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Токен доступа") },
+                    singleLine = true,
+                    visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                )
+                TextButton(onClick = { showToken = !showToken }) {
+                    Text(if (showToken) "Скрыть токен" else "Показать токен")
+                }
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Модель") },
+                    placeholder = { Text("gpt-4o-mini") },
+                    singleLine = true,
+                )
             }
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Модель") },
-                placeholder = { Text("gpt-4o-mini") },
-                singleLine = true,
-            )
             OutlinedTextField(
                 value = known,
                 onValueChange = { known = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = knownFieldMin, max = knownFieldMax),
                 label = { Text("Известные слова") },
                 placeholder = { Text("По одному слову на строку") },
-                minLines = 6,
             )
-            Text("Слов: ${words.size}. Иероглифов: ${hanzi.size}.")
-            Text(hanzi.joinToString(""), style = MaterialTheme.typography.bodyLarge)
-            Text("Символов в строке: $shown", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Крупный шрифт — ${range.first} в строке. Мелкий, при котором пиньинь ещё читается — ${range.last}.",
-            )
-            if (range.first < range.last) {
-                Slider(
-                    value = shown.toFloat(),
-                    onValueChange = { chars = it.roundToInt() },
-                    valueRange = range.first.toFloat()..range.last.toFloat(),
-                    steps = (range.last - range.first - 1).coerceAtLeast(0),
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = volume, onCheckedChange = { volume = it })
+            TextButton(onClick = {
+                scope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText("Известные слова", known)),
+                    )
+                }
+            }) { Text("Копировать") }
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Слов: ${words.size}. Иероглифов: ${hanzi.size}.")
                 Text(
-                    "Клавиши громкости переключают слои",
-                    modifier = Modifier.padding(start = 12.dp),
+                    hanzi.joinToString(""),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 120.dp)
+                        .verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodyLarge,
                 )
+                Text("Символов в строке: $shown", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Крупный шрифт — ${range.first} в строке. Мелкий, при котором пиньинь ещё читается — ${range.last}.",
+                )
+                if (range.first < range.last) {
+                    Slider(
+                        value = shown.toFloat(),
+                        onValueChange = { chars = it.roundToInt() },
+                        valueRange = range.first.toFloat()..range.last.toFloat(),
+                        steps = (range.last - range.first - 1).coerceAtLeast(0),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = volume, onCheckedChange = { volume = it })
+                    Text(
+                        "Клавиши громкости переключают слои",
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
+                Button(onClick = {
+                    val stored = if (shown == range.first) 0 else shown
+                    onSave(baseUrl, token, model, known, volume, stored)
+                }) { Text("Сохранить") }
+                TextButton(onClick = onBack) { Text("Назад") }
             }
-            Button(onClick = {
-                val stored = if (shown == range.first) 0 else shown
-                onSave(baseUrl, token, model, known, volume, stored)
-            }) { Text("Сохранить") }
-            TextButton(onClick = onBack) { Text("Назад") }
         }
     }
 }
