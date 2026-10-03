@@ -41,10 +41,11 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.byokassistedreader.domain.ColoredSpan
-import com.tepmex.byokassistedreader.domain.GlossEntry
 import com.tepmex.byokassistedreader.domain.KnownLexicon
 import com.tepmex.byokassistedreader.domain.PinyinSyllable
 import com.tepmex.byokassistedreader.domain.ReadingLayer
+import com.tepmex.byokassistedreader.domain.ReferenceKind
+import com.tepmex.byokassistedreader.domain.ReferenceSpan
 import com.tepmex.byokassistedreader.domain.RubyFit
 import com.tepmex.byokassistedreader.domain.Sentence
 import com.tepmex.byokassistedreader.domain.StpvoRole
@@ -223,7 +224,8 @@ private fun GlyphGrid(
     val rows = rubyRows(text, metrics.columns) { glyph ->
         pinyinToShow(glyph, familiar, PinyinSyllable.of(glyph))
     }
-    val spans = (assist as? AssistState.Structure)?.spans.orEmpty()
+    val structureSpans = (assist as? AssistState.Structure)?.spans.orEmpty()
+    val referenceSpans = (assist as? AssistState.Reference)?.spans.orEmpty()
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
     val slotDp = with(density) { metrics.slotPx.toDp() }
@@ -235,7 +237,11 @@ private fun GlyphGrid(
         for (row in rows) {
             Row {
                 for (cell in row) {
-                    val role = if (layer == ReadingLayer.STRUCTURE) roleAt(spans, cell.index) else null
+                    val tint = when (layer) {
+                        ReadingLayer.STRUCTURE -> roleAt(structureSpans, cell.index)?.let { roleColor(it, dark) }
+                        ReadingLayer.REFERENCE -> kindAt(referenceSpans, cell.index)?.let { referenceColor(it, dark) }
+                        else -> null
+                    }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.width(slotDp).clipToBounds(),
@@ -262,7 +268,7 @@ private fun GlyphGrid(
                                 .width(slotDp)
                                 .height(hanziHeight)
                                 .clipToBounds()
-                                .background(role?.let { roleColor(it, dark) } ?: Color.Transparent),
+                                .background(tint ?: Color.Transparent),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -285,6 +291,9 @@ private fun GlyphGrid(
 private fun roleAt(spans: List<ColoredSpan>, index: Int): StpvoRole? =
     spans.firstOrNull { index >= it.start && index < it.end }?.role
 
+private fun kindAt(spans: List<ReferenceSpan>, index: Int): ReferenceKind? =
+    spans.firstOrNull { index >= it.start && index < it.end }?.kind
+
 @Composable
 private fun BottomBand(
     layer: ReadingLayer,
@@ -293,6 +302,7 @@ private fun BottomBand(
     modifier: Modifier,
 ) {
     when (layer) {
+        ReadingLayer.REFERENCE -> ReferencePane(assist, onRetry, modifier)
         ReadingLayer.GLOSS_ZH, ReadingLayer.GLOSS_RU -> GlossaryPane(assist, onRetry, modifier)
         ReadingLayer.STRUCTURE -> Column(modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
             StructureLegend()
@@ -358,15 +368,15 @@ private fun GlossaryPane(assist: AssistState, onRetry: () -> Unit, modifier: Mod
                 TextButton(onClick = onRetry) { Text("Повторить") }
             }
             is AssistState.Gloss -> {
-                GlossaryBlock(
+                ExplainedBlock(
                     title = "Незнакомые слова",
-                    entries = assist.page.words,
+                    lines = assist.page.words.map { it.word to it.explanation },
                     empty = "Нет незнакомых слов на этой странице.",
                     background = dictionaryBackground(dark),
                 )
-                GlossaryBlock(
+                ExplainedBlock(
                     title = "成语",
-                    entries = assist.page.chengyu,
+                    lines = assist.page.chengyu.map { it.word to it.explanation },
                     empty = "На этой странице нет чэнъюев.",
                     background = chengyuBackground(dark),
                 )
@@ -375,15 +385,57 @@ private fun GlossaryPane(assist: AssistState, onRetry: () -> Unit, modifier: Mod
                 "Словарь появится после ответа модели.",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            is AssistState.Structure -> Unit
+            is AssistState.Structure, is AssistState.Reference -> Unit
         }
     }
 }
 
 @Composable
-private fun GlossaryBlock(
+private fun ReferencePane(assist: AssistState, onRetry: () -> Unit, modifier: Modifier) {
+    val dark = isSystemInDarkTheme()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (assist) {
+            AssistState.Loading -> Text(
+                "Ищу имена, места и термины…",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            is AssistState.Failed -> Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(assist.message, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = onRetry) { Text("Повторить") }
+            }
+            is AssistState.Reference -> {
+                ReferenceKind.entries.forEach { kind ->
+                    val entries = when (kind) {
+                        ReferenceKind.NAME -> assist.page.names
+                        ReferenceKind.PLACE -> assist.page.places
+                        ReferenceKind.TERM -> assist.page.terms
+                    }
+                    ExplainedBlock(
+                        title = kind.ru,
+                        lines = entries.map { it.word to it.explanation },
+                        empty = emptyReference(kind),
+                        background = referenceColor(kind, dark),
+                    )
+                }
+            }
+            else -> Text(
+                "Имена, места и термины появятся после ответа модели.",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+private fun emptyReference(kind: ReferenceKind): String = when (kind) {
+    ReferenceKind.NAME -> "На этой странице нет имён собственных."
+    ReferenceKind.PLACE -> "На этой странице нет названий мест."
+    ReferenceKind.TERM -> "На этой странице нет терминов."
+}
+
+@Composable
+private fun ExplainedBlock(
     title: String,
-    entries: List<GlossEntry>,
+    lines: List<Pair<String, String>>,
     empty: String,
     background: Color,
 ) {
@@ -395,12 +447,12 @@ private fun GlossaryBlock(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(title, style = MaterialTheme.typography.labelLarge)
-        if (entries.isEmpty()) {
+        if (lines.isEmpty()) {
             Text(empty)
         } else {
-            entries.forEach { entry ->
-                Text(entry.word, style = MaterialTheme.typography.titleLarge)
-                Text(entry.explanation)
+            lines.forEach { (word, explanation) ->
+                Text(word, style = MaterialTheme.typography.titleLarge)
+                Text(explanation)
             }
         }
     }

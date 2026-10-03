@@ -43,6 +43,53 @@ fun parseGloss(raw: String): GlossPage {
     )
 }
 
+fun parseReference(raw: String): ReferencePage {
+    val root = JSONObject(extractJsonObject(raw))
+    val flat = readFlatReference(root)
+    return ReferencePage(
+        names = readReference(root, "names", "people", "persons") + flat.named(ReferenceKind.NAME),
+        places = readReference(root, "places", "locations") + flat.named(ReferenceKind.PLACE),
+        terms = readReference(root, "terms", "terminology") + flat.named(ReferenceKind.TERM),
+    )
+}
+
+private fun List<KindedReference>.named(kind: ReferenceKind): List<ReferenceEntry> =
+    filter { it.kind == kind }.map { it.entry }
+
+private data class KindedReference(val kind: ReferenceKind, val entry: ReferenceEntry)
+
+private fun readReference(root: JSONObject, vararg keys: String): List<ReferenceEntry> {
+    for (key in keys) {
+        val found = readEntries(root, key).map { ReferenceEntry(it.word, it.explanation) }
+        if (found.isNotEmpty()) return found
+    }
+    return emptyList()
+}
+
+private fun readFlatReference(root: JSONObject): List<KindedReference> {
+    val array = root.optJSONArray("items") ?: return emptyList()
+    val out = ArrayList<KindedReference>()
+    for (i in 0 until array.length()) {
+        val item = array.optJSONObject(i) ?: continue
+        val kind = referenceKind(
+            item.optString("kind").ifEmpty { item.optString("role") }.ifEmpty { item.optString("type") },
+        ) ?: continue
+        val word = item.optString("word").ifEmpty { item.optString("hanzi") }.trim()
+        val explanation = item.optString("explanation").ifEmpty { item.optString("gloss") }.trim()
+        if (word.isNotEmpty() && explanation.isNotEmpty()) {
+            out.add(KindedReference(kind, ReferenceEntry(word, explanation)))
+        }
+    }
+    return out
+}
+
+private fun referenceKind(raw: String): ReferenceKind? = when (raw.trim().lowercase()) {
+    "name", "names", "person", "people", "proper" -> ReferenceKind.NAME
+    "place", "places", "location", "locations" -> ReferenceKind.PLACE
+    "term", "terms", "terminology" -> ReferenceKind.TERM
+    else -> null
+}
+
 private fun readEntries(root: JSONObject, key: String): List<GlossEntry> {
     val array = root.optJSONArray(key) ?: return emptyList()
     val out = ArrayList<GlossEntry>(array.length())

@@ -17,11 +17,16 @@ import com.tepmex.byokassistedreader.domain.Sentence
 import com.tepmex.byokassistedreader.domain.alignParts
 import com.tepmex.byokassistedreader.domain.packPages
 import com.tepmex.byokassistedreader.domain.parseEpub
+import com.tepmex.byokassistedreader.domain.ReferencePage
+import com.tepmex.byokassistedreader.domain.ReferenceSpan
+import com.tepmex.byokassistedreader.domain.alignReference
 import com.tepmex.byokassistedreader.domain.parseGloss
+import com.tepmex.byokassistedreader.domain.parseReference
 import com.tepmex.byokassistedreader.domain.parseStpvo
 import com.tepmex.byokassistedreader.domain.rubyRows
 import com.tepmex.byokassistedreader.domain.splitSentences
 import com.tepmex.byokassistedreader.domain.visibleGloss
+import com.tepmex.byokassistedreader.domain.visibleReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,6 +44,7 @@ sealed interface AssistState {
     data object Idle : AssistState
     data object Loading : AssistState
     data class Structure(val spans: List<ColoredSpan>) : AssistState
+    data class Reference(val page: ReferencePage, val spans: List<ReferenceSpan>) : AssistState
     data class Gloss(val page: GlossPage) : AssistState
     data class Failed(val message: String) : AssistState
 }
@@ -180,6 +186,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val state = when (currentLayer) {
                     ReadingLayer.STRUCTURE -> requestStructure(prefs, text)
+                    ReadingLayer.REFERENCE -> requestReference(prefs, text)
                     ReadingLayer.GLOSS_ZH -> requestGloss(prefs, text, russian = false)
                     ReadingLayer.GLOSS_RU -> requestGloss(prefs, text, russian = true)
                     else -> AssistState.Idle
@@ -220,6 +227,18 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             cursor = at + sentence.text.length
         }
         return AssistState.Structure(spans)
+    }
+
+    private suspend fun requestReference(prefs: ReaderSettings, text: String): AssistState {
+        val raw = llm.complete(
+            prefs.baseUrl,
+            prefs.token,
+            prefs.model,
+            Prompts.referenceSystem,
+            Prompts.referenceUser(text),
+        )
+        val page = visibleReference(text, parseReference(raw))
+        return AssistState.Reference(page, alignReference(text, page))
     }
 
     private suspend fun requestGloss(prefs: ReaderSettings, text: String, russian: Boolean): AssistState {
