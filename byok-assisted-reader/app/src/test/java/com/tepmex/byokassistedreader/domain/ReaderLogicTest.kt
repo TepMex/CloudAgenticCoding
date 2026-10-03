@@ -4,9 +4,9 @@ import com.tepmex.byokassistedreader.ui.KnownWordsFieldMaxFraction
 import com.tepmex.byokassistedreader.ui.chengyuBackground
 import com.tepmex.byokassistedreader.ui.dictionaryBackground
 import com.tepmex.byokassistedreader.ui.pageBackground
+import com.tepmex.byokassistedreader.ui.referenceColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -53,12 +53,15 @@ class ReaderLogicTest {
     @Test
     fun glossaryBackgroundsAreThreeDistinctShades() {
         for (dark in listOf(false, true)) {
-            val page = pageBackground(dark)
-            val words = dictionaryBackground(dark)
-            val chengyu = chengyuBackground(dark)
-            assertNotEquals(page, words)
-            assertNotEquals(page, chengyu)
-            assertNotEquals(words, chengyu)
+            val colors = listOf(
+                pageBackground(dark),
+                dictionaryBackground(dark),
+                chengyuBackground(dark),
+                referenceColor(ReferenceKind.NAME, dark),
+                referenceColor(ReferenceKind.PLACE, dark),
+                referenceColor(ReferenceKind.TERM, dark),
+            )
+            assertEquals(colors.toSet().size, colors.size)
         }
     }
 
@@ -226,10 +229,82 @@ class ReaderLogicTest {
     }
 
     @Test
+    fun referenceKeepsNamesPlacesAndTermsAheadOfGlossaries() {
+        val text = "孔子在长安谈科举和北京。我从北京去北京大学。"
+        val parsed = ReferencePage(
+            names = listOf(
+                ReferenceEntry("孔子", "Конфуций."),
+                ReferenceEntry("孔", "только внутри имени"),
+                ReferenceEntry("长安", "как имя"),
+                ReferenceEntry("无人", ""),
+            ),
+            places = listOf(
+                ReferenceEntry("长安", "Древняя столица."),
+                ReferenceEntry("北京", "Столица."),
+                ReferenceEntry("北京大学", "Университет."),
+                ReferenceEntry("外星", "нет на странице"),
+            ),
+            terms = listOf(
+                ReferenceEntry("科举", "Экзамены на службу."),
+                ReferenceEntry("北京", "не термин, уже место"),
+            ),
+        )
+        val page = visibleReference(text, parsed)
+        assertEquals(listOf("孔子", "长安"), page.names.map { it.word })
+        assertEquals(listOf("北京", "北京大学"), page.places.map { it.word })
+        assertEquals(listOf("科举"), page.terms.map { it.word })
+        assertEquals("Столица.", page.places.first { it.word == "北京" }.explanation)
+        val gloss = visibleGloss(
+            text,
+            setOf("北京"),
+            GlossPage(words = listOf(GlossEntry("北京", "столица")), chengyu = emptyList()),
+        )
+        assertTrue(gloss.words.isEmpty())
+        val spans = alignReference(text, page)
+        assertEquals(
+            listOf(
+                ReferenceKind.NAME to "孔子",
+                ReferenceKind.NAME to "长安",
+                ReferenceKind.TERM to "科举",
+                ReferenceKind.PLACE to "北京",
+                ReferenceKind.PLACE to "北京",
+                ReferenceKind.PLACE to "北京大学",
+            ),
+            spans.map { it.kind to text.substring(it.start, it.end) },
+        )
+        val university = spans.last { text.substring(it.start, it.end) == "北京大学" }
+        assertTrue(spans.none { it.start > university.start && it.start < university.end })
+    }
+
+    @Test
+    fun referenceJsonAndPrompt() {
+        val parsed = parseReference(
+            """```json
+            {"names":[{"word":"孔子","explanation":"Конфуций."}],"places":[{"hanzi":"长安","gloss":"Столица."}],"terms":[],"items":[{"kind":"term","word":"科举","explanation":"Экзамены."}]}
+            ```""",
+        )
+        assertEquals("孔子", parsed.names.single().word)
+        assertEquals("Столица.", parsed.places.single().explanation)
+        assertEquals("科举", parsed.terms.single().word)
+        assertTrue(Prompts.referenceSystem.contains("\"names\""))
+        assertTrue(Prompts.referenceSystem.contains("\"places\""))
+        assertTrue(Prompts.referenceSystem.contains("\"terms\""))
+        assertTrue(Prompts.referenceUser("孔子。").endsWith("孔子。"))
+    }
+
+    @Test
     fun layerWraps() {
         assertEquals(ReadingLayer.PINYIN, ReadingLayer.TEXT.step(forward = true))
+        assertEquals(ReadingLayer.REFERENCE, ReadingLayer.STRUCTURE.step(forward = true))
+        assertEquals(ReadingLayer.GLOSS_ZH, ReadingLayer.REFERENCE.step(forward = true))
+        assertEquals(ReadingLayer.GLOSS_RU, ReadingLayer.GLOSS_ZH.step(forward = true))
         assertEquals(ReadingLayer.TEXT, ReadingLayer.GLOSS_RU.step(forward = true))
         assertEquals(ReadingLayer.GLOSS_RU, ReadingLayer.TEXT.step(forward = false))
+        assertEquals("Имена", ReadingLayer.REFERENCE.label)
+        assertEquals(
+            listOf("Имена собственные", "Места", "Термины"),
+            ReferenceKind.entries.map { it.ru },
+        )
     }
 
     @Test

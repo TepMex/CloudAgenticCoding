@@ -11,6 +11,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.tepmex.byokassistedreader.domain.ReferenceKind
 import com.tepmex.byokassistedreader.domain.StpvoRole
 
 private val Ink = Color(0xFF1C1915)
@@ -27,6 +28,13 @@ fun dictionaryBackground(dark: Boolean): Color =
 /** Chengyu block. Warmer than the page and the dictionary. */
 fun chengyuBackground(dark: Boolean): Color =
     if (dark) Color(0xFF3A2E1C) else Color(0xFFF4D7B0)
+
+/** Reference-layer shade for names, places, or terms. Distinct from the page and both glossaries. */
+fun referenceColor(kind: ReferenceKind, dark: Boolean): Color = when (kind) {
+    ReferenceKind.NAME -> if (dark) Color(0xFF4C2A34) else Color(0xFFF8D0DC)
+    ReferenceKind.PLACE -> if (dark) Color(0xFF1B3D36) else Color(0xFFCDE8DF)
+    ReferenceKind.TERM -> if (dark) Color(0xFF332848) else Color(0xFFE3D6F5)
+}
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF1B3A4B),

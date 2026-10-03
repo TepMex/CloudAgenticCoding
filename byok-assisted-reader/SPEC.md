@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB and reads it in a large typeface, then switches information layers on the same page: pinyin ruby, a colored STPVO breakdown of each full sentence, and a glossary of unknown words (simple Chinese, then Russian). Explanations come from the user’s own OpenAI-compatible LLM (bring your own key).
+Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB and reads it in a large typeface, then switches information layers on the same page: pinyin ruby, a colored STPVO breakdown of each full sentence, a reference list of proper names, places, and terms, and a glossary of unknown words (simple Chinese, then Russian). Explanations come from the user’s own OpenAI-compatible LLM (bring your own key).
 
 ## Requirements
 
@@ -29,13 +29,14 @@ Android reader for a learner of Chinese. The user opens a DRM-free Chinese EPUB 
     - verb / Что делает
     - object / С чем
     Spans must be exact substrings. Overlapping characters keep the first accepted span. A legend names the five colors on two rows: Кто, Когда, Где, then Что делает and С чем. Each name stays on one line. A row scrolls sideways instead of splitting «С чем» into letters.
-12. **Layer 3 — 简单.** The LLM explains words on the page that are not in the known-word list, in the simplest Chinese. Chengyu present on the page are listed with explanations even when the word is known.
-13. **Layer 4 — По-русски.** The same glossary shape as layer 3, with Russian explanations.
-14. Layers 3 and 4 keep the passage at 75% of the reader body (more than 70%) and scroll the glossary in the remaining band. That split is the same height on every layer, so opening the glossary does not reflow the hanzi. The passage keeps the system background. Unknown-word entries use a second background shade, and chengyu use a third.
-15. Volume Up moves to the next layer, Volume Down to the previous, wrapping 0↔4, only while the reader is open and the switch is on. Those keys are consumed. With the switch off, they change the system volume.
-16. Swipe or **Назад** / **Дальше** turns pages. The top bar shows the book title, the layer name, and the page index, plus settings and open-file actions.
-17. LLM calls use `POST {base}/v1/chat/completions` (or `{base}/chat/completions` when the base URL already ends at one of those suffixes). Results are cached in memory by layer, endpoint, model, known words, and page text. Missing base URL or model shows an error and does not call the network. Failures stay on screen with **Повторить**.
-18. Sign release and debug (when the keystore is present) with the shared sideload keystore. GitHub Pages landing at `/byok-assisted-reader/` serves `byok-assisted-reader.apk`.
+12. **Layer 3 — Имена.** The LLM lists proper names (people, characters, organizations, and works), place names, and specialized terms that occur on the page. Explanations are one short Russian sentence. An item stays even when the word is already known. The same surface is listed once, in the earliest category. A shorter item that occurs only inside a longer item is dropped. Each word is an exact substring of the page. The passage tints every match with that category’s shade; a longer match keeps the characters it covers. The bottom band lists the three groups on those same shades, before the unknown-word dictionaries.
+13. **Layer 4 — 简单.** The LLM explains words on the page that are not in the known-word list, in the simplest Chinese. Chengyu present on the page are listed with explanations even when the word is known.
+14. **Layer 5 — По-русски.** The same glossary shape as layer 4, with Russian explanations.
+15. The passage stays at 75% of the reader body (more than 70%) on every layer. Layers 3, 4, and 5 scroll their lists in the remaining band. That split is the same height on every layer, so opening a list does not reflow the hanzi. The passage keeps the system background. Unknown-word entries use a second background shade, and chengyu use a third. Names, places, and terms use three further shades, distinct from the page and from both glossary shades.
+16. Volume Up moves to the next layer, Volume Down to the previous, wrapping 0↔5, only while the reader is open and the switch is on. Those keys are consumed. With the switch off, they change the system volume.
+17. Swipe or **Назад** / **Дальше** turns pages. The top bar shows the book title, the layer name, and the page index, plus settings and open-file actions.
+18. LLM calls use `POST {base}/v1/chat/completions` (or `{base}/chat/completions` when the base URL already ends at one of those suffixes). Results are cached in memory by layer, endpoint, model, known words, and page text. Missing base URL or model shows an error and does not call the network. Failures stay on screen with **Повторить**.
+19. Sign release and debug (when the keystore is present) with the shared sideload keystore. GitHub Pages landing at `/byok-assisted-reader/` serves `byok-assisted-reader.apk`.
 
 ## Interfaces
 
@@ -61,7 +62,13 @@ Glossary JSON:
 {"words":[{"word":"学校","explanation":"学习的地方。"}],"chengyu":[{"word":"一心一意","explanation":"很专心。"}]}
 ```
 
-Roles: `subject`, `time`, `place`, `verb`, `object`.
+Reference JSON:
+
+```json
+{"names":[{"word":"孔子","explanation":"Конфуций, философ."}],"places":[{"word":"长安","explanation":"Древняя столица."}],"terms":[{"word":"科举","explanation":"Экзамены на службу."}]}
+```
+
+Roles: `subject`, `time`, `place`, `verb`, `object`. Reference kinds: `name`, `place`, `term`.
 
 ## Data model
 
@@ -71,13 +78,15 @@ Roles: `subject`, `time`, `place`, `verb`, `object`.
 - **Page** — an ordered list of sentences chosen to fit the pinyin row budget.
 - **Ruby cell** — one code point plus its pinyin (empty when it is not a hanzi).
 - **STPVO span** — a half-open range in the sentence and one role.
+- **Reference entry** — a proper name, place, or term from the page, plus a short Russian explanation. Known words are kept. A surface listed in more than one category stays in the earliest one. A shorter item that occurs only inside a longer item is dropped.
+- **Reference span** — a half-open range on the page and one reference kind. A longer match keeps the characters it covers.
 - **Gloss entry** — surface word plus an explanation. Unknown-word entries that are already known, or that do not occur on the page, are dropped. Chengyu that do not occur on the page are dropped.
 
 The book text lives in memory. The EPUB file is not copied. The API token is stored in DataStore and is not written to logs.
 
 ## UI / UX
 
-Paper background, large black hanzi, a thin top bar. The passage is one character grid on every layer and keeps that system background. Layer 2 colors the hanzi cell: Кто blue, Когда amber, Где green, Что делает red, С чем purple. The legend is two rows, so «С чем» stays intact. The bottom band is 25% of the reader body. Layers 3 and 4 scroll the glossary there: unknown words on one background shade, then 成语 on another. Settings includes **Символов в строке**, from the largest type down to the smallest readable pinyin. The known-words field is at most half the screen, scrolls inside itself, and has **Копировать**.
+Paper background, large black hanzi, a thin top bar. The passage is one character grid on every layer and keeps that system background. Layer 2 colors the hanzi cell: Кто blue, Когда amber, Где green, Что делает red, С чем purple. The legend is two rows, so «С чем» stays intact. Layer 3 tints names, places, and terms and lists them in the bottom band on the same three shades. The bottom band is 25% of the reader body. Layers 4 and 5 scroll the glossary there: unknown words on one background shade, then 成语 on another. Settings includes **Символов в строке**, from the largest type down to the smallest readable pinyin. The known-words field is at most half the screen, scrolls inside itself, and has **Копировать**.
 
 ## Out of scope
 
@@ -98,8 +107,9 @@ Paper background, large black hanzi, a thin top bar. The passage is one characte
 5. STPVO parts align onto exact substrings; a part that overlaps an earlier part is skipped; a part missing from the sentence is skipped.
 6. Glossary parsing drops a known word, keeps an unknown word that occurs in the page, and keeps a chengyu that occurs in the page.
 7. A minimal EPUB zip yields its spine text in order, without ruby pronunciation dumped into the paragraph.
-8. Volume-key stepping wraps `TEXT → … → GLOSS_RU → TEXT`.
+8. Volume-key stepping wraps `TEXT → … → GLOSS_RU → TEXT` and steps `STRUCTURE → REFERENCE → GLOSS_ZH`.
 9. `./gradlew test assembleRelease` succeeds and the APK verifies with `android/verify-apk-sideload-cert.sh`.
 10. Deploy workflow includes `byok-assisted-reader` in `ANDROID_APPS`.
 11. Known words `你好，猫` mark `你`, `好`, and `猫` as familiar. Pinyin for those glyphs is blank; the reading for `看` is kept. With no known words, `你` still shows its reading.
-12. Page, dictionary, and chengyu backgrounds are three different colors in both light and dark themes.
+12. Page, dictionary, chengyu, and the three reference shades are six different colors in both light and dark themes.
+13. On `孔子在长安谈科举和北京。我从北京去北京大学。`, the reference list keeps `孔子`, `长安`, `科举`, `北京`, and `北京大学`. `长安` claimed as both a name and a place stays a name. `北京` stays even though it is a known word. `孔` is dropped when it occurs only inside `孔子`. `外星` and an empty explanation are dropped. `北京大学` covers its own span, and the separate `北京` keeps another.

@@ -129,6 +129,7 @@ enum class ReadingLayer {
     TEXT,
     PINYIN,
     STRUCTURE,
+    REFERENCE,
     GLOSS_ZH,
     GLOSS_RU,
     ;
@@ -144,6 +145,7 @@ enum class ReadingLayer {
             TEXT -> "Текст"
             PINYIN -> "Пиньинь"
             STRUCTURE -> "Структура"
+            REFERENCE -> "Имена"
             GLOSS_ZH -> "简单"
             GLOSS_RU -> "По-русски"
         }

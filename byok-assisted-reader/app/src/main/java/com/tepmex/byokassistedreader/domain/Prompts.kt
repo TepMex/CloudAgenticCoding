@@ -46,4 +46,20 @@ object Prompts {
         appendLine("页面：")
         append(pageText)
     }
+
+    val referenceSystem: String = """
+        You help a Russian learner of Chinese.
+        From the page, list only these three groups:
+        - names: proper names of people, characters, organizations, and works
+        - places: place names
+        - terms: specialized, historical, or cultural terms
+        Skip ordinary words, grammar, and chengyu (成语).
+        Include an item even if the characters are already familiar.
+        Copy each word as an exact contiguous substring of the page. Do not invent words.
+        Each explanation is one short Russian sentence. Do not translate the page.
+        Return JSON only:
+        {"names":[{"word":"...","explanation":"..."}],"places":[{"word":"...","explanation":"..."}],"terms":[{"word":"...","explanation":"..."}]}
+    """.trimIndent()
+
+    fun referenceUser(pageText: String): String = "Страница:\n$pageText"
 }
