@@ -129,9 +129,7 @@ enum class ReadingLayer {
     TEXT,
     PINYIN,
     STRUCTURE,
-    REFERENCE,
-    GLOSS_ZH,
-    GLOSS_RU,
+    ASSIST,
     ;
 
     fun step(forward: Boolean): ReadingLayer {
@@ -140,31 +138,85 @@ enum class ReadingLayer {
         return entries[(ordinal + delta).mod(n)]
     }
 
+    /** Readings stay on every layer after Текст, including when the layer changes. */
+    val showsPinyin: Boolean
+        get() = this != TEXT
+
     val label: String
         get() = when (this) {
             TEXT -> "Текст"
             PINYIN -> "Пиньинь"
             STRUCTURE -> "Структура"
-            REFERENCE -> "Имена"
-            GLOSS_ZH -> "简单"
-            GLOSS_RU -> "По-русски"
+            ASSIST -> "Справка"
         }
+}
+
+/** Floating card on the reference layer. [NONE] is the screen with no window. */
+enum class AssistCard {
+    NONE,
+    WORDS,
+    CHENGYU,
+    REFERENCE,
+    ;
+
+    fun step(forward: Boolean): AssistCard {
+        val n = entries.size
+        val delta = if (forward) 1 else -1
+        return entries[(ordinal + delta).mod(n)]
+    }
+
+    val label: String
+        get() = when (this) {
+            NONE -> ""
+            WORDS -> "Незнакомые слова"
+            CHENGYU -> "成语"
+            REFERENCE -> "Имена и места"
+        }
+}
+
+sealed interface OverlaySwipe {
+    data object ToggleLegend : OverlaySwipe
+    data class StepCard(val forward: Boolean) : OverlaySwipe
+}
+
+/**
+ * Horizontal swipe never turns a page.
+ * On [ReadingLayer.STRUCTURE] either direction toggles the legend.
+ * On [ReadingLayer.ASSIST] left steps the window forward and right steps back.
+ */
+fun overlaySwipe(layer: ReadingLayer, dragPx: Float, slopPx: Float = 80f): OverlaySwipe? {
+    if (dragPx.isNaN() || kotlin.math.abs(dragPx) < slopPx) return null
+    val forward = dragPx < 0f
+    return when (layer) {
+        ReadingLayer.STRUCTURE -> OverlaySwipe.ToggleLegend
+        ReadingLayer.ASSIST -> OverlaySwipe.StepCard(forward)
+        else -> null
+    }
 }
 
 object RubyFit {
     /** Pinyin size at the largest hanzi. `zhuāng` at this size is the comfort slot. */
     const val COMFORT_PINYIN_SP = 12f
 
-    /** Smallest pinyin that stays readable when more characters are placed on a line. */
+    /**
+     * Preferred pinyin floor. A slot that cannot hold [SAMPLE] at this size
+     * scales pinyin further; that smaller ruby is still treated as readable.
+     */
     const val MIN_PINYIN_SP = 8f
+
+    /**
+     * Densest characters-per-line setting added past the 8sp floor.
+     * The slider reaches this count (9 through 12) whenever the width can place the slots.
+     */
+    const val DENSE_COLUMNS_MAX = 12
 
     const val SAMPLE = "zhuāng"
 
     /**
-     * Passage share of the reader body on every layer.
-     * Glossary layers use the rest, so the main text keeps more than 70%.
+     * Passage share of the reader body. Every layer keeps the full height.
+     * Dictionaries and the structure legend float over the text.
      */
-    const val PASSAGE_FRACTION = 0.75f
+    const val PASSAGE_FRACTION = 1f
 
     fun passagePx(bodyPx: Int): Int =
         (bodyPx.coerceAtLeast(1) * PASSAGE_FRACTION).toInt().coerceAtLeast(1)
@@ -175,13 +227,16 @@ object RubyFit {
 
     /**
      * Characters per line from the largest type ([comfortCellPx], the current size)
-     * through the smallest type whose pinyin is still readable ([minCellPx]).
+     * through at least [DENSE_COLUMNS_MAX], past the 8sp cell ([minCellPx]).
+     * A wider screen that already fits more than [DENSE_COLUMNS_MAX] at 8sp keeps that larger count.
      */
     fun columnRange(contentWidthPx: Int, comfortCellPx: Int, minCellPx: Int): IntRange {
         val width = contentWidthPx.coerceAtLeast(1)
         val fewest = columnsThatFit(width, comfortCellPx)
-        val most = columnsThatFit(width, minCellPx.coerceAtMost(comfortCellPx)).coerceAtLeast(fewest)
-        return fewest..most
+        val readableCell = minCellPx.coerceAtMost(comfortCellPx).coerceAtLeast(1)
+        val readable = columnsThatFit(width, readableCell).coerceAtLeast(fewest)
+        val dense = DENSE_COLUMNS_MAX.coerceAtMost(width).coerceAtLeast(fewest)
+        return fewest..maxOf(readable, dense)
     }
 
     fun columnsThatFit(contentWidthPx: Int, cellPx: Int): Int =
@@ -203,11 +258,17 @@ object RubyFit {
         return slot.coerceAtLeast(1)
     }
 
+    /**
+     * Pinyin size for one slot. Scales from [comfortSp] with the slot and never grows past it.
+     * [minSp] is a floor only while the slot can still hold the comfort sample at that size.
+     * Narrower slots, including 9–12 characters per line, keep the proportional size.
+     */
     fun pinyinSp(comfortSp: Float, comfortSamplePx: Float, slotPx: Float, minSp: Float): Float {
-        if (comfortSamplePx <= 0f || slotPx <= 0f) return comfortSp
-        val scaled = comfortSp * (slotPx / comfortSamplePx)
-        val floor = minSp.coerceAtMost(comfortSp)
-        return scaled.coerceIn(floor, comfortSp)
+        if (comfortSamplePx <= 0f || slotPx <= 0f || comfortSp <= 0f) return comfortSp
+        val capped = (comfortSp * (slotPx / comfortSamplePx)).coerceAtMost(comfortSp)
+        val floor = minSp.coerceIn(1f, comfortSp)
+        val minSamplePx = comfortSamplePx * (floor / comfortSp)
+        return if (slotPx + 0.01f >= minSamplePx) capped.coerceAtLeast(floor) else capped.coerceAtLeast(1f)
     }
 
     /** sp that draws a probed glyph at [slotPx], so the ink stays inside the slot. */

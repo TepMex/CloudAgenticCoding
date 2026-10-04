@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
             val pages by model.pages.collectAsState()
             val pageIndex by model.pageIndex.collectAsState()
             val layer by model.layer.collectAsState()
+            val assistCard by model.assistCard.collectAsState()
+            val legendVisible by model.structureLegend.collectAsState()
             val assist by model.assist.collectAsState()
             val status by model.status.collectAsState()
             volumeKeysEnabled = settings.volumeKeys
@@ -80,11 +82,14 @@ class MainActivity : ComponentActivity() {
                                 pages = pages,
                                 pageIndex = pageIndex,
                                 layer = layer,
+                                assistCard = assistCard,
+                                legendVisible = legendVisible,
                                 charsPerLine = settings.charsPerLine,
                                 knownWords = settings.knownWords,
                                 assist = assist,
                                 onLayout = model::relayout,
                                 onTurn = model::turnPage,
+                                onOverlaySwipe = model::applyOverlaySwipe,
                                 onSettings = model::openSettings,
                                 onOpen = { openEpub.launch(arrayOf("application/epub+zip", "application/octet-stream")) },
                                 onRetry = model::refreshAssist,

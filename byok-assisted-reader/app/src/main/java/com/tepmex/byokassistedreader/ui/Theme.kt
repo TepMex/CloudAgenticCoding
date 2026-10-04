@@ -29,6 +29,13 @@ fun dictionaryBackground(dark: Boolean): Color =
 fun chengyuBackground(dark: Boolean): Color =
     if (dark) Color(0xFF3A2E1C) else Color(0xFFF4D7B0)
 
+/** Names, places, and terms window. Distinct from the page, both glossaries, and the three tints. */
+fun referenceWindowBackground(dark: Boolean): Color =
+    if (dark) Color(0xFF3D3358) else Color(0xFFDCCEF0)
+
+/** Floating windows are only slightly transparent, so the text behind them stays visible. */
+internal const val OverlayAlpha = 0.86f
+
 /** Reference-layer shade for names, places, or terms. Distinct from the page and both glossaries. */
 fun referenceColor(kind: ReferenceKind, dark: Boolean): Color = when (kind) {
     ReferenceKind.NAME -> if (dark) Color(0xFF4C2A34) else Color(0xFFF8D0DC)
