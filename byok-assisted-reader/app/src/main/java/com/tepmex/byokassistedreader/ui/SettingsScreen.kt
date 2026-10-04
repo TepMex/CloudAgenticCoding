@@ -12,13 +12,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -78,7 +85,12 @@ fun SettingsScreen(
                 modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Настройки", style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                    Text("Настройки", style = MaterialTheme.typography.titleLarge)
+                }
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = { baseUrl = it },
@@ -96,10 +108,15 @@ fun SettingsScreen(
                     singleLine = true,
                     visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { showToken = !showToken }) {
+                            Icon(
+                                if (showToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (showToken) "Скрыть токен" else "Показать токен",
+                            )
+                        }
+                    },
                 )
-                TextButton(onClick = { showToken = !showToken }) {
-                    Text(if (showToken) "Скрыть токен" else "Показать токен")
-                }
                 OutlinedTextField(
                     value = model,
                     onValueChange = { model = it },
@@ -118,13 +135,15 @@ fun SettingsScreen(
                 label = { Text("Известные слова") },
                 placeholder = { Text("По одному слову на строку") },
             )
-            TextButton(onClick = {
+            IconButton(onClick = {
                 scope.launch {
                     clipboard.setClipEntry(
                         ClipEntry(ClipData.newPlainText("Известные слова", known)),
                     )
                 }
-            }) { Text("Копировать") }
+            }) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = "Копировать")
+            }
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -140,7 +159,7 @@ fun SettingsScreen(
                 )
                 Text("Символов в строке: $shown", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Крупный шрифт — ${range.first} в строке. Мелкий, при котором пиньинь ещё читается — ${range.last}.",
+                    "Крупный шрифт — ${range.first} в строке. Мелкий — ${range.last}. Пиньинь уменьшается пропорционально клетке, в том числе с 9 по 12 символов.",
                 )
                 if (range.first < range.last) {
                     Slider(
@@ -157,11 +176,12 @@ fun SettingsScreen(
                         modifier = Modifier.padding(start = 12.dp),
                     )
                 }
-                Button(onClick = {
+                FilledIconButton(onClick = {
                     val stored = if (shown == range.first) 0 else shown
                     onSave(baseUrl, token, model, known, volume, stored)
-                }) { Text("Сохранить") }
-                TextButton(onClick = onBack) { Text("Назад") }
+                }) {
+                    Icon(Icons.Filled.Save, contentDescription = "Сохранить")
+                }
             }
         }
     }

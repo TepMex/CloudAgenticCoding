@@ -7,19 +7,22 @@ import androidx.lifecycle.viewModelScope
 import com.tepmex.byokassistedreader.data.LlmClient
 import com.tepmex.byokassistedreader.data.ReaderSettings
 import com.tepmex.byokassistedreader.data.SettingsStore
+import com.tepmex.byokassistedreader.domain.AssistCard
 import com.tepmex.byokassistedreader.domain.ColoredSpan
 import com.tepmex.byokassistedreader.domain.EpubBook
 import com.tepmex.byokassistedreader.domain.GlossPage
 import com.tepmex.byokassistedreader.domain.KnownLexicon
+import com.tepmex.byokassistedreader.domain.OverlaySwipe
 import com.tepmex.byokassistedreader.domain.Prompts
 import com.tepmex.byokassistedreader.domain.ReadingLayer
-import com.tepmex.byokassistedreader.domain.Sentence
-import com.tepmex.byokassistedreader.domain.alignParts
-import com.tepmex.byokassistedreader.domain.packPages
-import com.tepmex.byokassistedreader.domain.parseEpub
 import com.tepmex.byokassistedreader.domain.ReferencePage
 import com.tepmex.byokassistedreader.domain.ReferenceSpan
+import com.tepmex.byokassistedreader.domain.Sentence
+import com.tepmex.byokassistedreader.domain.alignParts
 import com.tepmex.byokassistedreader.domain.alignReference
+import com.tepmex.byokassistedreader.domain.overlaySwipe
+import com.tepmex.byokassistedreader.domain.packPages
+import com.tepmex.byokassistedreader.domain.parseEpub
 import com.tepmex.byokassistedreader.domain.parseGloss
 import com.tepmex.byokassistedreader.domain.parseReference
 import com.tepmex.byokassistedreader.domain.parseStpvo
@@ -30,6 +33,8 @@ import com.tepmex.byokassistedreader.domain.visibleReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,8 +49,12 @@ sealed interface AssistState {
     data object Idle : AssistState
     data object Loading : AssistState
     data class Structure(val spans: List<ColoredSpan>) : AssistState
-    data class Reference(val page: ReferencePage, val spans: List<ReferenceSpan>) : AssistState
-    data class Gloss(val page: GlossPage) : AssistState
+    data class Notes(
+        val glossZh: GlossPage,
+        val glossRu: GlossPage,
+        val reference: ReferencePage,
+        val spans: List<ReferenceSpan>,
+    ) : AssistState
     data class Failed(val message: String) : AssistState
 }
 
@@ -65,6 +74,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val pages = MutableStateFlow<List<List<Sentence>>>(emptyList())
     val pageIndex = MutableStateFlow(0)
     val layer = MutableStateFlow(ReadingLayer.TEXT)
+    val assistCard = MutableStateFlow(AssistCard.NONE)
+    val structureLegend = MutableStateFlow(false)
     val status = MutableStateFlow<String?>(null)
     val assist = MutableStateFlow<AssistState>(AssistState.Idle)
     private var settingsReturn = Route.SHELF
@@ -116,6 +127,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val index = if (saved.bookUri == uri.toString()) saved.pageIndex else 0
                 pageIndex.value = index.coerceAtLeast(0)
                 layer.value = ReadingLayer.TEXT
+                assistCard.value = AssistCard.NONE
+                structureLegend.value = false
                 layoutKey = ""
                 cache.clear()
                 assist.value = AssistState.Idle
@@ -163,6 +176,15 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         refreshAssist()
     }
 
+    /** Horizontal drag on the passage. Does not turn the page. */
+    fun applyOverlaySwipe(dragPx: Float) {
+        when (val swipe = overlaySwipe(layer.value, dragPx)) {
+            null -> Unit
+            OverlaySwipe.ToggleLegend -> structureLegend.value = !structureLegend.value
+            is OverlaySwipe.StepCard -> assistCard.value = assistCard.value.step(swipe.forward)
+        }
+    }
+
     fun refreshAssist() {
         assistJob?.cancel()
         val currentLayer = layer.value
@@ -186,9 +208,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val state = when (currentLayer) {
                     ReadingLayer.STRUCTURE -> requestStructure(prefs, text)
-                    ReadingLayer.REFERENCE -> requestReference(prefs, text)
-                    ReadingLayer.GLOSS_ZH -> requestGloss(prefs, text, russian = false)
-                    ReadingLayer.GLOSS_RU -> requestGloss(prefs, text, russian = true)
+                    ReadingLayer.ASSIST -> requestNotes(prefs, text)
                     else -> AssistState.Idle
                 }
                 cache[key] = state
@@ -229,7 +249,23 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         return AssistState.Structure(spans)
     }
 
-    private suspend fun requestReference(prefs: ReaderSettings, text: String): AssistState {
+    private suspend fun requestNotes(prefs: ReaderSettings, text: String): AssistState = coroutineScope {
+        val reference = async { loadReference(prefs, text) }
+        val glossZh = async { loadGloss(prefs, text, russian = false) }
+        val glossRu = async { loadGloss(prefs, text, russian = true) }
+        val (page, spans) = reference.await()
+        AssistState.Notes(
+            glossZh = glossZh.await(),
+            glossRu = glossRu.await(),
+            reference = page,
+            spans = spans,
+        )
+    }
+
+    private suspend fun loadReference(
+        prefs: ReaderSettings,
+        text: String,
+    ): Pair<ReferencePage, List<ReferenceSpan>> {
         val raw = llm.complete(
             prefs.baseUrl,
             prefs.token,
@@ -238,10 +274,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             Prompts.referenceUser(text),
         )
         val page = visibleReference(text, parseReference(raw))
-        return AssistState.Reference(page, alignReference(text, page))
+        return page to alignReference(text, page)
     }
 
-    private suspend fun requestGloss(prefs: ReaderSettings, text: String, russian: Boolean): AssistState {
+    private suspend fun loadGloss(prefs: ReaderSettings, text: String, russian: Boolean): GlossPage {
         val known = KnownLexicon.words(prefs.knownWords)
         val raw = llm.complete(
             prefs.baseUrl,
@@ -250,7 +286,6 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             Prompts.glossSystem(russian),
             Prompts.glossUser(text, known),
         )
-        val page = visibleGloss(text, known.toSet(), parseGloss(raw))
-        return AssistState.Gloss(page)
+        return visibleGloss(text, known.toSet(), parseGloss(raw))
     }
 }

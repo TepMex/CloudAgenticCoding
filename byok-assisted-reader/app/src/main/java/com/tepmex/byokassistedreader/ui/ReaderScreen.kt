@@ -13,21 +13,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -37,10 +44,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tepmex.byokassistedreader.domain.AssistCard
 import com.tepmex.byokassistedreader.domain.ColoredSpan
+import com.tepmex.byokassistedreader.domain.GlossEntry
 import com.tepmex.byokassistedreader.domain.KnownLexicon
 import com.tepmex.byokassistedreader.domain.PinyinSyllable
 import com.tepmex.byokassistedreader.domain.ReadingLayer
@@ -55,6 +65,7 @@ import com.tepmex.byokassistedreader.domain.rubyRows
 internal val ReaderHorizontalPadding = 12.dp
 
 private val GridFont = FontFamily.SansSerif
+private val WindowShape = RoundedCornerShape(16.dp)
 
 @Composable
 fun ReaderScreen(
@@ -62,37 +73,23 @@ fun ReaderScreen(
     pages: List<List<Sentence>>,
     pageIndex: Int,
     layer: ReadingLayer,
+    assistCard: AssistCard,
+    legendVisible: Boolean,
     charsPerLine: Int,
     knownWords: String,
     assist: AssistState,
     onLayout: (columns: Int, rowHeightPx: Int, viewportPx: Int) -> Unit,
     onTurn: (forward: Boolean) -> Unit,
+    onOverlaySwipe: (dragPx: Float) -> Unit,
     onSettings: () -> Unit,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val page = pages.getOrNull(pageIndex).orEmpty()
     val text = page.joinToString("") { it.text }
-    var drag by remember { mutableFloatStateOf(0f) }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(pageIndex, pages.size) {
-                detectHorizontalDragGestures(
-                    onDragStart = { drag = 0f },
-                    onHorizontalDrag = { _, amount -> drag += amount },
-                    onDragEnd = {
-                        when {
-                            drag > 80f -> onTurn(false)
-                            drag < -80f -> onTurn(true)
-                        }
-                        drag = 0f
-                    },
-                )
-            },
-    ) {
+    Column(Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -103,47 +100,76 @@ fun ReaderScreen(
                 style = MaterialTheme.typography.labelLarge,
             )
             Text("${layer.ordinal} ${layer.label}")
-            TextButton(onClick = onSettings) { Text("Настройки") }
-            TextButton(onClick = onOpen) { Text("Файл") }
+            if (assist is AssistState.Failed) {
+                IconButton(onClick = onRetry) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Повторить")
+                }
+            }
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Filled.Settings, contentDescription = "Настройки")
+            }
+            IconButton(onClick = onOpen) {
+                Icon(Icons.Filled.FolderOpen, contentDescription = "Файл")
+            }
         }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pointerInput(layer) {
+                    var drag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { drag = 0f },
+                        onHorizontalDrag = { _, amount -> drag += amount },
+                        onDragEnd = {
+                            onOverlaySwipe(drag)
+                            drag = 0f
+                        },
+                    )
+                },
+        ) {
             val density = LocalDensity.current
             val padPx = with(density) { ReaderHorizontalPadding.roundToPx() }
             val contentWidth = (constraints.maxWidth - padPx * 2).coerceAtLeast(1)
             val metrics = gridMetrics(contentWidth, charsPerLine)
             val passagePx = RubyFit.passagePx(constraints.maxHeight)
+            val windowMax = maxHeight * 0.46f
             LaunchedEffect(metrics.columns, metrics.rowHeightPx, passagePx, text.length) {
                 onLayout(metrics.columns, metrics.rowHeightPx, passagePx)
             }
-            Column(Modifier.fillMaxSize()) {
-                GlyphGrid(
-                    text = text,
-                    knownWords = knownWords,
-                    layer = layer,
-                    assist = assist,
-                    metrics = metrics,
-                    modifier = Modifier
-                        .weight(RubyFit.PASSAGE_FRACTION)
-                        .verticalScroll(rememberScrollState()),
-                )
-                BottomBand(
-                    layer = layer,
-                    assist = assist,
-                    onRetry = onRetry,
-                    modifier = Modifier
-                        .weight(1f - RubyFit.PASSAGE_FRACTION)
-                        .verticalScroll(rememberScrollState()),
-                )
-            }
+            GlyphGrid(
+                text = text,
+                knownWords = knownWords,
+                layer = layer,
+                assistCard = assistCard,
+                assist = assist,
+                metrics = metrics,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            )
+            OverlayWindow(
+                layer = layer,
+                assistCard = assistCard,
+                legendVisible = legendVisible,
+                assist = assist,
+                windowMax = windowMax,
+                onRetry = onRetry,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = { onTurn(false) }, enabled = pageIndex > 0) { Text("Назад") }
+            IconButton(onClick = { onTurn(false) }, enabled = pageIndex > 0) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+            }
             Text(if (pages.isEmpty()) "—" else "${pageIndex + 1} / ${pages.size}")
-            TextButton(onClick = { onTurn(true) }, enabled = pageIndex < pages.lastIndex) { Text("Дальше") }
+            IconButton(onClick = { onTurn(true) }, enabled = pageIndex < pages.lastIndex) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Дальше")
+            }
         }
     }
 }
@@ -216,6 +242,7 @@ private fun GlyphGrid(
     text: String,
     knownWords: String,
     layer: ReadingLayer,
+    assistCard: AssistCard,
     assist: AssistState,
     metrics: GridMetrics,
     modifier: Modifier,
@@ -225,7 +252,11 @@ private fun GlyphGrid(
         pinyinToShow(glyph, familiar, PinyinSyllable.of(glyph))
     }
     val structureSpans = (assist as? AssistState.Structure)?.spans.orEmpty()
-    val referenceSpans = (assist as? AssistState.Reference)?.spans.orEmpty()
+    val referenceSpans = if (layer == ReadingLayer.ASSIST && assistCard == AssistCard.REFERENCE) {
+        (assist as? AssistState.Notes)?.spans.orEmpty()
+    } else {
+        emptyList()
+    }
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
     val slotDp = with(density) { metrics.slotPx.toDp() }
@@ -233,13 +264,14 @@ private fun GlyphGrid(
     val hanziHeight = with(density) { metrics.hanziHeightPx.toDp() }
     val ink = MaterialTheme.colorScheme.onBackground
     val ruby = MaterialTheme.colorScheme.onSurfaceVariant
+    val showPinyin = layer.showsPinyin
     Column(modifier.padding(horizontal = ReaderHorizontalPadding)) {
         for (row in rows) {
             Row {
                 for (cell in row) {
                     val tint = when (layer) {
                         ReadingLayer.STRUCTURE -> roleAt(structureSpans, cell.index)?.let { roleColor(it, dark) }
-                        ReadingLayer.REFERENCE -> kindAt(referenceSpans, cell.index)?.let { referenceColor(it, dark) }
+                        ReadingLayer.ASSIST -> kindAt(referenceSpans, cell.index)?.let { referenceColor(it, dark) }
                         else -> null
                     }
                     Column(
@@ -250,7 +282,7 @@ private fun GlyphGrid(
                             Modifier.width(slotDp).height(pinyinHeight).clipToBounds(),
                             contentAlignment = Alignment.BottomCenter,
                         ) {
-                            if (layer == ReadingLayer.PINYIN && cell.pinyin.isNotEmpty()) {
+                            if (showPinyin && cell.pinyin.isNotEmpty()) {
                                 Text(
                                     cell.pinyin,
                                     style = metrics.pinyinStyle,
@@ -295,20 +327,85 @@ private fun kindAt(spans: List<ReferenceSpan>, index: Int): ReferenceKind? =
     spans.firstOrNull { index >= it.start && index < it.end }?.kind
 
 @Composable
-private fun BottomBand(
+private fun OverlayWindow(
     layer: ReadingLayer,
+    assistCard: AssistCard,
+    legendVisible: Boolean,
     assist: AssistState,
+    windowMax: Dp,
     onRetry: () -> Unit,
     modifier: Modifier,
 ) {
-    when (layer) {
-        ReadingLayer.REFERENCE -> ReferencePane(assist, onRetry, modifier)
-        ReadingLayer.GLOSS_ZH, ReadingLayer.GLOSS_RU -> GlossaryPane(assist, onRetry, modifier)
-        ReadingLayer.STRUCTURE -> Column(modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+    val dark = isSystemInDarkTheme()
+    val legendOpen = layer == ReadingLayer.STRUCTURE && legendVisible
+    val cardOpen = layer == ReadingLayer.ASSIST && assistCard != AssistCard.NONE
+    val failure = assist as? AssistState.Failed
+    when {
+        legendOpen -> FloatWindow(MaterialTheme.colorScheme.surface, windowMax, modifier) {
             StructureLegend()
-            AssistNote(assist, onRetry)
+            AssistStatus(assist, onRetry, loading = "Разбираю предложения…")
         }
-        else -> Box(modifier)
+        cardOpen -> {
+            val background = when (assistCard) {
+                AssistCard.WORDS -> dictionaryBackground(dark)
+                AssistCard.CHENGYU -> chengyuBackground(dark)
+                AssistCard.REFERENCE -> referenceWindowBackground(dark)
+                AssistCard.NONE -> Color.Transparent
+            }
+            FloatWindow(background, windowMax, modifier) {
+                when (assist) {
+                    AssistState.Loading -> Text("Собираю справку…")
+                    is AssistState.Failed -> FailedNote(assist.message, onRetry)
+                    is AssistState.Notes -> when (assistCard) {
+                        AssistCard.WORDS -> DualGlossary(
+                            title = assistCard.label,
+                            zh = assist.glossZh.words,
+                            ru = assist.glossRu.words,
+                            empty = "Нет незнакомых слов на этой странице.",
+                        )
+                        AssistCard.CHENGYU -> DualGlossary(
+                            title = assistCard.label,
+                            zh = assist.glossZh.chengyu,
+                            ru = assist.glossRu.chengyu,
+                            empty = "На этой странице нет чэнъюев.",
+                        )
+                        AssistCard.REFERENCE -> ReferenceWindow(assist)
+                        AssistCard.NONE -> Unit
+                    }
+                    else -> Text("Справка появится после ответа модели.")
+                }
+            }
+        }
+        failure != null &&
+            (layer == ReadingLayer.STRUCTURE || layer == ReadingLayer.ASSIST) -> {
+            val message = failure.message
+            FloatWindow(MaterialTheme.colorScheme.surface, windowMax, modifier) {
+                FailedNote(message, onRetry)
+            }
+        }
+        else -> Unit
+    }
+}
+
+@Composable
+private fun FloatWindow(
+    background: Color,
+    windowMax: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .heightIn(max = windowMax)
+            .clip(WindowShape)
+            .background(background.copy(alpha = OverlayAlpha))
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        content()
     }
 }
 
@@ -316,7 +413,7 @@ private fun BottomBand(
 private fun StructureLegend() {
     val dark = isSystemInDarkTheme()
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         LegendRow(dark, StpvoRole.SUBJECT, StpvoRole.TIME, StpvoRole.PLACE)
@@ -343,117 +440,77 @@ private fun LegendRow(dark: Boolean, vararg roles: StpvoRole) {
 }
 
 @Composable
-private fun AssistNote(assist: AssistState, onRetry: () -> Unit) {
+private fun AssistStatus(assist: AssistState, onRetry: () -> Unit, loading: String) {
     when (assist) {
-        AssistState.Loading -> Text("Разбираю предложения…", modifier = Modifier.padding(vertical = 4.dp))
-        is AssistState.Failed -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(assist.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-            TextButton(onClick = onRetry) { Text("Повторить") }
-        }
+        AssistState.Loading -> Text(loading)
+        is AssistState.Failed -> FailedNote(assist.message, onRetry)
         else -> Unit
     }
 }
 
 @Composable
-private fun GlossaryPane(assist: AssistState, onRetry: () -> Unit, modifier: Modifier) {
-    val dark = isSystemInDarkTheme()
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when (assist) {
-            AssistState.Loading -> Text(
-                "Собираю словарь…",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            is AssistState.Failed -> Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(assist.message, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = onRetry) { Text("Повторить") }
-            }
-            is AssistState.Gloss -> {
-                ExplainedBlock(
-                    title = "Незнакомые слова",
-                    lines = assist.page.words.map { it.word to it.explanation },
-                    empty = "Нет незнакомых слов на этой странице.",
-                    background = dictionaryBackground(dark),
-                )
-                ExplainedBlock(
-                    title = "成语",
-                    lines = assist.page.chengyu.map { it.word to it.explanation },
-                    empty = "На этой странице нет чэнъюев.",
-                    background = chengyuBackground(dark),
-                )
-            }
-            AssistState.Idle -> Text(
-                "Словарь появится после ответа модели.",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            is AssistState.Structure, is AssistState.Reference -> Unit
+private fun FailedNote(message: String, onRetry: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+        IconButton(onClick = onRetry) {
+            Icon(Icons.Filled.Refresh, contentDescription = "Повторить")
         }
     }
 }
 
 @Composable
-private fun ReferencePane(assist: AssistState, onRetry: () -> Unit, modifier: Modifier) {
-    val dark = isSystemInDarkTheme()
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when (assist) {
-            AssistState.Loading -> Text(
-                "Ищу имена, места и термины…",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            is AssistState.Failed -> Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(assist.message, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = onRetry) { Text("Повторить") }
-            }
-            is AssistState.Reference -> {
-                ReferenceKind.entries.forEach { kind ->
-                    val entries = when (kind) {
-                        ReferenceKind.NAME -> assist.page.names
-                        ReferenceKind.PLACE -> assist.page.places
-                        ReferenceKind.TERM -> assist.page.terms
-                    }
-                    ExplainedBlock(
-                        title = kind.ru,
-                        lines = entries.map { it.word to it.explanation },
-                        empty = emptyReference(kind),
-                        background = referenceColor(kind, dark),
-                    )
-                }
-            }
-            else -> Text(
-                "Имена, места и термины появятся после ответа модели.",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
-
-private fun emptyReference(kind: ReferenceKind): String = when (kind) {
-    ReferenceKind.NAME -> "На этой странице нет имён собственных."
-    ReferenceKind.PLACE -> "На этой странице нет названий мест."
-    ReferenceKind.TERM -> "На этой странице нет терминов."
-}
-
-@Composable
-private fun ExplainedBlock(
+private fun DualGlossary(
     title: String,
-    lines: List<Pair<String, String>>,
+    zh: List<GlossEntry>,
+    ru: List<GlossEntry>,
     empty: String,
-    background: Color,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(background)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.labelLarge)
-        if (lines.isEmpty()) {
-            Text(empty)
-        } else {
-            lines.forEach { (word, explanation) ->
-                Text(word, style = MaterialTheme.typography.titleLarge)
-                Text(explanation)
-            }
+    Text(title, style = MaterialTheme.typography.labelLarge)
+    if (zh.isEmpty() && ru.isEmpty()) {
+        Text(empty)
+        return
+    }
+    if (zh.isNotEmpty()) {
+        Text("简单", style = MaterialTheme.typography.labelLarge)
+        zh.forEach { GlossLine(it) }
+    }
+    if (ru.isNotEmpty()) {
+        Text("По-русски", style = MaterialTheme.typography.labelLarge)
+        ru.forEach { GlossLine(it) }
+    }
+}
+
+@Composable
+private fun GlossLine(entry: GlossEntry) {
+    Text(entry.word, style = MaterialTheme.typography.titleLarge)
+    Text(entry.explanation)
+}
+
+@Composable
+private fun ReferenceWindow(notes: AssistState.Notes) {
+    val dark = isSystemInDarkTheme()
+    val groups = ReferenceKind.entries.map { kind ->
+        kind to when (kind) {
+            ReferenceKind.NAME -> notes.reference.names
+            ReferenceKind.PLACE -> notes.reference.places
+            ReferenceKind.TERM -> notes.reference.terms
+        }
+    }
+    Text(AssistCard.REFERENCE.label, style = MaterialTheme.typography.labelLarge)
+    if (groups.all { it.second.isEmpty() }) {
+        Text("На этой странице нет имён, мест и терминов.")
+        return
+    }
+    groups.forEach { (kind, entries) ->
+        if (entries.isEmpty()) return@forEach
+        Text(
+            kind.ru,
+            modifier = Modifier.background(referenceColor(kind, dark)).padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        entries.forEach { entry ->
+            Text(entry.word, style = MaterialTheme.typography.titleLarge)
+            Text(entry.explanation)
         }
     }
 }

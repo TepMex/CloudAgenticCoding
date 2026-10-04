@@ -4,7 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,14 +32,16 @@ fun ShelfScreen(
     ) {
         Text("BYOK-assisted-reader", style = MaterialTheme.typography.titleLarge)
         Text(
-            "Читалка китайского EPUB. Пять слоёв: текст, пиньинь, структура предложения, словарь на простом китайском и по-русски.",
+            "Читалка китайского EPUB. Четыре слоя: текст, пиньинь, структура предложения и справка. Справка открывает незнакомые слова, чэнъюи и имена в прозрачных окнах.",
             style = MaterialTheme.typography.bodyLarge,
         )
         Button(onClick = onOpen) { Text("Открыть EPUB") }
         if (canContinue) {
             TextButton(onClick = onContinue) { Text("Продолжить") }
         }
-        TextButton(onClick = onSettings) { Text("Настройки") }
+        IconButton(onClick = onSettings) {
+            Icon(Icons.Filled.Settings, contentDescription = "Настройки")
+        }
         if (!status.isNullOrBlank()) {
             Text(status, color = MaterialTheme.colorScheme.error)
         }

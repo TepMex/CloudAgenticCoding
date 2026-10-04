@@ -1,12 +1,15 @@
 package com.tepmex.byokassistedreader.domain
 
 import com.tepmex.byokassistedreader.ui.KnownWordsFieldMaxFraction
+import com.tepmex.byokassistedreader.ui.OverlayAlpha
 import com.tepmex.byokassistedreader.ui.chengyuBackground
 import com.tepmex.byokassistedreader.ui.dictionaryBackground
 import com.tepmex.byokassistedreader.ui.pageBackground
 import com.tepmex.byokassistedreader.ui.referenceColor
+import com.tepmex.byokassistedreader.ui.referenceWindowBackground
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -52,11 +55,14 @@ class ReaderLogicTest {
 
     @Test
     fun glossaryBackgroundsAreThreeDistinctShades() {
+        assertEquals(0.86f, OverlayAlpha)
+        assertTrue(OverlayAlpha < 1f)
         for (dark in listOf(false, true)) {
             val colors = listOf(
                 pageBackground(dark),
                 dictionaryBackground(dark),
                 chengyuBackground(dark),
+                referenceWindowBackground(dark),
                 referenceColor(ReferenceKind.NAME, dark),
                 referenceColor(ReferenceKind.PLACE, dark),
                 referenceColor(ReferenceKind.TERM, dark),
@@ -128,19 +134,33 @@ class ReaderLogicTest {
         val comfort = RubyFit.cellPx(sample, sample)
         val minCell = RubyFit.cellPx(120, 120)
         val range = RubyFit.columnRange(content, comfort, minCell)
-        assertEquals(5..8, range)
+        assertEquals(5..12, range)
+        assertEquals(12, RubyFit.DENSE_COLUMNS_MAX)
         assertEquals(5, RubyFit.resolveColumns(0, range))
         assertEquals(5, RubyFit.resolveColumns(1, range))
-        assertEquals(8, RubyFit.resolveColumns(99, range))
+        assertEquals(12, RubyFit.resolveColumns(99, range))
         assertEquals(6, RubyFit.resolveColumns(6, range))
+        assertEquals(9, RubyFit.resolveColumns(9, range))
         for (columns in range) {
             val slot = RubyFit.slotPx(content, columns, comfort, range.first)
             assertTrue("$columns slots of $slot overflow $content", columns * slot <= content)
             val pinyin = RubyFit.pinyinSp(12f, sample.toFloat(), slot.toFloat(), 8f)
-            assertTrue(pinyin in 8f..12f)
+            val proportional = 12f * (slot / sample.toFloat())
+            if (columns <= 8) {
+                assertTrue("pinyin $pinyin left the 8sp floor", pinyin in 8f..12f)
+            } else {
+                assertEquals(proportional.coerceAtMost(12f), pinyin, 0.05f)
+                assertTrue("dense pinyin $pinyin was clamped back to 8sp", pinyin < 8f)
+            }
             val drawn = sample * (pinyin / 12f)
             assertTrue("pinyin $drawn exceeds slot $slot", drawn <= slot + 0.01f)
         }
+    }
+
+    @Test
+    fun wideScreenKeepsCountsBeyondTwelve() {
+        val range = RubyFit.columnRange(contentWidthPx = 2400, comfortCellPx = 100, minCellPx = 50)
+        assertEquals(24..48, range)
     }
 
     @Test
@@ -155,10 +175,9 @@ class ReaderLogicTest {
     }
 
     @Test
-    fun passageKeepsMostOfTheBodyForTheMainText() {
-        assertTrue(RubyFit.PASSAGE_FRACTION > 0.70f)
-        assertTrue(1f - RubyFit.PASSAGE_FRACTION < 0.30f)
-        assertEquals(750, RubyFit.passagePx(1000))
+    fun passageUsesTheFullReaderBody() {
+        assertEquals(1f, RubyFit.PASSAGE_FRACTION)
+        assertEquals(1000, RubyFit.passagePx(1000))
     }
 
     @Test
@@ -295,16 +314,43 @@ class ReaderLogicTest {
     @Test
     fun layerWraps() {
         assertEquals(ReadingLayer.PINYIN, ReadingLayer.TEXT.step(forward = true))
-        assertEquals(ReadingLayer.REFERENCE, ReadingLayer.STRUCTURE.step(forward = true))
-        assertEquals(ReadingLayer.GLOSS_ZH, ReadingLayer.REFERENCE.step(forward = true))
-        assertEquals(ReadingLayer.GLOSS_RU, ReadingLayer.GLOSS_ZH.step(forward = true))
-        assertEquals(ReadingLayer.TEXT, ReadingLayer.GLOSS_RU.step(forward = true))
-        assertEquals(ReadingLayer.GLOSS_RU, ReadingLayer.TEXT.step(forward = false))
-        assertEquals("Имена", ReadingLayer.REFERENCE.label)
+        assertEquals(ReadingLayer.STRUCTURE, ReadingLayer.PINYIN.step(forward = true))
+        assertEquals(ReadingLayer.ASSIST, ReadingLayer.STRUCTURE.step(forward = true))
+        assertEquals(ReadingLayer.TEXT, ReadingLayer.ASSIST.step(forward = true))
+        assertEquals(ReadingLayer.ASSIST, ReadingLayer.TEXT.step(forward = false))
+        assertEquals("Справка", ReadingLayer.ASSIST.label)
+        assertTrue(ReadingLayer.PINYIN.showsPinyin)
+        assertTrue(ReadingLayer.STRUCTURE.showsPinyin)
+        assertTrue(ReadingLayer.ASSIST.showsPinyin)
+        assertFalse(ReadingLayer.TEXT.showsPinyin)
         assertEquals(
             listOf("Имена собственные", "Места", "Термины"),
             ReferenceKind.entries.map { it.ru },
         )
+    }
+
+    @Test
+    fun assistWindowsCycleThroughAnEmptyScreen() {
+        assertEquals(AssistCard.WORDS, AssistCard.NONE.step(forward = true))
+        assertEquals(AssistCard.CHENGYU, AssistCard.WORDS.step(forward = true))
+        assertEquals(AssistCard.REFERENCE, AssistCard.CHENGYU.step(forward = true))
+        assertEquals(AssistCard.NONE, AssistCard.REFERENCE.step(forward = true))
+        assertEquals(AssistCard.REFERENCE, AssistCard.NONE.step(forward = false))
+        assertEquals("Незнакомые слова", AssistCard.WORDS.label)
+        assertEquals("成语", AssistCard.CHENGYU.label)
+        assertEquals("Имена и места", AssistCard.REFERENCE.label)
+        assertEquals("", AssistCard.NONE.label)
+    }
+
+    @Test
+    fun horizontalSwipeChangesWindowsAndNeverTurnsThePage() {
+        assertNull(overlaySwipe(ReadingLayer.TEXT, dragPx = -200f))
+        assertNull(overlaySwipe(ReadingLayer.PINYIN, dragPx = 200f))
+        assertNull(overlaySwipe(ReadingLayer.ASSIST, dragPx = 40f))
+        assertEquals(OverlaySwipe.ToggleLegend, overlaySwipe(ReadingLayer.STRUCTURE, dragPx = -120f))
+        assertEquals(OverlaySwipe.ToggleLegend, overlaySwipe(ReadingLayer.STRUCTURE, dragPx = 120f))
+        assertEquals(OverlaySwipe.StepCard(forward = true), overlaySwipe(ReadingLayer.ASSIST, dragPx = -120f))
+        assertEquals(OverlaySwipe.StepCard(forward = false), overlaySwipe(ReadingLayer.ASSIST, dragPx = 120f))
     }
 
     @Test
