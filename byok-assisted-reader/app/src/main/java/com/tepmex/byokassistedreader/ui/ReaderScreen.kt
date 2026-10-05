@@ -52,8 +52,10 @@ import com.tepmex.byokassistedreader.domain.AssistCard
 import com.tepmex.byokassistedreader.domain.ColoredSpan
 import com.tepmex.byokassistedreader.domain.GlossEntry
 import com.tepmex.byokassistedreader.domain.KnownLexicon
+import com.tepmex.byokassistedreader.domain.PinyinScope
 import com.tepmex.byokassistedreader.domain.PinyinSyllable
 import com.tepmex.byokassistedreader.domain.ReadingLayer
+import com.tepmex.byokassistedreader.domain.layerCaption
 import com.tepmex.byokassistedreader.domain.ReferenceKind
 import com.tepmex.byokassistedreader.domain.ReferenceSpan
 import com.tepmex.byokassistedreader.domain.RubyFit
@@ -75,6 +77,10 @@ fun ReaderScreen(
     layer: ReadingLayer,
     assistCard: AssistCard,
     legendVisible: Boolean,
+    pinyinScope: PinyinScope,
+    literalText: String?,
+    retellingText: String?,
+    readingStatus: ReadingStatus,
     charsPerLine: Int,
     knownWords: String,
     assist: AssistState,
@@ -92,14 +98,20 @@ fun ReaderScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                title,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Text("${layer.ordinal} ${layer.label}")
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    layerCaption(layer, pinyinScope),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
             if (assist is AssistState.Failed) {
                 IconButton(onClick = onRetry) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Повторить")
@@ -140,6 +152,7 @@ fun ReaderScreen(
             GlyphGrid(
                 text = text,
                 knownWords = knownWords,
+                pinyinScope = pinyinScope,
                 layer = layer,
                 assistCard = assistCard,
                 assist = assist,
@@ -152,6 +165,9 @@ fun ReaderScreen(
                 layer = layer,
                 assistCard = assistCard,
                 legendVisible = legendVisible,
+                literalText = literalText,
+                retellingText = retellingText,
+                readingStatus = readingStatus,
                 assist = assist,
                 windowMax = windowMax,
                 onRetry = onRetry,
@@ -241,6 +257,7 @@ private fun gridStyle(size: TextUnit) = TextStyle(
 private fun GlyphGrid(
     text: String,
     knownWords: String,
+    pinyinScope: PinyinScope,
     layer: ReadingLayer,
     assistCard: AssistCard,
     assist: AssistState,
@@ -249,7 +266,7 @@ private fun GlyphGrid(
 ) {
     val familiar = remember(knownWords) { KnownLexicon.familiarHanzi(knownWords) }
     val rows = rubyRows(text, metrics.columns) { glyph ->
-        pinyinToShow(glyph, familiar, PinyinSyllable.of(glyph))
+        pinyinToShow(glyph, familiar, PinyinSyllable.of(glyph), pinyinScope)
     }
     val structureSpans = (assist as? AssistState.Structure)?.spans.orEmpty()
     val referenceSpans = if (layer == ReadingLayer.ASSIST && assistCard == AssistCard.REFERENCE) {
@@ -331,6 +348,9 @@ private fun OverlayWindow(
     layer: ReadingLayer,
     assistCard: AssistCard,
     legendVisible: Boolean,
+    literalText: String?,
+    retellingText: String?,
+    readingStatus: ReadingStatus,
     assist: AssistState,
     windowMax: Dp,
     onRetry: () -> Unit,
@@ -345,14 +365,16 @@ private fun OverlayWindow(
             StructureLegend()
             AssistStatus(assist, onRetry, loading = "Разбираю предложения…")
         }
+        cardOpen && assistCard.needsReading -> FloatWindow(assistBackground(assistCard, dark), windowMax, modifier) {
+            ReadingPane(
+                card = assistCard,
+                body = if (assistCard == AssistCard.LITERAL) literalText else retellingText,
+                status = readingStatus,
+                onRetry = onRetry,
+            )
+        }
         cardOpen -> {
-            val background = when (assistCard) {
-                AssistCard.WORDS -> dictionaryBackground(dark)
-                AssistCard.CHENGYU -> chengyuBackground(dark)
-                AssistCard.REFERENCE -> referenceWindowBackground(dark)
-                AssistCard.NONE -> Color.Transparent
-            }
-            FloatWindow(background, windowMax, modifier) {
+            FloatWindow(assistBackground(assistCard, dark), windowMax, modifier) {
                 when (assist) {
                     AssistState.Loading -> Text("Собираю справку…")
                     is AssistState.Failed -> FailedNote(assist.message, onRetry)
@@ -370,7 +392,7 @@ private fun OverlayWindow(
                             empty = "На этой странице нет чэнъюев.",
                         )
                         AssistCard.REFERENCE -> ReferenceWindow(assist)
-                        AssistCard.NONE -> Unit
+                        AssistCard.LITERAL, AssistCard.RETELLING, AssistCard.NONE -> Unit
                     }
                     else -> Text("Справка появится после ответа модели.")
                 }
@@ -436,6 +458,31 @@ private fun LegendRow(dark: Boolean, vararg roles: StpvoRole) {
                 softWrap = false,
             )
         }
+    }
+}
+
+private fun assistBackground(card: AssistCard, dark: Boolean): Color = when (card) {
+    AssistCard.WORDS -> dictionaryBackground(dark)
+    AssistCard.CHENGYU -> chengyuBackground(dark)
+    AssistCard.REFERENCE -> referenceWindowBackground(dark)
+    AssistCard.LITERAL -> literalBackground(dark)
+    AssistCard.RETELLING -> retellingBackground(dark)
+    AssistCard.NONE -> Color.Transparent
+}
+
+@Composable
+private fun ReadingPane(
+    card: AssistCard,
+    body: String?,
+    status: ReadingStatus,
+    onRetry: () -> Unit,
+) {
+    Text(card.label, style = MaterialTheme.typography.labelLarge)
+    if (card.hint.isNotEmpty()) Text(card.hint)
+    when {
+        !body.isNullOrBlank() -> Text(body)
+        status is ReadingStatus.Failed -> FailedNote(status.message, onRetry)
+        else -> Text(if (card == AssistCard.LITERAL) "Делаю подстрочник…" else "Делаю пересказ…")
     }
 }
 

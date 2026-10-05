@@ -13,6 +13,7 @@ import com.tepmex.byokassistedreader.domain.EpubBook
 import com.tepmex.byokassistedreader.domain.GlossPage
 import com.tepmex.byokassistedreader.domain.KnownLexicon
 import com.tepmex.byokassistedreader.domain.OverlaySwipe
+import com.tepmex.byokassistedreader.domain.PinyinScope
 import com.tepmex.byokassistedreader.domain.Prompts
 import com.tepmex.byokassistedreader.domain.ReadingLayer
 import com.tepmex.byokassistedreader.domain.ReferencePage
@@ -24,6 +25,7 @@ import com.tepmex.byokassistedreader.domain.overlaySwipe
 import com.tepmex.byokassistedreader.domain.packPages
 import com.tepmex.byokassistedreader.domain.parseEpub
 import com.tepmex.byokassistedreader.domain.parseGloss
+import com.tepmex.byokassistedreader.domain.parsePageReading
 import com.tepmex.byokassistedreader.domain.parseReference
 import com.tepmex.byokassistedreader.domain.parseStpvo
 import com.tepmex.byokassistedreader.domain.rubyRows
@@ -32,6 +34,7 @@ import com.tepmex.byokassistedreader.domain.visibleGloss
 import com.tepmex.byokassistedreader.domain.visibleReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -58,6 +61,13 @@ sealed interface AssistState {
     data class Failed(val message: String) : AssistState
 }
 
+/** In-flight state of the Russian window that is open now. */
+sealed interface ReadingStatus {
+    data object Idle : ReadingStatus
+    data object Loading : ReadingStatus
+    data class Failed(val message: String) : ReadingStatus
+}
+
 class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val store = SettingsStore(app)
     private val llm = LlmClient()
@@ -76,10 +86,17 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val layer = MutableStateFlow(ReadingLayer.TEXT)
     val assistCard = MutableStateFlow(AssistCard.NONE)
     val structureLegend = MutableStateFlow(false)
+    val pinyinScope = MutableStateFlow(PinyinScope.UNKNOWN)
+    val literalText = MutableStateFlow<String?>(null)
+    val retellingText = MutableStateFlow<String?>(null)
+    val readingStatus = MutableStateFlow<ReadingStatus>(ReadingStatus.Idle)
     val status = MutableStateFlow<String?>(null)
     val assist = MutableStateFlow<AssistState>(AssistState.Idle)
     private var settingsReturn = Route.SHELF
     private var assistJob: Job? = null
+    private val readingJobs = HashMap<AssistCard, Job>()
+    private val readingText = HashMap<String, String>()
+    private var readingPage = ""
     private var layoutKey = ""
     private var sentences: List<Sentence> = emptyList()
 
@@ -106,6 +123,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             store.saveConnection(baseUrl, token, model, knownWords, volumeKeys, charsPerLine)
             cache.clear()
+            cancelReadings()
+            readingText.clear()
+            readingPage = ""
             closeSettings()
             refreshAssist()
         }
@@ -129,8 +149,15 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 layer.value = ReadingLayer.TEXT
                 assistCard.value = AssistCard.NONE
                 structureLegend.value = false
+                pinyinScope.value = PinyinScope.UNKNOWN
                 layoutKey = ""
                 cache.clear()
+                cancelReadings()
+                readingText.clear()
+                readingPage = ""
+                literalText.value = null
+                retellingText.value = null
+                readingStatus.value = ReadingStatus.Idle
                 assist.value = AssistState.Idle
                 status.value = null
                 route.value = Route.READER
@@ -181,29 +208,55 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         when (val swipe = overlaySwipe(layer.value, dragPx)) {
             null -> Unit
             OverlaySwipe.ToggleLegend -> structureLegend.value = !structureLegend.value
-            is OverlaySwipe.StepCard -> assistCard.value = assistCard.value.step(swipe.forward)
+            OverlaySwipe.TogglePinyin -> pinyinScope.value = pinyinScope.value.toggle()
+            is OverlaySwipe.StepCard -> {
+                assistCard.value = assistCard.value.step(swipe.forward)
+                loadReadingIfNeeded()
+            }
         }
+    }
+
+    /** Retry a failed layer request, or the Russian window when that text is still missing. */
+    fun retryAssist() {
+        val card = assistCard.value
+        val readingMissing = layer.value == ReadingLayer.ASSIST &&
+            card.needsReading &&
+            currentReading(card) == null
+        if (assist.value is AssistState.Failed) {
+            refreshAssist()
+            return
+        }
+        if (readingMissing) loadReadingIfNeeded(force = true)
     }
 
     fun refreshAssist() {
         assistJob?.cancel()
         val currentLayer = layer.value
         val text = pageText
+        if (text != readingPage) {
+            cancelReadings()
+            readingPage = text
+        }
+        syncVisibleReadings(text)
         if (currentLayer == ReadingLayer.TEXT || currentLayer == ReadingLayer.PINYIN || text.isBlank()) {
+            readingStatus.value = ReadingStatus.Idle
             assist.value = AssistState.Idle
             return
         }
         val prefs = settings.value
         if (!prefs.endpointReady) {
             assist.value = AssistState.Failed("Укажите base URL и модель в настройках.")
+            loadReadingIfNeeded()
             return
         }
-        val key = listOf(currentLayer.name, prefs.baseUrl, prefs.model, prefs.knownWords, text).joinToString("|")
+        val key = cacheKey(currentLayer, prefs, text)
         cache[key]?.let {
             assist.value = it
+            loadReadingIfNeeded()
             return
         }
         assist.value = AssistState.Loading
+        loadReadingIfNeeded()
         assistJob = viewModelScope.launch {
             try {
                 val state = when (currentLayer) {
@@ -222,6 +275,93 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    private fun loadReadingIfNeeded(force: Boolean = false) {
+        if (layer.value != ReadingLayer.ASSIST) {
+            readingStatus.value = ReadingStatus.Idle
+            return
+        }
+        val card = assistCard.value
+        if (!card.needsReading) {
+            readingStatus.value = ReadingStatus.Idle
+            return
+        }
+        val text = pageText
+        if (text.isBlank()) return
+        if (!force && currentReading(card) != null) {
+            readingStatus.value = ReadingStatus.Idle
+            return
+        }
+        val existing = readingJobs[card]
+        if (!force && existing?.isActive == true) {
+            readingStatus.value = ReadingStatus.Loading
+            return
+        }
+        existing?.cancel()
+        val prefs = settings.value
+        if (!prefs.endpointReady) {
+            readingStatus.value = ReadingStatus.Failed("Укажите base URL и модель в настройках.")
+            return
+        }
+        readingStatus.value = ReadingStatus.Loading
+        readingJobs[card] = viewModelScope.launch {
+            try {
+                val body = requestReading(prefs, text, card)
+                if (!isActive) return@launch
+                publishReading(text, card, body)
+                if (pageText == text && assistCard.value == card) {
+                    readingStatus.value = ReadingStatus.Idle
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (pageText == text && assistCard.value == card) {
+                    readingStatus.value = ReadingStatus.Failed(e.message ?: "Ошибка запроса")
+                }
+            }
+        }
+    }
+
+    private suspend fun requestReading(prefs: ReaderSettings, text: String, card: AssistCard): String {
+        val system = when (card) {
+            AssistCard.LITERAL -> Prompts.literalSystem
+            AssistCard.RETELLING -> Prompts.retellingSystem
+            else -> error("not a reading")
+        }
+        val raw = llm.complete(prefs.baseUrl, prefs.token, prefs.model, system, Prompts.readingUser(text))
+        return parsePageReading(raw)
+    }
+
+    private fun publishReading(page: String, card: AssistCard, body: String) {
+        readingText[readingKey(page, card)] = body
+        if (pageText != page) return
+        when (card) {
+            AssistCard.LITERAL -> literalText.value = body
+            AssistCard.RETELLING -> retellingText.value = body
+            else -> Unit
+        }
+    }
+
+    private fun syncVisibleReadings(page: String) {
+        literalText.value = readingText[readingKey(page, AssistCard.LITERAL)]
+        retellingText.value = readingText[readingKey(page, AssistCard.RETELLING)]
+    }
+
+    private fun currentReading(card: AssistCard): String? = when (card) {
+        AssistCard.LITERAL -> literalText.value
+        AssistCard.RETELLING -> retellingText.value
+        else -> null
+    }
+
+    private fun readingKey(page: String, card: AssistCard): String = "$page\u0000${card.name}"
+
+    private fun cancelReadings() {
+        readingJobs.values.forEach { it.cancel() }
+        readingJobs.clear()
+    }
+
+    private fun cacheKey(layer: ReadingLayer, prefs: ReaderSettings, text: String): String =
+        listOf(layer.name, prefs.baseUrl, prefs.model, prefs.knownWords, text).joinToString("|")
 
     private suspend fun requestStructure(prefs: ReaderSettings, text: String): AssistState {
         val complete = splitSentences(text).filter { it.complete }

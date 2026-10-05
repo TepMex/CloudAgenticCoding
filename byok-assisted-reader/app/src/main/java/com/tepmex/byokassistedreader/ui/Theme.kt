@@ -33,6 +33,14 @@ fun chengyuBackground(dark: Boolean): Color =
 fun referenceWindowBackground(dark: Boolean): Color =
     if (dark) Color(0xFF3D3358) else Color(0xFFDCCEF0)
 
+/** Russian interlinear. Yellow-green, distinct from the page and the other windows. */
+fun literalBackground(dark: Boolean): Color =
+    if (dark) Color(0xFF2A3320) else Color(0xFFE4EDC4)
+
+/** Russian retelling. Coral, distinct from chengyu, names, and the interlinear. */
+fun retellingBackground(dark: Boolean): Color =
+    if (dark) Color(0xFF4A2E28) else Color(0xFFF3C7B8)
+
 /** Floating windows are only slightly transparent, so the text behind them stays visible. */
 internal const val OverlayAlpha = 0.86f
 

@@ -4,9 +4,11 @@ import com.tepmex.byokassistedreader.ui.KnownWordsFieldMaxFraction
 import com.tepmex.byokassistedreader.ui.OverlayAlpha
 import com.tepmex.byokassistedreader.ui.chengyuBackground
 import com.tepmex.byokassistedreader.ui.dictionaryBackground
+import com.tepmex.byokassistedreader.ui.literalBackground
 import com.tepmex.byokassistedreader.ui.pageBackground
 import com.tepmex.byokassistedreader.ui.referenceColor
 import com.tepmex.byokassistedreader.ui.referenceWindowBackground
+import com.tepmex.byokassistedreader.ui.retellingBackground
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -35,6 +37,13 @@ class ReaderLogicTest {
         assertEquals("kàn", pinyinToShow("看", familiar, "kàn"))
         assertEquals("nǐ", pinyinToShow("你", emptySet(), "nǐ"))
         assertEquals("", pinyinToShow("。", familiar, ""))
+        assertEquals("nǐ", pinyinToShow("你", familiar, "nǐ", PinyinScope.ALL))
+        assertEquals("hǎo", pinyinToShow("好", familiar, "hǎo", PinyinScope.ALL))
+        assertEquals("", pinyinToShow("。", familiar, "", PinyinScope.ALL))
+        assertEquals(PinyinScope.ALL, PinyinScope.UNKNOWN.toggle())
+        assertEquals(PinyinScope.UNKNOWN, PinyinScope.ALL.toggle())
+        assertEquals("только неизвестные", PinyinScope.UNKNOWN.label)
+        assertEquals("все иероглифы", PinyinScope.ALL.label)
         assertEquals(emptySet<String>(), KnownLexicon.familiarHanzi("hello, 123"))
     }
 
@@ -66,6 +75,8 @@ class ReaderLogicTest {
                 referenceColor(ReferenceKind.NAME, dark),
                 referenceColor(ReferenceKind.PLACE, dark),
                 referenceColor(ReferenceKind.TERM, dark),
+                literalBackground(dark),
+                retellingBackground(dark),
             )
             assertEquals(colors.toSet().size, colors.size)
         }
@@ -312,13 +323,41 @@ class ReaderLogicTest {
     }
 
     @Test
+    fun pageReadingJsonAndPrompts() {
+        assertEquals(
+            "Я вчера в школа книга смотреть.",
+            parsePageReading("""{"text":"Я вчера в школа книга смотреть."}"""),
+        )
+        assertEquals("Пересказ страницы.", parsePageReading("""```json
+            {"translation":"Пересказ страницы."}
+            ```"""))
+        assertTrue(Prompts.literalSystem.contains("в ущерб русской структуре"))
+        assertTrue(Prompts.retellingSystem.contains("более художественный"))
+        assertTrue(Prompts.readingUser("昨天我看书。").endsWith("昨天我看书。"))
+        assertEquals("Подстрочный перевод", AssistCard.LITERAL.label)
+        assertEquals("Пересказ", AssistCard.RETELLING.label)
+        assertTrue(AssistCard.LITERAL.hint.contains("важнее русской структуры"))
+        assertTrue(AssistCard.RETELLING.hint.contains("родной русский"))
+    }
+
+    @Test
     fun layerWraps() {
         assertEquals(ReadingLayer.PINYIN, ReadingLayer.TEXT.step(forward = true))
-        assertEquals(ReadingLayer.STRUCTURE, ReadingLayer.PINYIN.step(forward = true))
-        assertEquals(ReadingLayer.ASSIST, ReadingLayer.STRUCTURE.step(forward = true))
-        assertEquals(ReadingLayer.TEXT, ReadingLayer.ASSIST.step(forward = true))
-        assertEquals(ReadingLayer.ASSIST, ReadingLayer.TEXT.step(forward = false))
+        assertEquals(ReadingLayer.ASSIST, ReadingLayer.PINYIN.step(forward = true))
+        assertEquals(ReadingLayer.STRUCTURE, ReadingLayer.ASSIST.step(forward = true))
+        assertEquals(ReadingLayer.TEXT, ReadingLayer.STRUCTURE.step(forward = true))
+        assertEquals(ReadingLayer.STRUCTURE, ReadingLayer.TEXT.step(forward = false))
         assertEquals("Справка", ReadingLayer.ASSIST.label)
+        assertEquals("2 Справка", layerCaption(ReadingLayer.ASSIST, PinyinScope.UNKNOWN))
+        assertEquals("3 Структура", layerCaption(ReadingLayer.STRUCTURE, PinyinScope.ALL))
+        assertEquals(
+            "1 Пиньинь · только неизвестные",
+            layerCaption(ReadingLayer.PINYIN, PinyinScope.UNKNOWN),
+        )
+        assertEquals(
+            "1 Пиньинь · все иероглифы",
+            layerCaption(ReadingLayer.PINYIN, PinyinScope.ALL),
+        )
         assertTrue(ReadingLayer.PINYIN.showsPinyin)
         assertTrue(ReadingLayer.STRUCTURE.showsPinyin)
         assertTrue(ReadingLayer.ASSIST.showsPinyin)
@@ -334,19 +373,25 @@ class ReaderLogicTest {
         assertEquals(AssistCard.WORDS, AssistCard.NONE.step(forward = true))
         assertEquals(AssistCard.CHENGYU, AssistCard.WORDS.step(forward = true))
         assertEquals(AssistCard.REFERENCE, AssistCard.CHENGYU.step(forward = true))
-        assertEquals(AssistCard.NONE, AssistCard.REFERENCE.step(forward = true))
-        assertEquals(AssistCard.REFERENCE, AssistCard.NONE.step(forward = false))
+        assertEquals(AssistCard.LITERAL, AssistCard.REFERENCE.step(forward = true))
+        assertEquals(AssistCard.RETELLING, AssistCard.LITERAL.step(forward = true))
+        assertEquals(AssistCard.NONE, AssistCard.RETELLING.step(forward = true))
+        assertEquals(AssistCard.RETELLING, AssistCard.NONE.step(forward = false))
         assertEquals("Незнакомые слова", AssistCard.WORDS.label)
         assertEquals("成语", AssistCard.CHENGYU.label)
         assertEquals("Имена и места", AssistCard.REFERENCE.label)
         assertEquals("", AssistCard.NONE.label)
+        assertTrue(AssistCard.LITERAL.needsReading)
+        assertTrue(AssistCard.RETELLING.needsReading)
+        assertFalse(AssistCard.WORDS.needsReading)
     }
 
     @Test
     fun horizontalSwipeChangesWindowsAndNeverTurnsThePage() {
         assertNull(overlaySwipe(ReadingLayer.TEXT, dragPx = -200f))
-        assertNull(overlaySwipe(ReadingLayer.PINYIN, dragPx = 200f))
         assertNull(overlaySwipe(ReadingLayer.ASSIST, dragPx = 40f))
+        assertEquals(OverlaySwipe.TogglePinyin, overlaySwipe(ReadingLayer.PINYIN, dragPx = -120f))
+        assertEquals(OverlaySwipe.TogglePinyin, overlaySwipe(ReadingLayer.PINYIN, dragPx = 120f))
         assertEquals(OverlaySwipe.ToggleLegend, overlaySwipe(ReadingLayer.STRUCTURE, dragPx = -120f))
         assertEquals(OverlaySwipe.ToggleLegend, overlaySwipe(ReadingLayer.STRUCTURE, dragPx = 120f))
         assertEquals(OverlaySwipe.StepCard(forward = true), overlaySwipe(ReadingLayer.ASSIST, dragPx = -120f))

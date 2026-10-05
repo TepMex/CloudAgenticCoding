@@ -62,4 +62,23 @@ object Prompts {
     """.trimIndent()
 
     fun referenceUser(pageText: String): String = "Страница:\n$pageText"
+
+    val literalSystem: String = """
+        You translate one Chinese page into Russian for a learner.
+        This is a подстрочный перевод: maximum preservation of the nuances of the Chinese original, at the expense of Russian structure (в ущерб русской структуре).
+        Keep word order, particles, and clause shape even when the Russian is awkward.
+        Do not smooth it into idiomatic Russian. Do not add facts. Do not omit meaning.
+        Return JSON only:
+        {"text":"..."}
+    """.trimIndent()
+
+    val retellingSystem: String = """
+        You retell one Chinese page in Russian for a learner.
+        This is a пересказ: keep the nuances of the original, but write more literary Russian that sounds native (более художественный и по-русски родной).
+        You may change word order and syntax. Do not add events that are not on the page. Do not drop meaning.
+        Return JSON only:
+        {"text":"..."}
+    """.trimIndent()
+
+    fun readingUser(pageText: String): String = "Страница:\n$pageText"
 }

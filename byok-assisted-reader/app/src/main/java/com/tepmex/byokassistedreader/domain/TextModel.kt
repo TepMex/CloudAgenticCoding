@@ -86,11 +86,35 @@ fun packPages(
 data class RubyCell(val glyph: String, val pinyin: String, val index: Int)
 
 /**
- * Pinyin drawn above one glyph.
- * A hanzi that already occurs in a known word keeps an empty ruby slot.
+ * Which hanzi get a reading in the ruby band.
+ * [UNKNOWN] is the default: a hanzi that already occurs in a known word keeps an empty slot.
+ * [ALL] fills every hanzi.
  */
-fun pinyinToShow(glyph: String, familiarHanzi: Set<String>, reading: String): String =
-    if (glyph in familiarHanzi) "" else reading
+enum class PinyinScope {
+    UNKNOWN,
+    ALL,
+    ;
+
+    fun toggle(): PinyinScope = if (this == UNKNOWN) ALL else UNKNOWN
+
+    /** Short name shown beside «Пиньинь». */
+    val label: String
+        get() = when (this) {
+            UNKNOWN -> "только неизвестные"
+            ALL -> "все иероглифы"
+        }
+}
+
+/**
+ * Pinyin drawn above one glyph.
+ * In [PinyinScope.UNKNOWN], a hanzi that already occurs in a known word keeps an empty ruby slot.
+ */
+fun pinyinToShow(
+    glyph: String,
+    familiarHanzi: Set<String>,
+    reading: String,
+    scope: PinyinScope = PinyinScope.UNKNOWN,
+): String = if (scope == PinyinScope.UNKNOWN && glyph in familiarHanzi) "" else reading
 
 fun rubyRows(
     text: String,
@@ -128,8 +152,8 @@ fun rubyRows(
 enum class ReadingLayer {
     TEXT,
     PINYIN,
-    STRUCTURE,
     ASSIST,
+    STRUCTURE,
     ;
 
     fun step(forward: Boolean): ReadingLayer {
@@ -157,6 +181,8 @@ enum class AssistCard {
     WORDS,
     CHENGYU,
     REFERENCE,
+    LITERAL,
+    RETELLING,
     ;
 
     fun step(forward: Boolean): AssistCard {
@@ -165,22 +191,38 @@ enum class AssistCard {
         return entries[(ordinal + delta).mod(n)]
     }
 
+    /** Whole-page Russian rendering, requested when this window is opened. */
+    val needsReading: Boolean
+        get() = this == LITERAL || this == RETELLING
+
     val label: String
         get() = when (this) {
             NONE -> ""
             WORDS -> "Незнакомые слова"
             CHENGYU -> "成语"
             REFERENCE -> "Имена и места"
+            LITERAL -> "Подстрочный перевод"
+            RETELLING -> "Пересказ"
+        }
+
+    /** One line under the title, so the two Russian windows stay distinct. */
+    val hint: String
+        get() = when (this) {
+            LITERAL -> "Нюансы китайского оригинала важнее русской структуры."
+            RETELLING -> "Те же нюансы, более художественный и родной русский."
+            else -> ""
         }
 }
 
 sealed interface OverlaySwipe {
+    data object TogglePinyin : OverlaySwipe
     data object ToggleLegend : OverlaySwipe
     data class StepCard(val forward: Boolean) : OverlaySwipe
 }
 
 /**
  * Horizontal swipe never turns a page.
+ * On [ReadingLayer.PINYIN] either direction toggles unknown-only and all-hanzi pinyin.
  * On [ReadingLayer.STRUCTURE] either direction toggles the legend.
  * On [ReadingLayer.ASSIST] left steps the window forward and right steps back.
  */
@@ -188,9 +230,21 @@ fun overlaySwipe(layer: ReadingLayer, dragPx: Float, slopPx: Float = 80f): Overl
     if (dragPx.isNaN() || kotlin.math.abs(dragPx) < slopPx) return null
     val forward = dragPx < 0f
     return when (layer) {
+        ReadingLayer.PINYIN -> OverlaySwipe.TogglePinyin
         ReadingLayer.STRUCTURE -> OverlaySwipe.ToggleLegend
         ReadingLayer.ASSIST -> OverlaySwipe.StepCard(forward)
         else -> null
+    }
+}
+
+/** Top-bar title: layer index and name, plus the pinyin scope on Пиньинь. */
+fun layerCaption(layer: ReadingLayer, scope: PinyinScope): String = buildString {
+    append(layer.ordinal)
+    append(' ')
+    append(layer.label)
+    if (layer == ReadingLayer.PINYIN) {
+        append(" · ")
+        append(scope.label)
     }
 }
 
