@@ -49,6 +49,8 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
+Релизный APK подписывается общим sideload-ключом репозитория (`sideload.keystore` в корне модуля) и публикуется на [страницу приложения](https://tepmex.github.io/CloudAgenticCoding/corne-game/).
+
 Для аппаратной клавиатуры раскладка ОС должна совпадать с EN или RU на экране. Тапы по нарисованным клавишам от раскладки ОС не зависят.
 
 ## Чек-лист ручной проверки
