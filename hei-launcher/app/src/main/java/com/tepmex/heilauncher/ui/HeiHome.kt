@@ -1,13 +1,19 @@
 package com.tepmex.heilauncher.ui
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -52,8 +59,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -70,9 +82,17 @@ import com.tepmex.heilauncher.domain.formatWeather
 import com.tepmex.heilauncher.domain.jumpIndex
 import com.tepmex.heilauncher.domain.railIndexAt
 import com.tepmex.heilauncher.domain.railLetters
+import androidx.core.view.WindowCompat
 import com.tepmex.heilauncher.domain.DayYearProgress
+import com.tepmex.heilauncher.timing.ui.IdealTimingAppShell
+import com.tepmex.heilauncher.timing.ui.IdealTimingViewModelFactory
+import com.tepmex.heilauncher.timing.ui.theme.IdealTimingTheme
 import java.util.Locale
 import kotlinx.coroutines.launch
+
+private const val PAGE_TIMING = 0
+private const val PAGE_FAVOURITES = 1
+private const val PAGE_APPS = 2
 
 private val Ink = Color.White
 private val Muted = Color(0xFF8A8A8A)
@@ -81,28 +101,38 @@ private val Dim = Color(0xFF4A4A4A)
 @Composable
 fun HeiHome(
     viewModel: HomeViewModel,
+    timingFactory: IdealTimingViewModelFactory,
     onOpenSystemSettings: () -> Unit,
     onOpenLauncherSettings: () -> Unit,
     onLaunch: (LaunchableApp) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = PAGE_FAVOURITES, pageCount = { 3 })
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
+    val timingPage = pagerState.currentPage == PAGE_TIMING
+
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = timingPage
+        controller.isAppearanceLightNavigationBars = timingPage
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.homeEvents.collect {
-            pagerState.scrollToPage(0)
+            pagerState.scrollToPage(PAGE_FAVOURITES)
             focusManager.clearFocus()
             keyboard?.hide()
         }
     }
 
-    BackHandler(enabled = pagerState.currentPage > 0) {
+    BackHandler(enabled = pagerState.currentPage != PAGE_FAVOURITES) {
         scope.launch {
-            pagerState.scrollToPage(0)
+            pagerState.scrollToPage(PAGE_FAVOURITES)
             focusManager.clearFocus()
             keyboard?.hide()
         }
@@ -113,25 +143,85 @@ fun HeiHome(
         modifier = modifier.fillMaxSize().background(Color.Black),
         beyondViewportPageCount = 1,
     ) { page ->
-        if (page == 0) {
-            FavouritesPage(
+        when (page) {
+            PAGE_TIMING -> TimingPage(
+                factory = timingFactory,
+                active = pagerState.currentPage == PAGE_TIMING,
+            )
+            PAGE_FAVOURITES -> FavouritesPage(
                 state = state,
                 onLaunch = onLaunch,
                 onUnpin = viewModel::removeFavourite,
                 onOpenSystemSettings = onOpenSystemSettings,
                 onOpenLauncherSettings = onOpenLauncherSettings,
             )
-        } else {
-            AllAppsPage(
+            PAGE_APPS -> AllAppsPage(
                 state = state,
                 onQuery = viewModel::setQuery,
                 onLaunch = onLaunch,
                 onToggleFavourite = { app ->
-                    val pinned = viewModel.toggleFavourite(app.component)
-                    pinned
+                    viewModel.toggleFavourite(app.component)
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun TimingPage(
+    factory: IdealTimingViewModelFactory,
+    active: Boolean,
+) {
+    val context = LocalContext.current
+    val locationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        requestLocationIfNeeded(context, locationPermission::launch)
+    }
+    LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        val activity = context as? Activity ?: return@LaunchedEffect
+        val notificationsGranted = ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!notificationsGranted) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            requestLocationIfNeeded(activity, locationPermission::launch)
+        }
+    }
+    IdealTimingTheme {
+        IdealTimingAppShell(
+            factory = factory,
+            nfcEnabled = active,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+private fun requestLocationIfNeeded(
+    context: Context,
+    launch: (Array<String>) -> Unit,
+) {
+    val fine = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    if (!fine && !coarse) {
+        launch(
+            arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ),
+        )
     }
 }
 
@@ -150,13 +240,13 @@ private fun FavouritesPage(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.systemBars),
     ) {
-        Column(Modifier.padding(horizontal = 24.dp).padding(top = 12.dp)) {
+        Column(Modifier.padding(horizontal = 24.dp).padding(top = 8.dp)) {
             Text(
                 text = formatClock(state.now.toLocalTime(), state.prefs.clockFormat, state.systemIs24Hour, locale),
                 color = Ink,
                 fontSize = 48.sp,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = formatHomeDate(state.now.toLocalDate(), locale),
                 color = Ink,
@@ -164,30 +254,26 @@ private fun FavouritesPage(
             )
             if (state.prefs.showYearProgress) {
                 val year = DayYearProgress.year(state.now.toLocalDate())
-                Spacer(Modifier.height(22.dp))
-                Text(
-                    text = stringResource(R.string.year_in_progress, year.percent),
-                    color = Ink,
-                    fontSize = 18.sp,
+                Spacer(Modifier.height(10.dp))
+                ProgressRow(
+                    percent = year.percent,
+                    fraction = year.fraction,
+                    description = stringResource(R.string.year_in_progress, year.percent),
                 )
-                Spacer(Modifier.height(8.dp))
-                DitherBar(year.fraction)
             }
             if (state.prefs.showDayProgress) {
                 val day = DayYearProgress.day(state.now.toLocalTime())
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.day_in_progress, day.percent),
-                    color = Ink,
-                    fontSize = 18.sp,
+                Spacer(Modifier.height(4.dp))
+                ProgressRow(
+                    percent = day.percent,
+                    fraction = day.fraction,
+                    description = stringResource(R.string.day_in_progress, day.percent),
                 )
-                Spacer(Modifier.height(8.dp))
-                DitherBar(day.fraction)
             }
             val battery = state.battery?.let { formatBattery(it) }
             val weather = state.weather?.let { formatWeather(it, locale) }
             if (battery != null || weather != null) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (battery != null) {
                         Text(battery, color = Ink, fontSize = 16.sp, maxLines = 1)
@@ -208,7 +294,7 @@ private fun FavouritesPage(
                 }
             }
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(12.dp))
         if (state.appsReady && state.favourites.isEmpty()) {
             Text(
                 text = stringResource(R.string.empty_favourites),
@@ -406,7 +492,7 @@ private fun AlphabetRail(
 ) {
     Box(
         modifier = Modifier
-            .width(28.dp)
+            .width(44.dp)
             .fillMaxHeight()
             .pointerInput(letters) {
                 awaitEachGesture {
@@ -433,25 +519,55 @@ private fun AlphabetRail(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxHeight().padding(vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             letters.forEach { letter ->
-                Text(
-                    text = letter.key,
-                    color = if (letter.enabled) Ink else Dim,
-                    fontSize = 10.sp,
-                )
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = letter.key,
+                        color = if (letter.enabled) Ink else Dim,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = TextStyle(
+                            fontSize = if (letter.key.length > 1) 9.sp else 10.sp,
+                            lineHeight = 10.sp,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        ),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
+private fun ProgressRow(percent: Int, fraction: Double, description: String) {
+    Row(
+        modifier = Modifier.semantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DitherBar(fraction, Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "$percent%",
+            color = Ink,
+            fontSize = 12.sp,
+            lineHeight = 12.sp,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.width(40.dp),
+        )
+    }
+}
+
+@Composable
 private fun DitherBar(fraction: Double, modifier: Modifier = Modifier) {
     val progress = fraction.toFloat().coerceIn(0f, 1f)
-    Canvas(modifier.fillMaxWidth().height(16.dp)) {
+    Canvas(modifier.fillMaxWidth().height(10.dp)) {
         val step = 3.dp.toPx()
         val cols = (size.width / step).toInt().coerceAtLeast(1)
         val rows = (size.height / step).toInt().coerceAtLeast(1)

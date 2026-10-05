@@ -14,6 +14,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.tepmex.heilauncher.domain.LaunchableApp
+import com.tepmex.heilauncher.timing.ui.IdealTimingViewModelFactory
 import com.tepmex.heilauncher.ui.GraphViewModelFactory
 import com.tepmex.heilauncher.ui.HeiHome
 import com.tepmex.heilauncher.ui.HeiTheme
@@ -30,10 +31,18 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        val graph = (application as HeiLauncherApp).graph
+        val timingFactory = IdealTimingViewModelFactory(
+            repository = graph.timingRepository,
+            sectionNotifications = graph.sectionNotifications,
+            locationSource = graph.locationSource,
+            nfcCheckInStore = graph.nfcCheckInStore,
+        )
         setContent {
             HeiTheme {
                 HeiHome(
                     viewModel = viewModel,
+                    timingFactory = timingFactory,
                     onOpenSystemSettings = ::openSystemSettings,
                     onOpenLauncherSettings = ::openLauncherSettings,
                     onLaunch = ::launch,

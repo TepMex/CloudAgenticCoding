@@ -85,22 +85,42 @@ class DomainLogicTest {
             app("z", "智谱清言"),
         )
         assertEquals("A", sectionKey("AnkiDroid"))
-        assertEquals("В", sectionKey("Вызовы"))
-        assertEquals("Ё", sectionKey("ёлка"))
-        assertEquals("•", sectionKey("智谱清言"))
+        assertEquals("АБВ", sectionKey("Вызовы"))
+        assertEquals("АБВ", sectionKey("ёлка"))
+        assertEquals("中文", sectionKey("智谱清言"))
         assertEquals("#", sectionKey("123 Go"))
+        assertEquals("•", sectionKey("Αθήνα"))
         assertEquals(0, jumpIndex(apps, "A"))
         assertEquals(1, jumpIndex(apps, "B"))
         val head = listOf(app("a", "AnkiDroid"), app("c", "Chrome"))
         assertEquals(1, jumpIndex(head, "Z"))
-        assertEquals(2, jumpIndex(apps, "В"))
+        assertEquals(2, jumpIndex(apps, "АБВ"))
+        assertEquals(3, jumpIndex(apps, "中文"))
         val rail = railLetters(apps)
         assertEquals("#", rail.first().key)
+        assertEquals("Z", rail[26].key)
+        assertEquals("АБВ", rail[27].key)
+        assertEquals("中文", rail[28].key)
+        assertEquals(29, rail.size)
         assertEquals(false, rail.first { it.key == "B" }.enabled)
-        assertEquals(true, rail.first { it.key == "В" }.enabled)
-        assertEquals(true, rail.any { it.key == "•" && it.enabled })
+        assertEquals(true, rail.first { it.key == "АБВ" }.enabled)
+        assertEquals(true, rail.first { it.key == "中文" }.enabled)
         assertEquals(0, railIndexAt(0f, 100f, rail.size))
         assertEquals(rail.lastIndex, railIndexAt(100f, 100f, rail.size))
+    }
+
+    @Test
+    fun unfilteredListGroupsDigitsLatinCyrillicThenCjk() {
+        val sorted = sortApps(
+            listOf(
+                app("zh", "微信"),
+                app("ru", "Яндекс"),
+                app("en", "Chrome"),
+                app("num", "123 Go"),
+                app("a", "AnkiDroid"),
+            ),
+        )
+        assertEquals(listOf("123 Go", "AnkiDroid", "Chrome", "Яндекс", "微信"), sorted.map { it.label })
     }
 
     @Test

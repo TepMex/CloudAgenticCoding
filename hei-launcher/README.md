@@ -1,6 +1,6 @@
 # hei-launcher
 
-Minimal Android launcher: text only, no icons. Favourites on the first screen, every app one swipe left, substring search, gear for device settings, ellipsis for launcher settings.
+Minimal Android launcher: text only, no icons. Favourites in the middle, every app one swipe left, a 16-hour Mi Fitness day clock (same behaviour as ideal-timing) one swipe right, substring search, gear for device settings, ellipsis for launcher settings.
 
 See [SPEC.md](./SPEC.md).
 
