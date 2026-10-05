@@ -102,3 +102,8 @@ same-element-android/local.properties
 same-element-android/app/src/main/assets/www/**
 !same-element-android/app/src/main/assets/www/.gitkeep
 !same-element-android/app/src/main/assets/www/.gitignore
+
+# Android (tingli-stories)
+tingli-stories/.gradle/
+tingli-stories/**/build/
+tingli-stories/local.properties
