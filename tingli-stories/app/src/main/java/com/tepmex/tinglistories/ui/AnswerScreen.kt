@@ -152,7 +152,11 @@ private fun QuestionBlock(
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = if (prompt.isNullOrBlank()) number.toString() else "$number. $prompt",
-            style = MaterialTheme.typography.titleMedium,
+            style = if (prompt.isNullOrBlank()) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
         )
         OutlinedTextField(
             value = answer,
