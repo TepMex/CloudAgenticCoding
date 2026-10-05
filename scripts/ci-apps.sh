@@ -41,6 +41,7 @@ ANDROID_APPS=(
   byok-assisted-reader
   tingli-stories
   hei-launcher
+  corne-game
 )
 
 # Repo-root files copied onto the site on every publish.
