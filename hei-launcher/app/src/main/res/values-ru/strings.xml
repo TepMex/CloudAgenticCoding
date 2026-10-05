@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_hint">Поиск приложений</string>
+    <string name="year_in_progress">Год пройден на %1$d%%</string>
+    <string name="day_in_progress">День пройден на %1$d%%</string>
+    <string name="empty_favourites">Свайпните влево и удерживайте приложение, чтобы закрепить его здесь.</string>
+    <string name="no_matches">Ничего не найдено</string>
+    <string name="device_settings">Настройки устройства</string>
+    <string name="launcher_settings">Настройки лаунчера</string>
+    <string name="settings_title">Настройки</string>
+    <string name="clock">Часы</string>
+    <string name="clock_system">Как в системе</string>
+    <string name="clock_12">12 часов</string>
+    <string name="clock_24">24 часа</string>
+    <string name="show_year">Прогресс года</string>
+    <string name="show_day">Прогресс дня</string>
+    <string name="show_battery">Батарея</string>
+    <string name="show_weather">Погода</string>
+    <string name="show_last_opened">Время с открытия</string>
+    <string name="name_size">Размер имён</string>
+    <string name="favourites">Избранное</string>
+    <string name="favourites_hint">Удерживайте приложение в полном списке, чтобы закрепить или убрать. Удерживайте избранное, чтобы убрать. Порядок меняется здесь.</string>
+    <string name="favourites_empty">Пока ничего не закреплено.</string>
+    <string name="move_up">Выше</string>
+    <string name="move_down">Ниже</string>
+    <string name="remove">Убрать</string>
+    <string name="usage_access">Доступ к использованию</string>
+    <string name="usage_on">Разрешён — время с открытия видно</string>
+    <string name="usage_off">Выключен — время с открытия скрыто</string>
+    <string name="location_access">Геолокация для погоды</string>
+    <string name="location_on">Разрешена</string>
+    <string name="location_off">Выключена — погода скрыта</string>
+    <string name="set_default">Сделать лаунчером по умолчанию</string>
+    <string name="default_on">Уже стоит по умолчанию</string>
+    <string name="pinned">Закреплено</string>
+    <string name="unpinned">Убрано из избранного</string>
+    <string name="cant_open">Не удалось открыть</string>
+    <string name="back">Назад</string>
+    <string name="version">Версия %1$s</string>
+</resources>

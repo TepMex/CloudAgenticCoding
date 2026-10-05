@@ -107,3 +107,8 @@ same-element-android/app/src/main/assets/www/**
 tingli-stories/.gradle/
 tingli-stories/**/build/
 tingli-stories/local.properties
+
+# Android (hei-launcher)
+hei-launcher/.gradle/
+hei-launcher/**/build/
+hei-launcher/local.properties
