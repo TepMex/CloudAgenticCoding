@@ -34,6 +34,22 @@ fun filterApps(apps: List<LaunchableApp>, query: String): List<LaunchableApp> {
         .map { it.second }
 }
 
+/**
+ * Pause before opening the only search hit, so a prefix the user is still
+ * typing does not launch. Further input cancels the pending open.
+ */
+const val SOLE_MATCH_OPEN_DELAY_MS = 350L
+
+/**
+ * The single app to open for a non-blank query.
+ * [matches] must already be the filtered list. A blank query never opens,
+ * even when the device has only one app.
+ */
+fun soleSearchMatch(query: String, matches: List<LaunchableApp>): LaunchableApp? {
+    if (query.isBlank()) return null
+    return matches.singleOrNull()
+}
+
 private fun words(label: String): List<String> {
     return label.split(' ', '\u00A0', '-', '_', '.').filter { it.isNotEmpty() }
 }

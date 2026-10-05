@@ -36,18 +36,20 @@ A gear at the bottom of favourites opens the device Settings app. An ellipsis be
 7. The alphabet rail is a fixed strip that always fits on screen: `#`, `A`–`Z`, `АБВ`, `中文`. `#` jumps to the first name that does not start with a letter. Each Latin letter jumps to the first name starting with that letter. `АБВ` jumps to the first Cyrillic name. `中文` jumps to the first CJK name. Keys with no apps are dim and jump to the next present section. The rail is hidden while the query is non-empty.
 8. The day-clock page implements [ideal-timing](../ideal-timing/SPEC.md): browser or WebView Xiaomi sign-in, persisted wake time, 16-hour dial that freezes at 16h, sector labels, offline sunrise/sunset, meal and 19:00 dog-walk markers, same-day exact-alarm cues, and foreground NFC check-in. NFC reader mode is on only while that page is the current page and the activity is resumed. Notification and location prompts are requested when the user opens the page, not on every visit to favourites. Pref files are `hei_timing_auth`, `hei_timing_wake`, `hei_timing_geo`, `hei_timing_nfc_checkin`, and `hei_timing_section_alarms`.
 9. Tap an app to launch its launcher activity. Long-press a favourite to unpin it. Long-press a row in the full list to pin or unpin. New pins go to the end.
-10. Gear opens `Settings.ACTION_SETTINGS`. Ellipsis opens the launcher settings screen.
-11. Launcher settings (v1):
+10. Tap the favourites clock to open the default clock. Tap the favourites date to open the default calendar. Clock resolution order: `MAIN` + `android.intent.category.APP_CLOCK`, then the launcher activity of the app that handles `SHOW_ALARMS` (the alarms intent itself if that app has no launcher activity, or a chooser when several clocks are installed and none is the default). Calendar resolution order: `MAIN` + `CATEGORY_APP_CALENDAR`, then `VIEW` of `content://com.android.calendar/time/{now}`. If nothing resolves, show the existing “Can’t open” toast.
+11. Gear opens `Settings.ACTION_SETTINGS`. Ellipsis opens the launcher settings screen.
+12. Launcher settings (v1):
     - Clock: system / 12-hour / 24-hour.
     - Show or hide year progress, day progress, battery, weather, time since open.
     - Name size S / M / L (default L).
     - Reorder and remove favourites.
     - Shortcuts: usage access, coarse location, request the Home role.
-12. Persist preferences and favourite order in `SharedPreferences` so the first frame does not wait on DataStore.
-13. Cache resolved labels in memory. Invalidate on package added / removed / changed. Do not reload labels on every resume.
-14. Poll clock, battery, and usage only while the home activity is started. Weather network at most every 30 minutes when a cached reading exists, and at most one failed attempt every 10 minutes.
-15. Favourites and the app list use a solid black window. No wallpaper, badges, folders, widgets, or icon packs. The day-clock page uses the ideal-timing parchment dial.
-16. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/hei-launcher/` with `hei-launcher.apk`.
+13. Persist preferences and favourite order in `SharedPreferences` so the first frame does not wait on DataStore.
+14. Cache resolved labels in memory. Invalidate on package added / removed / changed. Do not reload labels on every resume.
+15. Poll clock, battery, and usage only while the home activity is started. Weather network at most every 30 minutes when a cached reading exists, and at most one failed attempt every 10 minutes.
+16. Favourites and the app list use a solid black window. No wallpaper, badges, folders, widgets, or icon packs. The day-clock page uses the ideal-timing parchment dial.
+17. On the all-apps page, a non-empty query that matches exactly one app opens that app after a 350 ms pause. More typing before the pause cancels the open. The keyboard Done action opens that single app immediately. The query is cleared after a successful open, so leaving the page and coming back does not open it again. A blank query never auto-opens, including when only one app is installed. The open runs only while the all-apps page is settled and the activity is still resumed.
+18. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/hei-launcher/` with `hei-launcher.apk`.
 
 ## Interfaces
 
@@ -61,6 +63,8 @@ A gear at the bottom of favourites opens the device Settings app. An ellipsis be
 | `Settings.ACTION_USAGE_ACCESS_SETTINGS` | Usage-access row |
 | `RoleManager.ROLE_HOME` | Default-launcher row |
 | `MAIN` + `LAUNCHER` component | Open a pinned or listed app |
+| `MAIN` + `android.intent.category.APP_CLOCK`, then `SHOW_ALARMS` | Favourites clock tap. `SHOW_ALARMS` opens that app’s launcher activity |
+| `MAIN` + `CATEGORY_APP_CALENDAR`, then `VIEW content://com.android.calendar/time/{now}` | Favourites date tap |
 
 Permissions: `QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS` (special, granted in system settings), `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `INTERNET`, `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `VIBRATE`, `NFC` (hardware optional).
 
@@ -89,8 +93,8 @@ Uninstalled components are dropped from the favourite list the next time the pac
 ## UI / UX
 
 - Black background, white text, no app icons.
-- Favourites: compact header (clock, date, progress bars with a small percent on the right, battery, weather), scrolling names, gear and `...` pinned to the bottom above the navigation bar.
-- All apps: underlined search field (placeholder **Search apps** / **Поиск приложений**), scrolling names, a rail of `#` `A`–`Z` `АБВ` `中文` that fits the viewport only while the query is empty.
+- Favourites: compact header (clock, date, progress bars with a small percent on the right, battery, weather), scrolling names, gear and `...` pinned to the bottom above the navigation bar. The clock and the date are buttons: clock opens the default clock app, date opens the default calendar app.
+- All apps: underlined search field (placeholder **Search apps** / **Поиск приложений**), scrolling names, a rail of `#` `A`–`Z` `АБВ` `中文` that fits the viewport only while the query is empty. A query that leaves exactly one app opens it on its own.
 - Day clock: ideal-timing login, then the parchment 16-hour dial. Status-bar icons switch to dark on that page and back to light on the black pages.
 - Settings uses the same black text UI. System back closes it.
 - Empty favourites: one line telling the user to swipe left and hold an app.
@@ -107,6 +111,6 @@ Uninstalled components are dropped from the favourite list the next time the pac
 ## Acceptance criteria
 
 1. `./gradlew test assembleRelease` succeeds. Release APK is signed with the shared sideload certificate (`android/verify-apk-sideload-cert.sh`).
-2. Unit tests cover year 75% and day 54% at 2026-10-05 13:02, English ordinal date, relative time, search rank, alphabet jump (`#`, Latin, `АБВ`, `中文`) and script grouping, battery text, Open-Meteo parsing (`weather_code` 2 → переменная облачность), and the ideal-timing clock, sleep, sun, cue, and NFC cases.
-3. Favourites opens in the middle. Swipe left into the full list; swipe right into the day clock; Back from either side returns to favourites. Search keeps only substring matches; gear opens device settings; ellipsis opens launcher settings.
+2. Unit tests cover year 75% and day 54% at 2026-10-05 13:02, English ordinal date, relative time, search rank, a unique search hit versus a blank query, the default clock and calendar intent order, alphabet jump (`#`, Latin, `АБВ`, `中文`) and script grouping, battery text, Open-Meteo parsing (`weather_code` 2 → переменная облачность), and the ideal-timing clock, sleep, sun, cue, and NFC cases.
+3. Favourites opens in the middle. Swipe left into the full list; swipe right into the day clock; Back from either side returns to favourites. Search keeps only substring matches; a single match opens that app; gear opens device settings; ellipsis opens launcher settings. The favourites clock opens the clock app and the date opens the calendar app.
 4. The app list path does not load icons.

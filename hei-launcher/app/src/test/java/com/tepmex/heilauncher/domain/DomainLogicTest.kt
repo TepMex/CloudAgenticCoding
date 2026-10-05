@@ -77,6 +77,45 @@ class DomainLogicTest {
     }
 
     @Test
+    fun soleSearchMatchRequiresExactlyOneHit() {
+        val apps = listOf(
+            app("com.android.chrome", "Chrome"),
+            app("com.google.android.calendar", "Calendar"),
+            app("com.android.deskclock", "Clock"),
+        )
+        assertNull(soleSearchMatch("", filterApps(apps, "")))
+        assertNull(soleSearchMatch("   ", filterApps(apps, "   ")))
+        assertNull(soleSearchMatch("c", filterApps(apps, "c")))
+        assertEquals("Calendar", soleSearchMatch("cal", filterApps(apps, "cal"))?.label)
+        assertNull(soleSearchMatch("missing", filterApps(apps, "missing")))
+        val only = listOf(app("only", "Only"))
+        assertEquals(listOf("Only"), filterApps(only, "").map { it.label })
+        assertNull(soleSearchMatch("", filterApps(only, "")))
+        assertEquals("Only", soleSearchMatch("on", filterApps(only, "on"))?.label)
+    }
+
+    @Test
+    fun defaultClockAndCalendarIntents() {
+        val calendar = DefaultApps.calendar(1_700_000_000_000L)
+        assertEquals(DefaultApps.ACTION_MAIN, calendar[0].action)
+        assertEquals(listOf(DefaultApps.CATEGORY_APP_CALENDAR), calendar[0].categories)
+        assertEquals(false, calendar[0].openLauncher)
+        assertEquals(DefaultApps.ACTION_VIEW, calendar[1].action)
+        assertEquals("content://com.android.calendar/time/1700000000000", calendar[1].data)
+        val clock = DefaultApps.clock()
+        assertEquals(DefaultApps.ACTION_MAIN, clock[0].action)
+        assertEquals(listOf(DefaultApps.CATEGORY_APP_CLOCK), clock[0].categories)
+        assertEquals(false, clock[0].openLauncher)
+        assertEquals(DefaultApps.ACTION_SHOW_ALARMS, clock[1].action)
+        assertEquals(true, clock[1].openLauncher)
+        assertEquals(350L, SOLE_MATCH_OPEN_DELAY_MS)
+        assertEquals(true, isSystemChooser(null, null))
+        assertEquals(true, isSystemChooser("android", "com.android.internal.app.ResolverActivity"))
+        assertEquals(true, isSystemChooser("com.android.intentresolver", "com.android.intentresolver.ChooserActivity"))
+        assertEquals(false, isSystemChooser("com.android.deskclock", "com.android.deskclock.DeskClock"))
+    }
+
+    @Test
     fun alphabetJumpsToTheNextPresentLetter() {
         val apps = listOf(
             app("a", "AnkiDroid"),

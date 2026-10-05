@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
                     timingFactory = timingFactory,
                     onOpenSystemSettings = ::openSystemSettings,
                     onOpenLauncherSettings = ::openLauncherSettings,
+                    onOpenClock = ::openClock,
+                    onOpenCalendar = ::openCalendar,
                     onLaunch = ::launch,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -74,21 +76,35 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(Settings.ACTION_SETTINGS))
     }
 
+    private fun openClock() {
+        if (!DefaultAppLauncher(this).openClock()) {
+            Toast.makeText(this, R.string.cant_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openCalendar() {
+        if (!DefaultAppLauncher(this).openCalendar()) {
+            Toast.makeText(this, R.string.cant_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun openLauncherSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    private fun launch(app: LaunchableApp) {
-        val component = ComponentName.unflattenFromString(app.component) ?: return
+    private fun launch(app: LaunchableApp): Boolean {
+        val component = ComponentName.unflattenFromString(app.component) ?: return false
         val launch = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
             this.component = component
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         }
-        try {
+        return try {
             startActivity(launch)
+            true
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, R.string.cant_open, Toast.LENGTH_SHORT).show()
+            false
         }
     }
 }

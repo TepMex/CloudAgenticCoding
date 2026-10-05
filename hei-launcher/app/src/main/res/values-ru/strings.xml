@@ -35,6 +35,8 @@
     <string name="pinned">Закреплено</string>
     <string name="unpinned">Убрано из избранного</string>
     <string name="cant_open">Не удалось открыть</string>
+    <string name="open_clock">Открыть часы</string>
+    <string name="open_calendar">Открыть календарь</string>
     <string name="back">Назад</string>
     <string name="version">Версия %1$s</string>
 </resources>

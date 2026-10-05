@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -45,7 +46,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -61,6 +65,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
@@ -79,15 +84,20 @@ import com.tepmex.heilauncher.domain.formatClock
 import com.tepmex.heilauncher.domain.formatHomeDate
 import com.tepmex.heilauncher.domain.formatSince
 import com.tepmex.heilauncher.domain.formatWeather
+import com.tepmex.heilauncher.domain.SOLE_MATCH_OPEN_DELAY_MS
 import com.tepmex.heilauncher.domain.jumpIndex
 import com.tepmex.heilauncher.domain.railIndexAt
 import com.tepmex.heilauncher.domain.railLetters
+import com.tepmex.heilauncher.domain.soleSearchMatch
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.tepmex.heilauncher.domain.DayYearProgress
 import com.tepmex.heilauncher.timing.ui.IdealTimingAppShell
 import com.tepmex.heilauncher.timing.ui.IdealTimingViewModelFactory
 import com.tepmex.heilauncher.timing.ui.theme.IdealTimingTheme
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val PAGE_TIMING = 0
@@ -104,7 +114,9 @@ fun HeiHome(
     timingFactory: IdealTimingViewModelFactory,
     onOpenSystemSettings: () -> Unit,
     onOpenLauncherSettings: () -> Unit,
-    onLaunch: (LaunchableApp) -> Unit,
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onLaunch: (LaunchableApp) -> Boolean,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
@@ -152,11 +164,14 @@ fun HeiHome(
                 state = state,
                 onLaunch = onLaunch,
                 onUnpin = viewModel::removeFavourite,
+                onOpenClock = onOpenClock,
+                onOpenCalendar = onOpenCalendar,
                 onOpenSystemSettings = onOpenSystemSettings,
                 onOpenLauncherSettings = onOpenLauncherSettings,
             )
             PAGE_APPS -> AllAppsPage(
                 state = state,
+                active = pagerState.settledPage == PAGE_APPS,
                 onQuery = viewModel::setQuery,
                 onLaunch = onLaunch,
                 onToggleFavourite = { app ->
@@ -228,13 +243,17 @@ private fun requestLocationIfNeeded(
 @Composable
 private fun FavouritesPage(
     state: HomeUiState,
-    onLaunch: (LaunchableApp) -> Unit,
+    onLaunch: (LaunchableApp) -> Boolean,
     onUnpin: (String) -> Unit,
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
     onOpenSystemSettings: () -> Unit,
     onOpenLauncherSettings: () -> Unit,
 ) {
     val locale = locale()
     val nowMillis = System.currentTimeMillis()
+    val openClock = stringResource(R.string.open_clock)
+    val openCalendar = stringResource(R.string.open_calendar)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -245,12 +264,18 @@ private fun FavouritesPage(
                 text = formatClock(state.now.toLocalTime(), state.prefs.clockFormat, state.systemIs24Hour, locale),
                 color = Ink,
                 fontSize = 48.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = openClock, role = Role.Button, onClick = onOpenClock),
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 text = formatHomeDate(state.now.toLocalDate(), locale),
                 color = Ink,
                 fontSize = 20.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = openCalendar, role = Role.Button, onClick = onOpenCalendar),
             )
             if (state.prefs.showYearProgress) {
                 val year = DayYearProgress.year(state.now.toLocalDate())
@@ -347,20 +372,39 @@ private fun FavouritesPage(
 @Composable
 private fun AllAppsPage(
     state: HomeUiState,
+    active: Boolean,
     onQuery: (String) -> Unit,
-    onLaunch: (LaunchableApp) -> Unit,
+    onLaunch: (LaunchableApp) -> Boolean,
     onToggleFavourite: (LaunchableApp) -> Boolean,
 ) {
     val listState = rememberLazyListState()
     val haptic = LocalHapticFeedback.current
     val keyboard = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val nowMillis = System.currentTimeMillis()
     val letters = railLetters(if (state.query.isBlank()) state.listedApps else emptyList())
     val scope = rememberCoroutineScope()
+    val sole = soleSearchMatch(state.query, state.listedApps)
+    var openedQuery by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(state.query) {
         listState.scrollToItem(0)
+    }
+
+    LaunchedEffect(active, state.query, sole?.component) {
+        val key = state.query.trim()
+        val match = if (active) sole else null
+        if (match == null) {
+            if (key.isEmpty()) openedQuery = null
+            return@LaunchedEffect
+        }
+        delay(SOLE_MATCH_OPEN_DELAY_MS)
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        if (openedQuery == key) return@LaunchedEffect
+        openedQuery = key
+        keyboard?.hide()
+        if (onLaunch(match)) onQuery("")
     }
 
     Column(
@@ -372,7 +416,14 @@ private fun AllAppsPage(
         SearchField(
             query = state.query,
             onQuery = onQuery,
-            onDone = { keyboard?.hide() },
+            onDone = {
+                keyboard?.hide()
+                val match = soleSearchMatch(state.query, state.listedApps) ?: return@SearchField
+                val key = state.query.trim()
+                if (openedQuery == key) return@SearchField
+                openedQuery = key
+                if (onLaunch(match)) onQuery("")
+            },
             modifier = Modifier.padding(horizontal = 24.dp).padding(top = 8.dp),
         )
         Spacer(Modifier.height(12.dp))
