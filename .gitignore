@@ -112,3 +112,8 @@ tingli-stories/local.properties
 hei-launcher/.gradle/
 hei-launcher/**/build/
 hei-launcher/local.properties
+
+# Android (corne-game)
+corne-game/.gradle/
+corne-game/**/build/
+corne-game/local.properties
