@@ -68,6 +68,10 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -85,6 +89,8 @@ kotlin {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.05.01")
     implementation(composeBom)
+    debugImplementation(composeBom)
+    testImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity-compose:1.10.1")
@@ -101,6 +107,10 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 }
