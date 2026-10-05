@@ -45,6 +45,10 @@ class MainActivity : ComponentActivity() {
             val layer by model.layer.collectAsState()
             val assistCard by model.assistCard.collectAsState()
             val legendVisible by model.structureLegend.collectAsState()
+            val pinyinScope by model.pinyinScope.collectAsState()
+            val literalText by model.literalText.collectAsState()
+            val retellingText by model.retellingText.collectAsState()
+            val readingStatus by model.readingStatus.collectAsState()
             val assist by model.assist.collectAsState()
             val status by model.status.collectAsState()
             volumeKeysEnabled = settings.volumeKeys
@@ -84,6 +88,10 @@ class MainActivity : ComponentActivity() {
                                 layer = layer,
                                 assistCard = assistCard,
                                 legendVisible = legendVisible,
+                                pinyinScope = pinyinScope,
+                                literalText = literalText,
+                                retellingText = retellingText,
+                                readingStatus = readingStatus,
                                 charsPerLine = settings.charsPerLine,
                                 knownWords = settings.knownWords,
                                 assist = assist,
@@ -92,7 +100,7 @@ class MainActivity : ComponentActivity() {
                                 onOverlaySwipe = model::applyOverlaySwipe,
                                 onSettings = model::openSettings,
                                 onOpen = { openEpub.launch(arrayOf("application/epub+zip", "application/octet-stream")) },
-                                onRetry = model::refreshAssist,
+                                onRetry = model::retryAssist,
                             )
                             Route.SETTINGS -> SettingsScreen(
                                 initial = settings,

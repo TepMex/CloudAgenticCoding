@@ -104,6 +104,13 @@ private fun readEntries(root: JSONObject, key: String): List<GlossEntry> {
     return out
 }
 
+fun parsePageReading(raw: String): String {
+    val root = JSONObject(extractJsonObject(raw))
+    val text = root.optString("text").ifEmpty { root.optString("translation") }.trim()
+    if (text.isEmpty()) throw IllegalArgumentException("В ответе нет перевода")
+    return text
+}
+
 fun chatCompletionsUrl(baseUrl: String): String {
     val root = baseUrl.trim().trimEnd('/')
     return when {
