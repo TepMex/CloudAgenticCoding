@@ -2,6 +2,7 @@ package com.tepmex.tinglistories.ui
 
 import android.app.Application
 import android.net.Uri
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tepmex.tinglistories.data.LibraryStore
@@ -12,6 +13,7 @@ import com.tepmex.tinglistories.data.StoryPlayer
 import com.tepmex.tinglistories.domain.AudioKind
 import com.tepmex.tinglistories.domain.Library
 import com.tepmex.tinglistories.domain.alignedAnswers
+import com.tepmex.tinglistories.domain.clampSeek
 import com.tepmex.tinglistories.domain.evaluationSystemPrompt
 import com.tepmex.tinglistories.domain.evaluationUserPrompt
 import com.tepmex.tinglistories.domain.importMessage
@@ -20,10 +22,13 @@ import com.tepmex.tinglistories.domain.parseEvaluation
 import com.tepmex.tinglistories.domain.shouldCountPlay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -48,6 +53,8 @@ data class TingliUiState(
     val draftStoryId: Int? = null,
     val draftAnswers: List<String> = emptyList(),
     val playing: Playing? = null,
+    val playbackPositionMs: Int = 0,
+    val playbackDurationMs: Int = 0,
     val busy: Boolean = false,
     val message: String? = null,
     val confirmReplace: Boolean = false,
@@ -60,10 +67,13 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val llm = LlmClient()
     private val player = StoryPlayer()
+    private var positionJob: Job? = null
     private val stack = ArrayDeque<Screen>()
     private val disk = Mutex()
     private var pendingImport: (() -> Unit)? = null
     private var playToken = 0
+    private var seekHoldUntilMs = 0L
+    private var seekTargetMs = 0
     private var libraryReady = false
     private var settingsReady = false
 
@@ -163,6 +173,8 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
         val story = _state.value.library.story(storyId) ?: return
         if (!shouldCountPlay(story, kind)) return
         val token = ++playToken
+        seekHoldUntilMs = 0
+        cancelPositionUpdates()
         viewModelScope.launch {
             val audio = disk.withLock {
                 val file = withContext(Dispatchers.IO) { store.audioFile(story, kind) }
@@ -177,6 +189,8 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
                         snapshot.copy(
                             library = library,
                             playing = if (token == playToken) Playing(storyId, kind) else snapshot.playing,
+                            playbackPositionMs = if (token == playToken) 0 else snapshot.playbackPositionMs,
+                            playbackDurationMs = if (token == playToken) 0 else snapshot.playbackDurationMs,
                         )
                     }
                     file
@@ -185,21 +199,68 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
             if (audio == null || token != playToken) return@launch
             try {
                 player.play(audio) {
-                    if (token == playToken) {
-                        _state.update { snapshot ->
-                            if (snapshot.playing == Playing(storyId, kind)) {
-                                snapshot.copy(playing = null)
-                            } else {
-                                snapshot
-                            }
+                    if (token != playToken) return@play
+                    cancelPositionUpdates()
+                    _state.update { snapshot ->
+                        if (snapshot.playing == Playing(storyId, kind)) {
+                            snapshot.withoutPlayback()
+                        } else {
+                            snapshot
                         }
                     }
                 }
+                if (token != playToken || _state.value.playing != Playing(storyId, kind)) return@launch
+                val duration = player.durationMs()
+                _state.update { snapshot ->
+                    if (snapshot.playing != Playing(storyId, kind)) snapshot
+                    else snapshot.copy(playbackPositionMs = 0, playbackDurationMs = duration)
+                }
+                cancelPositionUpdates()
+                positionJob = viewModelScope.launch {
+                    while (isActive && token == playToken) {
+                        val reported = player.positionMs()
+                        val position = if (
+                            SystemClock.uptimeMillis() < seekHoldUntilMs &&
+                            kotlin.math.abs(reported - seekTargetMs) > 800
+                        ) {
+                            seekTargetMs
+                        } else {
+                            reported
+                        }
+                        val liveDuration = player.durationMs()
+                        if (token != playToken || _state.value.playing != Playing(storyId, kind)) break
+                        _state.update { snapshot ->
+                            if (token != playToken || snapshot.playing != Playing(storyId, kind)) snapshot
+                            else snapshot.copy(
+                                playbackPositionMs = position,
+                                playbackDurationMs = liveDuration.coerceAtLeast(snapshot.playbackDurationMs),
+                            )
+                        }
+                        delay(200)
+                    }
+                }
             } catch (_: Exception) {
+                cancelPositionUpdates()
                 if (token == playToken) {
-                    _state.update { it.copy(playing = null, message = "Не удалось воспроизвести аудио") }
+                    _state.update {
+                        it.withoutPlayback().copy(message = "Не удалось воспроизвести аудио")
+                    }
                 }
             }
+        }
+    }
+
+    fun seekPlayback(positionMs: Int) {
+        if (_state.value.playing == null) return
+        val duration = player.durationMs().let { live ->
+            if (live > 0) live else _state.value.playbackDurationMs
+        }
+        val target = clampSeek(positionMs, duration)
+        seekTargetMs = target
+        seekHoldUntilMs = SystemClock.uptimeMillis() + 400
+        player.seekTo(target)
+        _state.update { current ->
+            if (current.playing == null) current else current.copy(playbackPositionMs = target)
         }
     }
 
@@ -270,18 +331,16 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun goNext(storyId: Int) {
-        player.stop()
-        playToken++
+        haltAudio()
         val next = nextStoryId(_state.value.library.stories, storyId)
         stack.clear()
         if (next == null) {
-            _state.update { it.copy(screen = Screen.Library, playing = null) }
+            _state.update { it.withoutPlayback().copy(screen = Screen.Library) }
         } else {
             stack.addLast(Screen.Library)
             _state.update {
-                it.copy(
+                it.withoutPlayback().copy(
                     screen = Screen.Listen(next),
-                    playing = null,
                     draftAnswers = emptyList(),
                     draftStoryId = null,
                 )
@@ -301,8 +360,7 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun back() {
-        player.stop()
-        playToken++
+        haltAudio()
         if (_state.value.confirmReplace) {
             cancelReplace()
             return
@@ -312,7 +370,7 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val previous = if (stack.isEmpty()) Screen.Library else stack.removeLast()
-        _state.update { it.copy(screen = previous, playing = null) }
+        _state.update { it.withoutPlayback().copy(screen = previous) }
     }
 
     fun dismissMessage() {
@@ -320,6 +378,7 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        cancelPositionUpdates()
         player.stop()
     }
 
@@ -330,11 +389,10 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun navigate(screen: Screen) {
-        player.stop()
-        playToken++
+        haltAudio()
         val current = _state.value.screen
         if (current != screen) stack.addLast(current)
-        _state.update { it.copy(screen = screen, playing = null) }
+        _state.update { it.withoutPlayback().copy(screen = screen) }
     }
 
     private fun requestImport(block: () -> Unit) {
@@ -351,9 +409,8 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun importFile(file: File) {
-        player.stop()
-        playToken++
-        _state.update { it.copy(busy = true, message = null, playing = null) }
+        haltAudio()
+        _state.update { it.withoutPlayback().copy(busy = true, message = null) }
         try {
             disk.withLock {
                 val outcome = withContext(Dispatchers.IO) { store.importZip(file) }
@@ -378,6 +435,20 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(busy = false, message = e.message ?: "Не удалось импортировать архив") }
         }
     }
+
+    private fun haltAudio() {
+        playToken++
+        cancelPositionUpdates()
+        player.stop()
+    }
+
+    private fun cancelPositionUpdates() {
+        positionJob?.cancel()
+        positionJob = null
+    }
+
+    private fun TingliUiState.withoutPlayback(): TingliUiState =
+        copy(playing = null, playbackPositionMs = 0, playbackDurationMs = 0)
 
     private fun copyToCache(uri: Uri): File {
         val dest = File(getApplication<Application>().cacheDir, "import-${System.currentTimeMillis()}.zip")

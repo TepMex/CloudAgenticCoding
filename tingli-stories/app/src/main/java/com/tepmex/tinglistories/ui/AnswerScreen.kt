@@ -32,6 +32,8 @@ import com.tepmex.tinglistories.domain.Evaluation
 import com.tepmex.tinglistories.domain.Story
 import com.tepmex.tinglistories.domain.alignedAnswers
 import com.tepmex.tinglistories.domain.nextStoryId
+import com.tepmex.tinglistories.domain.showQuestionWording
+import com.tepmex.tinglistories.domain.showStoryTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,18 +73,26 @@ fun AnswerScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(story.title, style = MaterialTheme.typography.titleLarge)
+            if (showStoryTitle(progress)) {
+                Text(story.title, style = MaterialTheme.typography.titleLarge)
+            }
             if (!completed) {
+                val hint = if (showQuestionWording(story, progress)) {
+                    "Можно отвечать по-русски или по-китайски. Эталон откроется после проверки."
+                } else {
+                    "Можно отвечать по-русски или по-китайски. Формулировки и эталон откроются после проверки."
+                }
                 Text(
-                    "Можно отвечать по-русски или по-китайски. Эталон откроется после проверки.",
+                    hint,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            val showPrompt = showQuestionWording(story, progress)
             story.questions.forEachIndexed { index, question ->
                 QuestionBlock(
                     number = index + 1,
-                    prompt = question.prompt,
+                    prompt = if (showPrompt) question.prompt else null,
                     answer = answers.getOrElse(index) { "" },
                     reference = if (completed) question.reference else null,
                     comment = progress.evaluation?.items?.find { it.index == index + 1 },
@@ -132,7 +142,7 @@ fun AnswerScreen(
 @Composable
 private fun QuestionBlock(
     number: Int,
-    prompt: String,
+    prompt: String?,
     answer: String,
     reference: String?,
     comment: com.tepmex.tinglistories.domain.EvaluationItem?,
@@ -140,7 +150,14 @@ private fun QuestionBlock(
     onValue: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$number. $prompt", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = if (prompt.isNullOrBlank()) number.toString() else "$number. $prompt",
+            style = if (prompt.isNullOrBlank()) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
+        )
         OutlinedTextField(
             value = answer,
             onValueChange = onValue,

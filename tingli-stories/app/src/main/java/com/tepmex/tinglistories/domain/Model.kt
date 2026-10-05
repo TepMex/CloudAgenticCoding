@@ -105,6 +105,31 @@ fun alignedAnswers(questionCount: Int, answers: List<String>): List<String> =
 /** Text stays hidden until the grade when the story itself has audio. */
 fun showTextBeforeAnswer(story: Story): Boolean = !story.hasStoryAudio
 
+/** The title gives away the topic, so it stays hidden until the grade. */
+fun showStoryTitle(progress: StoryProgress): Boolean = progress.completed
+
+/**
+ * Written prompts stay hidden until the grade when the questions have audio.
+ * Without that audio the wording is the only way to know the question.
+ */
+fun showQuestionWording(story: Story, progress: StoryProgress): Boolean =
+    progress.completed || !story.hasQuestionsAudio
+
+/** Elapsed time as `m:ss`. Hours stay in the minute field. */
+fun formatPlayback(positionMs: Int): String {
+    val totalSeconds = positionMs.coerceAtLeast(0) / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
+}
+
+/** Keeps a seek inside the clip. An unknown duration only rejects a negative position. */
+fun clampSeek(positionMs: Int, durationMs: Int): Int {
+    val safe = positionMs.coerceAtLeast(0)
+    if (durationMs <= 0) return safe
+    return safe.coerceAtMost(durationMs)
+}
+
 fun audioCoverageNote(library: Library): String? {
     if (library.stories.isEmpty()) return null
     val withAudio = library.stories.count { it.hasStoryAudio || it.hasQuestionsAudio }

@@ -2,6 +2,7 @@ package com.tepmex.tinglistories.data
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import com.tepmex.tinglistories.domain.clampSeek
 import java.io.File
 
 class StoryPlayer {
@@ -43,6 +44,16 @@ class StoryPlayer {
             if (player === mp) player = null
             throw e
         }
+    }
+
+    fun positionMs(): Int = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+
+    fun durationMs(): Int = runCatching { player?.duration ?: 0 }.getOrDefault(0).coerceAtLeast(0)
+
+    fun seekTo(positionMs: Int) {
+        val mp = player ?: return
+        val target = clampSeek(positionMs, durationMs())
+        runCatching { mp.seekTo(target.toLong(), MediaPlayer.SEEK_CLOSEST_SYNC) }
     }
 
     fun stop() {

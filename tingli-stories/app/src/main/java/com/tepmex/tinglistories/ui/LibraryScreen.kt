@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.tinglistories.domain.audioCoverageNote
 import com.tepmex.tinglistories.domain.listensLabel
+import com.tepmex.tinglistories.domain.showStoryTitle
 import com.tepmex.tinglistories.domain.storiesLabel
 import com.tepmex.tinglistories.domain.storySubtitle
 
@@ -123,7 +124,9 @@ fun LibraryScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                Text(story.title, style = MaterialTheme.typography.titleLarge)
+                                if (showStoryTitle(progress)) {
+                                    Text(story.title, style = MaterialTheme.typography.titleLarge)
+                                }
                                 Text(
                                     storySubtitle(story, progress),
                                     style = MaterialTheme.typography.bodyMedium,
