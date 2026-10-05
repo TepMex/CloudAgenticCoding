@@ -162,17 +162,40 @@ fun storiesLabel(count: Int): String {
 fun importMessage(storyCount: Int, storyAudio: Int, questionAudio: Int): String =
     "Импортировано ${storiesLabel(storyCount)}. Аудио историй: $storyAudio, аудио вопросов: $questionAudio."
 
-fun storySubtitle(story: Story, progress: StoryProgress): String {
-    val status = if (progress.completed) {
-        val grade = progress.evaluation
-        "Пройдена · ${grade?.score ?: 0} из ${grade?.max ?: story.questions.size}"
+/**
+ * Library badge. Before a grade the circle is empty and [count] is absent,
+ * so a zero listen total is never shown. After a grade [count] is the listen
+ * total when it is positive, and [correctFraction] is score / max.
+ */
+data class ListenMark(
+    val count: Int?,
+    val correctFraction: Float,
+)
+
+fun listenMark(progress: StoryProgress): ListenMark {
+    val grade = progress.evaluation ?: return ListenMark(count = null, correctFraction = 0f)
+    val fraction = if (grade.max <= 0) {
+        0f
     } else {
-        "Не пройдена"
+        grade.score.coerceIn(0, grade.max).toFloat() / grade.max.toFloat()
     }
-    val audio = when {
-        story.hasStoryAudio && story.hasQuestionsAudio -> status
-        story.hasStoryAudio || story.hasQuestionsAudio -> "$status · аудио неполное"
-        else -> "$status · без аудио"
+    return ListenMark(
+        count = progress.listenCount.takeIf { it > 0 },
+        correctFraction = fraction,
+    )
+}
+
+/** Spoken label for the library circle. A blank circle says there is no attempt yet. */
+fun listenMarkDescription(progress: StoryProgress): String {
+    val mark = listenMark(progress)
+    val grade = progress.evaluation
+    if (mark.count == null && grade == null) return "Нет ответов"
+    val parts = mutableListOf<String>()
+    mark.count?.let { parts += listensLabel(it) }
+    if (grade != null) {
+        val max = grade.max.coerceAtLeast(0)
+        val score = grade.score.coerceIn(0, max)
+        parts += "верных $score из $max"
     }
-    return audio
+    return parts.joinToString(", ")
 }

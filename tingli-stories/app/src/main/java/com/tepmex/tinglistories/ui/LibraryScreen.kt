@@ -1,6 +1,8 @@
 package com.tepmex.tinglistories.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -30,15 +33,23 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tepmex.tinglistories.domain.StoryProgress
 import com.tepmex.tinglistories.domain.audioCoverageNote
-import com.tepmex.tinglistories.domain.listensLabel
+import com.tepmex.tinglistories.domain.listenMark
+import com.tepmex.tinglistories.domain.listenMarkDescription
 import com.tepmex.tinglistories.domain.showStoryTitle
 import com.tepmex.tinglistories.domain.storiesLabel
-import com.tepmex.tinglistories.domain.storySubtitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +122,7 @@ fun LibraryScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -123,25 +134,91 @@ fun LibraryScreen(
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                if (showStoryTitle(progress)) {
-                                    Text(story.title, style = MaterialTheme.typography.titleLarge)
-                                }
+                            if (showStoryTitle(progress)) {
                                 Text(
-                                    storySubtitle(story, progress),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    story.title,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                                    style = MaterialTheme.typography.titleLarge,
                                 )
+                            } else {
+                                Spacer(Modifier.weight(1f))
                             }
-                            Text(
-                                listensLabel(progress.listenCount),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ListenMarkBadge(
+                                progress,
+                                Modifier.testTag("listen-mark-${story.id}"),
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ListenMarkBadge(progress: StoryProgress, modifier: Modifier = Modifier) {
+    val mark = listenMark(progress)
+    val fillColor = MaterialTheme.colorScheme.secondaryContainer
+    val rimColor = MaterialTheme.colorScheme.secondary
+    val trackColor = MaterialTheme.colorScheme.outline
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .semantics {
+                contentDescription = listenMarkDescription(progress)
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val fraction = mark.correctFraction.coerceIn(0f, 1f)
+            val strokePx = 2.5.dp.toPx()
+            val inset = strokePx / 2f
+            val arcSize = Size(size.width - strokePx, size.height - strokePx)
+            val arcTopLeft = Offset(inset, inset)
+            if (fraction > 0f) {
+                drawArc(
+                    color = fillColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * fraction,
+                    useCenter = true,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                )
+            }
+            drawArc(
+                color = trackColor,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = strokePx),
+            )
+            if (fraction > 0f) {
+                drawArc(
+                    color = rimColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * fraction,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokePx),
+                )
+            }
+        }
+        val count = mark.count
+        if (count != null) {
+            val digits = count.toString()
+            Text(
+                text = digits,
+                modifier = Modifier.clearAndSetSemantics {},
+                color = MaterialTheme.colorScheme.onSurface,
+                style = if (digits.length >= 3) {
+                    MaterialTheme.typography.labelLarge
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
+            )
         }
     }
 }

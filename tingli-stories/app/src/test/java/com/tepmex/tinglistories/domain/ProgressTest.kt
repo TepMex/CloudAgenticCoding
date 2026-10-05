@@ -100,6 +100,61 @@ class ProgressTest {
     }
 
     @Test
+    fun listenMarkFillsFromTheGradeAndHidesZero() {
+        assertEquals(ListenMark(null, 0f), listenMark(StoryProgress(listenCount = 0)))
+        assertEquals(ListenMark(null, 0f), listenMark(StoryProgress(listenCount = 7)))
+        assertEquals(
+            ListenMark(31, 0.5f),
+            listenMark(
+                StoryProgress(
+                    listenCount = 31,
+                    evaluation = Evaluation(2, 4, "ok", emptyList()),
+                ),
+            ),
+        )
+        assertEquals(
+            ListenMark(null, 1f),
+            listenMark(
+                StoryProgress(
+                    listenCount = 0,
+                    evaluation = Evaluation(4, 4, "ok", emptyList()),
+                ),
+            ),
+        )
+        assertEquals(
+            ListenMark(3, 0f),
+            listenMark(
+                StoryProgress(
+                    listenCount = 3,
+                    evaluation = Evaluation(0, 4, "ok", emptyList()),
+                ),
+            ),
+        )
+        assertEquals(
+            ListenMark(2, 1f),
+            listenMark(
+                StoryProgress(
+                    listenCount = 2,
+                    evaluation = Evaluation(9, 4, "ok", emptyList()),
+                ),
+            ),
+        )
+        assertEquals("Нет ответов", listenMarkDescription(StoryProgress(listenCount = 7)))
+        assertEquals(
+            "31 прослушивание, верных 2 из 4",
+            listenMarkDescription(
+                StoryProgress(listenCount = 31, evaluation = Evaluation(2, 4, "ok", emptyList())),
+            ),
+        )
+        assertEquals(
+            "верных 4 из 4",
+            listenMarkDescription(
+                StoryProgress(listenCount = 0, evaluation = Evaluation(4, 4, "ok", emptyList())),
+            ),
+        )
+    }
+
+    @Test
     fun partialAudioNoteCountsStoriesThatHaveEitherFile() {
         val silent = story.copy(id = 2, hasStoryAudio = false, hasQuestionsAudio = false)
         val library = Library(stories = listOf(story, silent))
