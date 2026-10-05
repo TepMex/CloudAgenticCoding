@@ -1,0 +1,49 @@
+package com.tepmex.heilauncher.domain
+
+import java.text.Collator
+
+data class LaunchableApp(
+    val component: String,
+    val packageName: String,
+    val label: String,
+    val lastUsedAt: Long? = null,
+)
+
+fun sortApps(
+    apps: List<LaunchableApp>,
+    collator: Collator = Collator.getInstance(),
+): List<LaunchableApp> {
+    return apps.sortedWith { a, b ->
+        val byLabel = collator.compare(a.label, b.label)
+        if (byLabel != 0) byLabel else a.component.compareTo(b.component)
+    }
+}
+
+fun withUsage(apps: List<LaunchableApp>, usage: Map<String, Long>): List<LaunchableApp> {
+    if (usage.isEmpty()) return apps
+    return apps.map { app ->
+        val at = usage[app.packageName]
+        if (at == null || at <= 0L) app else app.copy(lastUsedAt = at)
+    }
+}
+
+fun resolveFavourites(order: List<String>, apps: List<LaunchableApp>): List<LaunchableApp> {
+    if (order.isEmpty() || apps.isEmpty()) return emptyList()
+    val byId = apps.associateBy { it.component }
+    return order.mapNotNull { byId[it] }
+}
+
+fun toggleFavourite(ids: List<String>, component: String): List<String> {
+    return if (component in ids) ids.filterNot { it == component } else ids + component
+}
+
+fun moveFavourite(ids: List<String>, component: String, delta: Int): List<String> {
+    val index = ids.indexOf(component)
+    if (index < 0 || delta == 0) return ids
+    val target = (index + delta).coerceIn(0, ids.lastIndex)
+    if (target == index) return ids
+    val mutable = ids.toMutableList()
+    val item = mutable.removeAt(index)
+    mutable.add(target, item)
+    return mutable
+}

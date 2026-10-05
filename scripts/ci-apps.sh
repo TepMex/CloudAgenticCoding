@@ -40,6 +40,7 @@ ANDROID_APPS=(
   hanzi-info-gf14
   byok-assisted-reader
   tingli-stories
+  hei-launcher
 )
 
 # Repo-root files copied onto the site on every publish.

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">hei-launcher</string>
+    <string name="search_hint">Search apps</string>
+    <string name="year_in_progress">Year in progress %1$d%%</string>
+    <string name="day_in_progress">Day in progress %1$d%%</string>
+    <string name="empty_favourites">Swipe left and hold an app to pin it here.</string>
+    <string name="no_matches">No matches</string>
+    <string name="device_settings">Device settings</string>
+    <string name="launcher_settings">Launcher settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="clock">Clock</string>
+    <string name="clock_system">System</string>
+    <string name="clock_12">12-hour</string>
+    <string name="clock_24">24-hour</string>
+    <string name="show_year">Year progress</string>
+    <string name="show_day">Day progress</string>
+    <string name="show_battery">Battery</string>
+    <string name="show_weather">Weather</string>
+    <string name="show_last_opened">Time since opened</string>
+    <string name="name_size">Name size</string>
+    <string name="size_s">S</string>
+    <string name="size_m">M</string>
+    <string name="size_l">L</string>
+    <string name="favourites">Favourites</string>
+    <string name="favourites_hint">Hold an app in the full list to pin or unpin it. Hold a favourite to unpin it. Order is changed here.</string>
+    <string name="favourites_empty">Nothing pinned yet.</string>
+    <string name="move_up">Up</string>
+    <string name="move_down">Down</string>
+    <string name="remove">Remove</string>
+    <string name="usage_access">Usage access</string>
+    <string name="usage_on">Allowed — time since open is shown</string>
+    <string name="usage_off">Off — time since open is hidden</string>
+    <string name="location_access">Location for weather</string>
+    <string name="location_on">Allowed</string>
+    <string name="location_off">Off — weather stays hidden</string>
+    <string name="set_default">Set as default launcher</string>
+    <string name="default_on">Already the default</string>
+    <string name="pinned">Pinned</string>
+    <string name="unpinned">Removed from favourites</string>
+    <string name="cant_open">Can\'t open</string>
+    <string name="back">Back</string>
+    <string name="version">Version %1$s</string>
+</resources>
