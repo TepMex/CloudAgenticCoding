@@ -1,9 +1,7 @@
 package com.tepmex.heilauncher
 
 import android.app.role.RoleManager
-import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -43,7 +41,6 @@ class SettingsActivity : ComponentActivity() {
                 SettingsScreen(
                     viewModel = viewModel,
                     onBack = { finish() },
-                    onOpenUsageAccess = ::openUsageAccess,
                     onRequestLocation = {
                         locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
                     },
@@ -56,14 +53,6 @@ class SettingsActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         viewModel.refresh()
-    }
-
-    private fun openUsageAccess() {
-        try {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-        } catch (_: Exception) {
-            startActivity(Intent(Settings.ACTION_SETTINGS))
-        }
     }
 
     private fun requestHomeRole() {

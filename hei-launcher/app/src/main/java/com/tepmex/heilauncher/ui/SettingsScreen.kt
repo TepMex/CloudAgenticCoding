@@ -42,7 +42,6 @@ private val Muted = Color(0xFF8A8A8A)
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
-    onOpenUsageAccess: () -> Unit,
     onRequestLocation: () -> Unit,
     onRequestHomeRole: () -> Unit,
 ) {
@@ -83,7 +82,6 @@ fun SettingsScreen(
         ToggleRow(stringResource(R.string.show_day), state.prefs.showDayProgress, viewModel::setShowDay)
         ToggleRow(stringResource(R.string.show_battery), state.prefs.showBattery, viewModel::setShowBattery)
         ToggleRow(stringResource(R.string.show_weather), state.prefs.showWeather, viewModel::setShowWeather)
-        ToggleRow(stringResource(R.string.show_last_opened), state.prefs.showLastOpened, viewModel::setShowLastOpened)
 
         Spacer(Modifier.height(18.dp))
         SectionLabel(stringResource(R.string.name_size))
@@ -141,11 +139,6 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(28.dp))
-        LinkRow(
-            title = stringResource(R.string.usage_access),
-            detail = stringResource(if (state.usageGranted) R.string.usage_on else R.string.usage_off),
-            onClick = onOpenUsageAccess,
-        )
         LinkRow(
             title = stringResource(R.string.location_access),
             detail = stringResource(if (state.locationGranted) R.string.location_on else R.string.location_off),

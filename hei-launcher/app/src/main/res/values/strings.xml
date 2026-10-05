@@ -17,7 +17,6 @@
     <string name="show_day">Day progress</string>
     <string name="show_battery">Battery</string>
     <string name="show_weather">Weather</string>
-    <string name="show_last_opened">Time since opened</string>
     <string name="name_size">Name size</string>
     <string name="size_s">S</string>
     <string name="size_m">M</string>
@@ -28,9 +27,6 @@
     <string name="move_up">Up</string>
     <string name="move_down">Down</string>
     <string name="remove">Remove</string>
-    <string name="usage_access">Usage access</string>
-    <string name="usage_on">Allowed — time since open is shown</string>
-    <string name="usage_off">Off — time since open is hidden</string>
     <string name="location_access">Location for weather</string>
     <string name="location_on">Allowed</string>
     <string name="location_off">Off — weather stays hidden</string>

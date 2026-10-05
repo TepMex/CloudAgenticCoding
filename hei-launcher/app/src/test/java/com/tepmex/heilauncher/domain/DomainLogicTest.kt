@@ -44,19 +44,6 @@ class DomainLogicTest {
     }
 
     @Test
-    fun relativeTime() {
-        val now = 1_700_000_000_000L
-        assertNull(formatSince(null, now))
-        assertNull(formatSince(0L, now))
-        assertEquals("<1m", formatSince(now - 20_000L, now))
-        assertEquals("26m", formatSince(now - 26 * 60_000L, now))
-        assertEquals("1h 38m", formatSince(now - (60 + 38) * 60_000L, now))
-        assertEquals("3h", formatSince(now - 3 * 60 * 60_000L, now))
-        assertEquals("2d", formatSince(now - 2 * 24 * 60 * 60_000L, now))
-        assertNull(formatSince(now + 5 * 60_000L, now))
-    }
-
-    @Test
     fun searchRanksSubstringMatches() {
         val apps = listOf(
             app("com.android.chrome", "Chrome"),

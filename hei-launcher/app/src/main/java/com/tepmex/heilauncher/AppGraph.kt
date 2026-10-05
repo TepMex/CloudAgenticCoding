@@ -4,7 +4,6 @@ import android.content.Context
 import com.tepmex.heilauncher.data.BatteryReader
 import com.tepmex.heilauncher.data.InstalledApps
 import com.tepmex.heilauncher.data.PrefsStore
-import com.tepmex.heilauncher.data.UsageTimes
 import com.tepmex.heilauncher.data.WeatherRepository
 import com.tepmex.heilauncher.timing.data.AuthTokenStore
 import com.tepmex.heilauncher.timing.data.DeviceLocationSource
@@ -18,7 +17,6 @@ class AppGraph(context: Context) {
     val appContext: Context = context.applicationContext
     val prefs = PrefsStore(appContext)
     val apps = InstalledApps(appContext)
-    val usage = UsageTimes(appContext)
     val battery = BatteryReader(appContext)
     val weather = WeatherRepository(appContext)
     val timingRepository = IdealTimingRepository(

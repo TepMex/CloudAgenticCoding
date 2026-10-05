@@ -82,7 +82,6 @@ import com.tepmex.heilauncher.domain.NameSize
 import com.tepmex.heilauncher.domain.formatBattery
 import com.tepmex.heilauncher.domain.formatClock
 import com.tepmex.heilauncher.domain.formatHomeDate
-import com.tepmex.heilauncher.domain.formatSince
 import com.tepmex.heilauncher.domain.formatWeather
 import com.tepmex.heilauncher.domain.SOLE_MATCH_OPEN_DELAY_MS
 import com.tepmex.heilauncher.domain.jumpIndex
@@ -251,7 +250,6 @@ private fun FavouritesPage(
     onOpenLauncherSettings: () -> Unit,
 ) {
     val locale = locale()
-    val nowMillis = System.currentTimeMillis()
     val openClock = stringResource(R.string.open_clock)
     val openCalendar = stringResource(R.string.open_calendar)
     Column(
@@ -337,7 +335,6 @@ private fun FavouritesPage(
             items(state.favourites, key = { it.component }) { app ->
                 AppRow(
                     label = app.label,
-                    since = if (state.prefs.showLastOpened) formatSince(app.lastUsedAt, nowMillis) else null,
                     fontSize = state.prefs.nameSize.favouriteSp(),
                     onClick = { onLaunch(app) },
                     onLongClick = { onUnpin(app.component) },
@@ -382,7 +379,6 @@ private fun AllAppsPage(
     val keyboard = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val nowMillis = System.currentTimeMillis()
     val letters = railLetters(if (state.query.isBlank()) state.listedApps else emptyList())
     val scope = rememberCoroutineScope()
     val sole = soleSearchMatch(state.query, state.listedApps)
@@ -443,7 +439,6 @@ private fun AllAppsPage(
                 items(state.listedApps, key = { it.component }) { app ->
                     AppRow(
                         label = app.label,
-                        since = if (state.prefs.showLastOpened) formatSince(app.lastUsedAt, nowMillis) else null,
                         fontSize = state.prefs.nameSize.drawerSp(),
                         onClick = { onLaunch(app) },
                         onLongClick = {
@@ -508,32 +503,22 @@ private fun SearchField(
 @Composable
 private fun AppRow(
     label: String,
-    since: String?,
     fontSize: TextUnit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    Row(
+    Text(
+        text = label,
+        color = Ink,
+        fontSize = fontSize,
+        lineHeight = fontSize,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            color = Ink,
-            fontSize = fontSize,
-            lineHeight = fontSize,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (since != null) {
-            Spacer(Modifier.width(12.dp))
-            Text(text = since, color = Ink, fontSize = 14.sp, maxLines = 1)
-        }
-    }
+    )
 }
 
 @Composable
