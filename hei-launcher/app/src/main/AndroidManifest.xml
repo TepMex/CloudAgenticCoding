@@ -9,7 +9,17 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.NFC" />
+
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="false" />
 
     <queries>
         <intent>
@@ -52,5 +62,18 @@
             android:exported="false"
             android:launchMode="singleTop"
             android:theme="@style/Theme.HeiLauncher" />
+        <activity
+            android:name=".timing.ui.login.XiaomiAuthWebActivity"
+            android:exported="false"
+            android:label="@string/xiaomi_sign_in"
+            android:theme="@style/Theme.HeiLauncher"
+            android:windowSoftInputMode="adjustResize" />
+        <receiver
+            android:name=".timing.notification.SectionChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tepmex.heilauncher.timing.action.SECTION_CHANGE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

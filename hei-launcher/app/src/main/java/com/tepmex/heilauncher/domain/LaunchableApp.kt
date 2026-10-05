@@ -14,8 +14,13 @@ fun sortApps(
     collator: Collator = Collator.getInstance(),
 ): List<LaunchableApp> {
     return apps.sortedWith { a, b ->
-        val byLabel = collator.compare(a.label, b.label)
-        if (byLabel != 0) byLabel else a.component.compareTo(b.component)
+        val byScript = scriptBucket(a.label).compareTo(scriptBucket(b.label))
+        if (byScript != 0) {
+            byScript
+        } else {
+            val byLabel = collator.compare(a.label, b.label)
+            if (byLabel != 0) byLabel else a.component.compareTo(b.component)
+        }
     }
 }
 
