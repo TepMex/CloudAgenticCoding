@@ -6,7 +6,6 @@ data class LaunchableApp(
     val component: String,
     val packageName: String,
     val label: String,
-    val lastUsedAt: Long? = null,
 )
 
 fun sortApps(
@@ -21,14 +20,6 @@ fun sortApps(
             val byLabel = collator.compare(a.label, b.label)
             if (byLabel != 0) byLabel else a.component.compareTo(b.component)
         }
-    }
-}
-
-fun withUsage(apps: List<LaunchableApp>, usage: Map<String, Long>): List<LaunchableApp> {
-    if (usage.isEmpty()) return apps
-    return apps.map { app ->
-        val at = usage[app.packageName]
-        if (at == null || at <= 0L) app else app.copy(lastUsedAt = at)
     }
 }
 

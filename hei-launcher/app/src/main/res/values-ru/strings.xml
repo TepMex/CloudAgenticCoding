@@ -16,7 +16,6 @@
     <string name="show_day">Прогресс дня</string>
     <string name="show_battery">Батарея</string>
     <string name="show_weather">Погода</string>
-    <string name="show_last_opened">Время с открытия</string>
     <string name="name_size">Размер имён</string>
     <string name="favourites">Избранное</string>
     <string name="favourites_hint">Удерживайте приложение в полном списке, чтобы закрепить или убрать. Удерживайте избранное, чтобы убрать. Порядок меняется здесь.</string>
@@ -24,9 +23,6 @@
     <string name="move_up">Выше</string>
     <string name="move_down">Ниже</string>
     <string name="remove">Убрать</string>
-    <string name="usage_access">Доступ к использованию</string>
-    <string name="usage_on">Разрешён — время с открытия видно</string>
-    <string name="usage_off">Выключен — время с открытия скрыто</string>
     <string name="location_access">Геолокация для погоды</string>
     <string name="location_on">Разрешена</string>
     <string name="location_off">Выключена — погода скрыта</string>
@@ -35,6 +31,8 @@
     <string name="pinned">Закреплено</string>
     <string name="unpinned">Убрано из избранного</string>
     <string name="cant_open">Не удалось открыть</string>
+    <string name="open_clock">Открыть часы</string>
+    <string name="open_calendar">Открыть календарь</string>
     <string name="back">Назад</string>
     <string name="version">Версия %1$s</string>
 </resources>

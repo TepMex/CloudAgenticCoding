@@ -21,7 +21,6 @@ data class FavouriteRow(val component: String, val label: String)
 data class SettingsUiState(
     val prefs: LauncherPrefs = LauncherPrefs(),
     val favourites: List<FavouriteRow> = emptyList(),
-    val usageGranted: Boolean = false,
     val locationGranted: Boolean = false,
     val homeRoleHeld: Boolean = false,
     val versionName: String = "",
@@ -41,7 +40,6 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
             state.value = SettingsUiState(
                 prefs = prefs,
                 favourites = rows,
-                usageGranted = graph.usage.canRead(),
                 locationGranted = graph.weather.hasLocationPermission(),
                 homeRoleHeld = homeRoleHeld(),
                 versionName = versionName(),
@@ -58,8 +56,6 @@ class SettingsViewModel(private val graph: AppGraph) : ViewModel() {
     fun setShowBattery(value: Boolean) = edit { it.copy(showBattery = value) }
 
     fun setShowWeather(value: Boolean) = edit { it.copy(showWeather = value) }
-
-    fun setShowLastOpened(value: Boolean) = edit { it.copy(showLastOpened = value) }
 
     fun setNameSize(size: NameSize) = edit { it.copy(nameSize = size) }
 

@@ -11,7 +11,6 @@ import com.tepmex.heilauncher.domain.Weather
 import com.tepmex.heilauncher.domain.filterApps
 import com.tepmex.heilauncher.domain.resolveFavourites
 import com.tepmex.heilauncher.domain.toggleFavourite
-import com.tepmex.heilauncher.domain.withUsage
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,7 +42,6 @@ data class HomeUiState(
 
 class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private val apps = MutableStateFlow<List<LaunchableApp>>(emptyList())
-    private val usage = MutableStateFlow<Map<String, Long>>(emptyMap())
     private val prefs = MutableStateFlow(graph.prefs.read())
     private val battery = MutableStateFlow<BatteryStatus?>(null)
     private val weather = MutableStateFlow<Weather?>(null)
@@ -60,20 +58,19 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private val prefsListener: (LauncherPrefs) -> Unit = { prefs.value = it }
 
     val ui: StateFlow<HomeUiState> = combine(
-        combine(apps, usage, prefs, query) { loaded, used, pref, q ->
-            Core(loaded, used, pref, q)
+        combine(apps, prefs, query) { loaded, pref, q ->
+            Core(loaded, pref, q)
         },
         combine(battery, weather, now, is24Hour, ready) { batt, wx, moment, hour24, isReady ->
             Sensors(batt, wx, moment, hour24, isReady)
         },
     ) { core, sensors ->
-        val merged = withUsage(core.apps, if (core.prefs.showLastOpened) core.usage else emptyMap())
         HomeUiState(
             now = sensors.now,
             systemIs24Hour = sensors.is24Hour,
             prefs = core.prefs,
-            favourites = resolveFavourites(core.prefs.favouriteIds, merged),
-            listedApps = filterApps(merged, core.query),
+            favourites = resolveFavourites(core.prefs.favouriteIds, core.apps),
+            listedApps = filterApps(core.apps, core.query),
             query = core.query,
             battery = if (core.prefs.showBattery) sensors.battery else null,
             weather = if (core.prefs.showWeather) sensors.weather else null,
@@ -153,13 +150,11 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
             val moment = LocalDateTime.now()
             val hour24 = DateFormat.is24HourFormat(graph.appContext)
             val batt = if (pref.showBattery) graph.battery.read() else null
-            val used = if (pref.showLastOpened) graph.usage.read() else emptyMap()
             val wx = if (pref.showWeather) graph.weather.refresh() else null
             if (!isActive) return@withContext
             now.value = moment
             is24Hour.value = hour24
             battery.value = batt
-            usage.value = used
             weather.value = wx
         }
     }
@@ -181,7 +176,6 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
 
     private data class Core(
         val apps: List<LaunchableApp>,
-        val usage: Map<String, Long>,
         val prefs: LauncherPrefs,
         val query: String,
     )

@@ -21,4 +21,4 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 
 Download `hei-launcher.apk` from GitHub Pages and install. Sideload signing matches other monorepo Android apps. After install, set it as the Home app from launcher settings (or the system Home picker).
 
-Usage access (optional) shows time since an app was last opened. Coarse location (optional) shows weather from Open-Meteo.
+Coarse location (optional) shows weather from Open-Meteo.

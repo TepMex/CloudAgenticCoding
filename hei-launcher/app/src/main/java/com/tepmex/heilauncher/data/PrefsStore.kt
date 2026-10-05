@@ -10,7 +10,6 @@ data class LauncherPrefs(
     val showDayProgress: Boolean = true,
     val showBattery: Boolean = true,
     val showWeather: Boolean = true,
-    val showLastOpened: Boolean = true,
     val nameSize: NameSize = NameSize.L,
     val favouriteIds: List<String> = emptyList(),
 )
@@ -59,7 +58,6 @@ class PrefsStore(context: Context) {
             showDayProgress = prefs.getBoolean(KEY_DAY, true),
             showBattery = prefs.getBoolean(KEY_BATTERY, true),
             showWeather = prefs.getBoolean(KEY_WEATHER, true),
-            showLastOpened = prefs.getBoolean(KEY_LAST, true),
             nameSize = enumValue(size, NameSize.L),
             favouriteIds = favourites,
         )
@@ -72,7 +70,6 @@ class PrefsStore(context: Context) {
             .putBoolean(KEY_DAY, value.showDayProgress)
             .putBoolean(KEY_BATTERY, value.showBattery)
             .putBoolean(KEY_WEATHER, value.showWeather)
-            .putBoolean(KEY_LAST, value.showLastOpened)
             .putString(KEY_SIZE, value.nameSize.name)
             .putString(KEY_FAVS, value.favouriteIds.joinToString("\n"))
             .apply()
@@ -90,7 +87,6 @@ class PrefsStore(context: Context) {
         private const val KEY_DAY = "day"
         private const val KEY_BATTERY = "battery"
         private const val KEY_WEATHER = "weather"
-        private const val KEY_LAST = "last_opened"
         private const val KEY_SIZE = "name_size"
         private const val KEY_FAVS = "favourites"
     }
