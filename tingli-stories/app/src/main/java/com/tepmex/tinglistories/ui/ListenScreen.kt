@@ -13,23 +13,37 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.tepmex.tinglistories.domain.AudioKind
 import com.tepmex.tinglistories.domain.Story
+import com.tepmex.tinglistories.domain.formatPlayback
 import com.tepmex.tinglistories.domain.listensLabel
 import com.tepmex.tinglistories.domain.nextStoryId
+import com.tepmex.tinglistories.domain.showStoryTitle
 import com.tepmex.tinglistories.domain.showTextBeforeAnswer
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +53,7 @@ fun ListenScreen(
     story: Story,
     onBack: () -> Unit,
     onPlay: (AudioKind) -> Unit,
+    onSeek: (Int) -> Unit,
     onAnswer: () -> Unit,
     onReset: () -> Unit,
     onNext: () -> Unit,
@@ -65,7 +80,9 @@ fun ListenScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(story.title, style = MaterialTheme.typography.titleLarge)
+            if (showStoryTitle(progress)) {
+                Text(story.title, style = MaterialTheme.typography.titleLarge)
+            }
             Text(
                 listensLabel(progress.listenCount),
                 style = MaterialTheme.typography.bodyMedium,
@@ -95,6 +112,15 @@ fun ListenScreen(
                     "В архиве нет аудио вопросов. Формулировки откроются по кнопке «Ответить».",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            val playingNow = state.playing?.takeIf { it.storyId == story.id }
+            if (playingNow != null) {
+                PlaybackBar(
+                    caption = if (playingNow.kind == AudioKind.STORY) "История" else "Вопросы",
+                    positionMs = state.playbackPositionMs,
+                    durationMs = state.playbackDurationMs,
+                    onSeek = onSeek,
                 )
             }
             if (showTextBeforeAnswer(story) && story.text.isNotBlank()) {
@@ -131,6 +157,60 @@ fun ListenScreen(
             }
             Spacer(Modifier.height(12.dp))
         }
+    }
+}
+
+private const val SEEK_STEP_MS = 10_000
+
+@Composable
+private fun PlaybackBar(
+    caption: String,
+    positionMs: Int,
+    durationMs: Int,
+    onSeek: (Int) -> Unit,
+) {
+    var dragging by remember(caption) { mutableStateOf(false) }
+    var dragPosition by remember(caption) { mutableIntStateOf(positionMs) }
+    val shown = if (dragging) dragPosition else positionMs
+    val rangeEnd = durationMs.coerceAtLeast(1)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            caption,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            FilledTonalIconButton(onClick = { onSeek(shown - SEEK_STEP_MS) }) {
+                Icon(Icons.Filled.Replay10, contentDescription = "На 10 секунд назад")
+            }
+            Text(
+                "${formatPlayback(shown)} / ${formatPlayback(durationMs)}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            FilledTonalIconButton(onClick = { onSeek(shown + SEEK_STEP_MS) }) {
+                Icon(Icons.Filled.Forward10, contentDescription = "На 10 секунд вперёд")
+            }
+        }
+        Slider(
+            value = shown.coerceIn(0, rangeEnd).toFloat(),
+            onValueChange = { next ->
+                dragging = true
+                dragPosition = next.toInt()
+            },
+            onValueChangeFinished = {
+                onSeek(dragPosition)
+                dragging = false
+            },
+            valueRange = 0f..rangeEnd.toFloat(),
+            enabled = durationMs > 0,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "Место воспроизведения" },
+        )
     }
 }
 

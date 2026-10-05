@@ -92,6 +92,7 @@ fun TingliApp(viewModel: TingliViewModel) {
                                 story = story,
                                 onBack = viewModel::back,
                                 onPlay = { viewModel.play(story.id, it) },
+                                onSeek = viewModel::seekPlayback,
                                 onAnswer = { viewModel.openAnswer(story.id) },
                                 onReset = viewModel::requestReset,
                                 onNext = { viewModel.goNext(story.id) },

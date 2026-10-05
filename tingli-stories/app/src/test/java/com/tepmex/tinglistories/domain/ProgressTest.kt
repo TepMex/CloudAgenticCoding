@@ -59,6 +59,37 @@ class ProgressTest {
     }
 
     @Test
+    fun titleAndQuestionWordingStayHiddenUntilTheGrade() {
+        val unanswered = StoryProgress(listenCount = 2)
+        assertFalse(showStoryTitle(unanswered))
+        assertFalse(showQuestionWording(story, unanswered))
+
+        val graded = unanswered.copy(
+            answers = listOf("会计"),
+            evaluation = Evaluation(1, 1, "Верно", emptyList()),
+        )
+        assertTrue(showStoryTitle(graded))
+        assertTrue(showQuestionWording(story, graded))
+
+        val readOnly = story.copy(hasQuestionsAudio = false)
+        assertTrue(showQuestionWording(readOnly, unanswered))
+        assertFalse(showStoryTitle(unanswered))
+    }
+
+    @Test
+    fun playbackTimeAndSeekStayInsideTheClip() {
+        assertEquals("0:00", formatPlayback(0))
+        assertEquals("0:00", formatPlayback(-40))
+        assertEquals("0:42", formatPlayback(42_000))
+        assertEquals("2:05", formatPlayback(125_000))
+        assertEquals(0, clampSeek(-10, 90_000))
+        assertEquals(15_000, clampSeek(15_000, 90_000))
+        assertEquals(90_000, clampSeek(120_000, 90_000))
+        assertEquals(12_000, clampSeek(12_000, 0))
+        assertEquals(0, clampSeek(-5, -1))
+    }
+
+    @Test
     fun listenLabelsFollowRussianPlural() {
         assertEquals("1 прослушивание", listensLabel(1))
         assertEquals("2 прослушивания", listensLabel(2))

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tepmex.tinglistories.domain.listensLabel
+import com.tepmex.tinglistories.domain.showStoryTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +72,7 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                     )
                 }
                 itemsIndexed(library.stories, key = { _, story -> story.id }) { index, story ->
+                    val progress = library.progressOf(story.id)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -80,13 +83,17 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.titleMedium,
                         )
+                        if (showStoryTitle(progress)) {
+                            Text(
+                                story.title,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
                         Text(
-                            story.title,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
-                            listensLabel(library.progressOf(story.id).listenCount),
+                            listensLabel(progress.listenCount),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
