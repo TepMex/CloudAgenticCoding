@@ -4,6 +4,7 @@ import com.tepmex.cornegame.data.FileSessionHistory
 import com.tepmex.cornegame.data.FileSettingsStore
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.TrainerAction
+import com.tepmex.cornegame.domain.actionsToType
 import java.io.File
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
@@ -68,9 +69,10 @@ class TrainViewModelTest {
         var now = 1_000L
         val viewModel = TrainViewModel(history, settings, clock = { now }, random = Random(8))
         val target = viewModel.state.value.session.target
-        target.forEach { ch ->
+        val language = viewModel.state.value.session.language
+        actionsToType(target, language).forEach { action ->
             now += 1_000
-            viewModel.onTrainerAction(TrainerAction.Character(ch))
+            viewModel.onTrainerAction(action)
         }
         assertEquals(AppScreen.Results, viewModel.state.value.screen)
         assertEquals(1, history.load().size)
@@ -78,11 +80,11 @@ class TrainViewModelTest {
         assertTrue(history.load().single().durationMs > 0)
 
         viewModel.restart()
-        val language = viewModel.state.value.settings.language
+        val same = viewModel.state.value.settings.language
         val head = viewModel.state.value.session.target.first()
         viewModel.onTrainerAction(TrainerAction.Character(head))
         assertEquals(1, viewModel.state.value.session.index)
-        viewModel.setLanguage(language)
+        viewModel.setLanguage(same)
         assertEquals(1, viewModel.state.value.session.index)
         assertTrue(viewModel.state.value.settings.highlight)
 

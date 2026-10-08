@@ -3,6 +3,7 @@ package com.tepmex.cornegame.domain
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,17 +21,34 @@ class SessionTest {
                 assertTrue(word.all { it in allowed })
             }
         }
-        assertFalse(usableWords(Language.RU).any { 'ё' in it || 'Ё' in it })
+        assertFalse(usableWords(Language.RU).any { 'ё' in it || 'Ё' in it || 'х' in it || 'ъ' in it })
     }
 
     @Test
-    fun promptIsTwentyWordsSeparatedBySingleSpaces() {
-        val prompt = generatePrompt(Language.EN, Random(1))
-        val words = prompt.split(' ')
-        assertEquals(SESSION_WORD_COUNT, words.size)
-        assertFalse(prompt.endsWith(' '))
-        assertFalse(prompt.contains("  "))
-        words.forEach { assertTrue(it.length in 3..10) }
+    fun promptCoversLowerCaseShiftPunctuationAndLanguageSwitch() {
+        listOf(Language.EN, Language.RU).forEach { language ->
+            val prompt = generatePrompt(language, Random(1))
+            assertTrue(prompt.startsWith("("))
+            assertTrue(LANGUAGE_SWITCH in prompt)
+            assertFalse(prompt.contains("  "))
+            val switchAt = prompt.indexOf(LANGUAGE_SWITCH)
+            val head = prompt.substring(0, switchAt)
+            val tail = prompt.substring(switchAt + 1)
+            assertTrue(head.any { it.isLowerCase() && it.isLetter() })
+            assertTrue(head.any { it.isUpperCase() && it.isLetter() })
+            assertTrue(head.any { it.isDigit() })
+            assertTrue('(' in head && ')' in head)
+            assertTrue(tail.any { it.isLetter() })
+            assertTrue(tail.trim().endsWith("."))
+            var current = language
+            prompt.forEach { char ->
+                if (char == LANGUAGE_SWITCH) {
+                    current = current.other()
+                } else {
+                    assertNotNull(strokeFor(char, current))
+                }
+            }
+        }
     }
 
     @Test
@@ -101,14 +119,69 @@ class SessionTest {
     }
 
     @Test
-    fun hardwareMapper() {
+    fun shiftLatchAndLowerLayerThenLanguageSwitch() {
+        var session = TypingSession(Language.EN, "A(2)${LANGUAGE_SWITCH}й")
+        assertNull(session.startedAtMs)
+        val (armed, armEffect) = session.apply(TrainerAction.Shift, 1_000)
+        assertFalse(armEffect.mistake)
+        assertEquals(Latch.SHIFT, armed.latch)
+        assertNull(armed.startedAtMs)
+        session = armed.apply(TrainerAction.Character('A'), 2_000).first
+        assertEquals(1, session.index)
+        assertEquals(Latch.NONE, session.latch)
+
+        val (notShift, shiftMiss) = session.apply(TrainerAction.Shift, 2_500)
+        assertTrue(shiftMiss.mistake)
+        session = notShift
+        assertEquals(1, session.errors)
+
+        actionsToType("(2)", Language.EN).forEachIndexed { step, action ->
+            session = session.apply(action, 3_000L + step).first
+        }
+        assertEquals(LANGUAGE_SWITCH, session.nextChar)
+        assertEquals(Language.EN, session.typingLanguage)
+
+        session = session.apply(TrainerAction.Alt, 11_000).first
+        assertTrue(session.altArmed)
+        session = session.apply(TrainerAction.Shift, 12_000).first
+        assertEquals(Language.RU, session.typingLanguage)
+        assertEquals('й', session.nextChar)
+        session = session.apply(TrainerAction.Character('й'), 13_000).first
+        assertTrue(session.completed)
+        assertEquals(1, session.errors)
+    }
+
+    @Test
+    fun backspaceUndoesLanguageSwitchAndCancelsLatchFirst() {
+        var session = TypingSession(Language.EN, "a${LANGUAGE_SWITCH}б")
+        session = session.apply(TrainerAction.Character('a'), 1_000).first
+        session = session.apply(TrainerAction.Alt, 2_000).first
+        session = session.apply(TrainerAction.Backspace, 3_000).first
+        assertFalse(session.altArmed)
+        assertEquals(1, session.index)
+        session = session.apply(TrainerAction.AltShift, 4_000).first
+        assertEquals(Language.RU, session.typingLanguage)
+        session = session.apply(TrainerAction.Backspace, 5_000).first
+        assertEquals(1, session.index)
+        assertEquals(Language.EN, session.typingLanguage)
+        assertEquals(LANGUAGE_SWITCH, session.nextChar)
+    }
+
+    @Test
+    fun hardwareMapperKeepsCaseAndAltShift() {
         assertEquals(TrainerAction.Character(' '), mapHardwareKey(AndroidKeyCodes.SPACE, 0))
-        assertEquals(TrainerAction.Character(' '), mapHardwareKey(AndroidKeyCodes.ENTER, '\n'.code))
-        assertEquals(TrainerAction.Character(' '), mapHardwareKey(AndroidKeyCodes.NUMPAD_ENTER, 0))
+        assertNull(mapHardwareKey(AndroidKeyCodes.ENTER, '\n'.code))
+        assertNull(mapHardwareKey(AndroidKeyCodes.NUMPAD_ENTER, 0))
         assertEquals(TrainerAction.Backspace, mapHardwareKey(AndroidKeyCodes.DEL, 0))
-        assertEquals(TrainerAction.Character('q'), mapHardwareKey(45, 'Q'.code))
-        assertEquals(TrainerAction.Character('й'), mapHardwareKey(45, 'Й'.code))
+        assertEquals(TrainerAction.Character('Q'), mapHardwareKey(45, 'Q'.code))
+        assertEquals(TrainerAction.Character('й'), mapHardwareKey(45, 'й'.code))
+        assertEquals(TrainerAction.Character('Й'), mapHardwareKey(45, 'Й'.code))
         assertEquals(TrainerAction.Character(';'), mapHardwareKey(74, ';'.code))
+        assertNull(mapHardwareKey(AndroidKeyCodes.SHIFT_LEFT, 0))
+        assertEquals(
+            TrainerAction.AltShift,
+            mapHardwareKey(AndroidKeyCodes.SHIFT_LEFT, 0, altPressed = true),
+        )
         assertNull(mapHardwareKey(61, 0))
     }
 }

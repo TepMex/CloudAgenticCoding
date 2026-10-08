@@ -4,13 +4,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -31,14 +32,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tepmex.cornegame.domain.Board
 import com.tepmex.cornegame.domain.Finger
-import com.tepmex.cornegame.domain.KeyCell
+import com.tepmex.cornegame.domain.KEY_COLS
+import com.tepmex.cornegame.domain.KEY_COUNT
+import com.tepmex.cornegame.domain.KEY_ROWS
+import com.tepmex.cornegame.domain.KeyFace
+import com.tepmex.cornegame.domain.KeyboardModel
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.ui.theme.HighlightYellow
 
 private val ErrorRed = Color(0xFFE53935)
 private val KeyInk = Color(0xFF1C1C1C)
+
+/** Доля высоты клавиши, на которую колонка опущена. Как в info.json Cornedeon 2M. */
+internal val COLUMN_STAGGER = floatArrayOf(0.30f, 0.30f, 0.10f, 0.00f, 0.10f, 0.20f)
 
 /** Пастельные зоны. Жёлтый оставлен подсветке следующей клавиши, не пальцу. */
 fun Finger.zoneColor(): Color = when (this) {
@@ -70,8 +77,6 @@ fun fingerLabel(finger: Finger): String = when (finger) {
 /** Размеры в тех же единицах, что и вход (в UI это dp). Клавиатура не выше и не шире ящика. */
 internal data class KeyboardFit(
     val key: Float,
-    val thumbWidth: Float,
-    val thumbHeight: Float,
     val width: Float,
     val height: Float,
 )
@@ -81,29 +86,26 @@ internal fun fitKeyboard(
     maxHeight: Float,
     keyScale: Float,
     gap: Float = 4f,
-    centerGap: Float = 22f,
+    centerGap: Float = 16f,
 ): KeyboardFit {
     val scale = keyScale.coerceIn(0.65f, 1f)
+    val stagger = COLUMN_STAGGER.max()
     val halfWidth = (maxWidth - centerGap) / 2f
-    val keyFromWidth = (halfWidth - gap * 5f) / 6f
-    val thumbFactor = 0.9f
-    val keyFromHeight = (maxHeight - gap * 3f) / (3f + thumbFactor)
+    val keyFromWidth = (halfWidth - gap * (KEY_COLS - 1)) / KEY_COLS
+    val keyFromHeight = (maxHeight - gap * (KEY_ROWS - 1)) / (KEY_ROWS + stagger)
     val key = minOf(keyFromWidth, keyFromHeight).coerceAtLeast(1f) * scale
-    val thumbHeight = key * thumbFactor
-    val thumbWidth = key * 2f + gap
-    val width = (key * 6f + gap * 5f) * 2f + centerGap
-    val height = key * 3f + thumbHeight + gap * 3f
-    return KeyboardFit(key, thumbWidth, thumbHeight, width, height)
+    val width = (key * KEY_COLS + gap * (KEY_COLS - 1)) * 2f + centerGap
+    val height = key * (KEY_ROWS + stagger) + gap * (KEY_ROWS - 1)
+    return KeyboardFit(key, width, height)
 }
 
 /**
- * Обе половинки вписываются в доступный прямоугольник.
+ * Обе половинки, все 48 клавиш, включая L1 и L2.
  * [keyScale] только уменьшает уже вписанный размер, за край экран не вылезает.
  */
 @Composable
 fun CorneKeyboard(
-    board: Board,
-    nextChar: Char?,
+    model: KeyboardModel,
     highlightEnabled: Boolean,
     fingerColors: Boolean,
     keyScale: Float,
@@ -122,6 +124,7 @@ fun CorneKeyboard(
     Box(
         modifier
             .fillMaxSize()
+            .semantics { contentDescription = "Клавиатура $KEY_COUNT" }
             .drawWithContent {
                 drawContent()
                 if (flashAlpha > 0f) {
@@ -130,8 +133,8 @@ fun CorneKeyboard(
             },
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val gap = 4.dp
-            val centerGap = 22.dp
+            val gap = 3.dp
+            val centerGap = 12.dp
             val fit = fitKeyboard(
                 maxWidth = maxWidth.value,
                 maxHeight = maxHeight.value,
@@ -140,13 +143,7 @@ fun CorneKeyboard(
                 centerGap = centerGap.value,
             )
             val key = fit.key.dp
-            val thumbHeight = fit.thumbHeight.dp
-            val thumbWidth = fit.thumbWidth.dp
-            val highlight = if (highlightEnabled && nextChar != null) {
-                board.highlightCell(nextChar)
-            } else {
-                null
-            }
+            val stagger = (COLUMN_STAGGER.max() * fit.key).dp
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
@@ -154,26 +151,22 @@ fun CorneKeyboard(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(centerGap)) {
                     KeyboardHalf(
-                        rows = board.leftRows,
-                        thumbs = board.leftThumbs,
+                        rows = model.leftRows,
                         keySize = key,
-                        thumbWidth = thumbWidth,
-                        thumbHeight = thumbHeight,
+                        stagger = stagger,
                         gap = gap,
-                        highlight = highlight,
+                        highlightEnabled = highlightEnabled,
                         fingerColors = fingerColors,
                         flashAlpha = flashAlpha,
                         lastWrong = lastWrong,
                         onAction = onAction,
                     )
                     KeyboardHalf(
-                        rows = board.rightRows,
-                        thumbs = board.rightThumbs,
+                        rows = model.rightRows,
                         keySize = key,
-                        thumbWidth = thumbWidth,
-                        thumbHeight = thumbHeight,
+                        stagger = stagger,
                         gap = gap,
-                        highlight = highlight,
+                        highlightEnabled = highlightEnabled,
                         fingerColors = fingerColors,
                         flashAlpha = flashAlpha,
                         lastWrong = lastWrong,
@@ -187,13 +180,11 @@ fun CorneKeyboard(
 
 @Composable
 private fun KeyboardHalf(
-    rows: List<List<KeyCell>>,
-    thumbs: List<KeyCell>,
+    rows: List<List<KeyFace>>,
     keySize: Dp,
-    thumbWidth: Dp,
-    thumbHeight: Dp,
+    stagger: Dp,
     gap: Dp,
-    highlight: KeyCell?,
+    highlightEnabled: Boolean,
     fingerColors: Boolean,
     flashAlpha: Float,
     lastWrong: Char?,
@@ -201,33 +192,27 @@ private fun KeyboardHalf(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                row.forEach { cell ->
-                    KeyButton(
-                        cell = cell,
-                        width = keySize,
-                        height = keySize,
-                        highlighted = cell == highlight,
-                        fingerColors = fingerColors,
-                        flashAlpha = flashAlpha,
-                        lastWrong = lastWrong,
-                        onAction = onAction,
-                    )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalAlignment = Alignment.Top,
+            ) {
+                row.forEach { face ->
+                    val drop = (COLUMN_STAGGER[face.column] * keySize.value).dp
+                    Box(Modifier.size(keySize, keySize + stagger)) {
+                        KeyButton(
+                            face = face,
+                            highlighted = highlightEnabled && face.primary,
+                            hinted = highlightEnabled && face.hinted,
+                            fingerColors = fingerColors,
+                            flashAlpha = flashAlpha,
+                            lastWrong = lastWrong,
+                            onAction = onAction,
+                            modifier = Modifier
+                                .offset(y = drop)
+                                .size(keySize),
+                        )
+                    }
                 }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-            thumbs.forEach { cell ->
-                KeyButton(
-                    cell = cell,
-                    width = thumbWidth,
-                    height = thumbHeight,
-                    highlighted = cell == highlight,
-                    fingerColors = fingerColors,
-                    flashAlpha = flashAlpha,
-                    lastWrong = lastWrong,
-                    onAction = onAction,
-                )
             }
         }
     }
@@ -235,61 +220,82 @@ private fun KeyboardHalf(
 
 @Composable
 private fun KeyButton(
-    cell: KeyCell,
-    width: Dp,
-    height: Dp,
+    face: KeyFace,
     highlighted: Boolean,
+    hinted: Boolean,
     fingerColors: Boolean,
     flashAlpha: Float,
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     val base = when {
-        fingerColors -> cell.finger.zoneColor()
+        fingerColors -> face.finger.zoneColor()
         else -> scheme.surfaceVariant
     }
-    val wrong = lastWrong != null &&
-        (cell.action as? TrainerAction.Character)?.value == lastWrong &&
-        flashAlpha > 0f
+    val wrong = lastWrong != null && flashAlpha > 0f && faceProduces(face, lastWrong)
     val background = when {
         highlighted -> HighlightYellow
+        hinted -> lerp(base, HighlightYellow, 0.55f)
         wrong -> lerp(base, ErrorRed, flashAlpha.coerceIn(0f, 1f))
         else -> base
     }
-    val foreground = if (highlighted || fingerColors) KeyInk else scheme.onSurface
-    val shape = RoundedCornerShape(8.dp)
-    val action = cell.action
+    val foreground = if (highlighted || hinted || fingerColors) KeyInk else scheme.onSurface
+    val shape = RoundedCornerShape(6.dp)
     val labelSize = (
-        height.value * if (cell.legend.length <= 1) 0.42f else 0.28f
-        ).coerceIn(8f, 22f).sp
+        when {
+            face.legend.length <= 1 -> 0.42f
+            face.legend.length <= 3 -> 0.30f
+            else -> 0.20f
+        } * if (face.holdLegend != null) 0.82f else 1f
+        ).coerceIn(7f, 22f).sp
+    val layerKey = face.legend == "L1" || face.legend == "L2"
     Box(
-        modifier = Modifier
-            .size(width, height)
+        modifier
             .clip(shape)
             .background(background)
             .border(
                 width = if (highlighted) 2.dp else 1.dp,
-                color = if (highlighted) Color(0xFF8A6A00) else scheme.outline.copy(alpha = 0.45f),
+                color = when {
+                    highlighted -> Color(0xFF8A6A00)
+                    hinted -> Color(0xFF8A6A00).copy(alpha = 0.7f)
+                    else -> scheme.outline.copy(alpha = 0.45f)
+                },
                 shape = shape,
             )
-            .semantics { contentDescription = "Клавиша ${cell.legend}" }
-            .then(
-                if (action != null) {
-                    Modifier.clickable { onAction(action) }
-                } else {
-                    Modifier
-                },
+            .semantics { contentDescription = "Клавиша ${face.legend.ifEmpty { face.id.toString() }}" }
+            .combinedClickable(
+                onClick = { onAction(face.tap) },
+                onLongClick = face.longPress?.let { action -> { onAction(action) } },
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = cell.legend,
-            color = if (action == null) foreground.copy(alpha = 0.55f) else foreground,
-            fontSize = labelSize,
-            fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = face.legend,
+                color = foreground,
+                fontSize = labelSize,
+                fontWeight = if (highlighted || layerKey) FontWeight.Bold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            if (face.holdLegend != null) {
+                Text(
+                    text = face.holdLegend,
+                    color = if (face.holdCue) Color(0xFF8A6A00) else foreground.copy(alpha = 0.72f),
+                    fontSize = (labelSize.value * 0.72f).coerceAtLeast(7f).sp,
+                    fontWeight = if (face.holdCue) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
+        }
     }
+}
+
+private fun faceProduces(face: KeyFace, char: Char): Boolean {
+    val tap = (face.tap as? TrainerAction.Character)?.value
+    val hold = (face.longPress as? TrainerAction.Character)?.value
+    return tap == char || hold == char
 }
