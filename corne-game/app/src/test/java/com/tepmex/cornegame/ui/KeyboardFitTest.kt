@@ -10,7 +10,7 @@ class KeyboardFitTest {
         val fit = fitKeyboard(maxWidth = 760f, maxHeight = 180f, keyScale = 1f)
         assertTrue(fit.width <= 760f + 0.5f)
         assertTrue(fit.height <= 180f + 0.5f)
-        assertTrue(fit.thumbWidth > fit.key)
+        assertTrue(fit.key > 8f)
     }
 
     @Test

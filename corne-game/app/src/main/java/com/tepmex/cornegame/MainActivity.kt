@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val mapped = mapHardwareKey(event.keyCode, event.unicodeChar)
+        val mapped = mapHardwareKey(event.keyCode, event.unicodeChar, event.isAltPressed)
             ?: return super.dispatchKeyEvent(event)
         when (event.action) {
             KeyEvent.ACTION_DOWN -> {

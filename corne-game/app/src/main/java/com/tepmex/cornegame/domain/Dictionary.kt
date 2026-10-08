@@ -2,11 +2,10 @@ package com.tepmex.cornegame.domain
 
 import kotlin.random.Random
 
-const val SESSION_WORD_COUNT = 20
-
 /**
- * Частотные слова. В подсказку попадают только те, что состоят из букв базового слоя
+ * Частотные слова. В подсказку попадают только те, что состоят из букв базового тапа
  * и имеют длину 3–10. Фильтр в [usableWords] — защита, если список когда-нибудь разъедется с раскладкой.
+ * х, ъ и ё на Cornedeon 2M — удержание P, M и T, в слова сессии они не входят.
  */
 private val EN_WORDS = listOf(
     "the", "and", "you", "that", "was", "for", "are", "with", "his", "they",
@@ -43,12 +42,23 @@ fun usableWords(language: Language): List<String> {
     }
 }
 
+/**
+ * Строка закрывает слои Cornedeon 2M: Lower (`(цифра)`), строчные слова,
+ * запятую, прописное слово, смену языка ⇄ и хвост на другом языке с точкой.
+ * Слова по-прежнему только из букв базового тапа.
+ */
 fun generatePrompt(
     language: Language,
     random: Random,
-    wordCount: Int = SESSION_WORD_COUNT,
 ): String {
-    val pool = usableWords(language)
-    check(pool.size >= 40) { "Словарь $language слишком короткий: ${pool.size}" }
-    return pool.shuffled(random).take(wordCount).joinToString(" ")
+    val primary = usableWords(language).shuffled(random)
+    val secondary = usableWords(language.other()).shuffled(random)
+    check(primary.size >= 8) { "Словарь $language слишком короткий: ${primary.size}" }
+    check(secondary.size >= 4) { "Словарь ${language.other()} слишком короткий: ${secondary.size}" }
+    val digit = ('0'.code + random.nextInt(10)).toChar()
+    val head = primary.take(6).joinToString(" ")
+    val capital = primary[6].replaceFirstChar { it.uppercaseChar() }
+    val tailCapital = secondary[0].replaceFirstChar { it.uppercaseChar() }
+    val tail = secondary.drop(1).take(3).joinToString(" ")
+    return "($digit) $head, $capital $LANGUAGE_SWITCH $tailCapital $tail."
 }

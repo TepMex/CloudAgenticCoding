@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LiveStats
 import com.tepmex.cornegame.domain.TrainerAction
-import com.tepmex.cornegame.domain.board
+import com.tepmex.cornegame.domain.keyboardModel
 import com.tepmex.cornegame.ui.theme.typedColor
 
 @Composable
@@ -70,10 +70,15 @@ fun TrainScreen(
         )
         Spacer(Modifier.height(4.dp))
         StatsRow(stats = state.session.stats(state.nowMs))
-        Spacer(Modifier.height(6.dp))
+        val model = keyboardModel(state.session)
+        Text(
+            text = model.caption,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 2.dp),
+        )
         CorneKeyboard(
-            board = board(state.session.language),
-            nextChar = state.session.nextChar,
+            model = model,
             highlightEnabled = state.settings.highlight,
             fingerColors = state.settings.fingerColors,
             keyScale = state.settings.keyScale,
