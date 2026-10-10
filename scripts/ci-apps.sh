@@ -14,6 +14,7 @@ WEB_APPS=(
   rth-agriculture
   same-element
   mock-br-lk
+  zametki-kitai
 )
 
 ANDROID_APPS=(
