@@ -250,13 +250,14 @@ button { cursor: pointer; }
     top: 0;
     z-index: 2;
     display: flex;
+    align-items: flex-start;
     gap: 8px;
     max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
     margin: 0 -4px 12px;
-    padding: 8px 0;
-    background: rgba(243, 234, 220, 0.94);
+    padding: 8px 0 10px;
+    background: rgba(243, 234, 220, 0.96);
     backdrop-filter: blur(8px);
   }
 
@@ -265,12 +266,19 @@ button { cursor: pointer; }
     flex-direction: column;
     align-items: flex-start;
     width: auto;
-    min-width: 8.5rem;
-    max-width: 12rem;
+    min-width: 7.25rem;
+    max-width: 9.5rem;
     flex: 0 0 auto;
     border-left: none;
     border-bottom: 2px solid transparent;
     padding: 6px 10px 8px;
+  }
+
+  .day-link-place {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .day-link.on {
@@ -278,5 +286,5 @@ button { cursor: pointer; }
     background: transparent;
   }
 
-  .day { scroll-margin-top: 88px; }
+  .day { scroll-margin-top: 6.5rem; }
 }
