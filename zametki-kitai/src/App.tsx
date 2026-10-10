@@ -134,7 +134,11 @@ function JournalView({
     const node = document.getElementById(id)
     if (!node) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    node.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    const narrow = window.matchMedia('(max-width: 860px)').matches
+    const strip = narrow ? document.querySelector('.days') : null
+    const cover = strip instanceof HTMLElement ? strip.getBoundingClientRect().height + 20 : 0
+    const top = node.getBoundingClientRect().top + window.scrollY - cover
+    window.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' })
   }
 
   return (
