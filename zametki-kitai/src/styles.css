@@ -305,6 +305,22 @@ button { cursor: pointer; }
   background: #efe6d6;
 }
 
+.illustration {
+  margin-top: 1.6rem;
+}
+
+.illustration img {
+  border: 1px solid var(--line);
+}
+
+.illustration figcaption {
+  margin: 0.45rem 0 0;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--cinnabar);
+}
+
 @media (max-width: 860px) {
   .gate-card { padding: 28px 20px 24px; }
 
