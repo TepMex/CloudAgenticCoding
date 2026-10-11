@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { journalAssetUrl } from './asset'
 import { UnlockError, openSealed } from './codec'
+import { TripMap } from './TripMap'
 import type { Journal } from './types'
 
 type Phase = 'locked' | 'opening' | 'open'
@@ -171,6 +172,11 @@ function JournalView({
         <div className="reading">
           {days.map((day) => (
             <section key={day.id} id={day.id} className="day" aria-labelledby={`${day.id}-title`}>
+              <TripMap
+                dayId={day.id}
+                place={day.place}
+                paragraphs={day.blocks.flatMap((block) => (block.t === 'p' ? [block.text] : []))}
+              />
               <p className="day-date">{day.heading}</p>
               <h2 id={`${day.id}-title`}>{day.place}</h2>
               {day.blocks.map((block, index) =>

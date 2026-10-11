@@ -1,6 +1,6 @@
 # Путевые заметки
 
-Reading page for the September 2026 China trip. The prose and photos are stored in `public/journal.bin` and decrypted in the browser with a passphrase. The page is a casual gate for people who open the link, not a security product.
+Reading page for the September 2026 China trip. Each day opens with a simplified map of China: the day's cities and arrows for the moves between them, plus a neighboring country when the day leaves China. The prose and photos are stored in `public/journal.bin` and decrypted in the browser with a passphrase. The page is a casual gate for people who open the link, not a security product.
 
 ```bash
 bun install
