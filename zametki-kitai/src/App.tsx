@@ -6,7 +6,7 @@ import type { Journal } from './types'
 
 type Phase = 'locked' | 'opening' | 'open'
 
-type ViewBlock = { t: 'p'; text: string } | { t: 'img'; bytes: Uint8Array }
+type ViewBlock = { t: 'p'; text: string } | { t: 'img'; bytes: Uint8Array; k?: 'day' }
 
 export default function App() {
   const [password, setPassword] = useState('')
@@ -183,7 +183,7 @@ function JournalView({
                 block.t === 'p' ? (
                   <p key={index}>{block.text}</p>
                 ) : (
-                  <Photo key={index} bytes={block.bytes} />
+                  <Photo key={index} bytes={block.bytes} kind={block.k} />
                 ),
               )}
             </section>
@@ -194,7 +194,7 @@ function JournalView({
   )
 }
 
-function Photo({ bytes }: { bytes: Uint8Array }) {
+function Photo({ bytes, kind }: { bytes: Uint8Array; kind?: 'day' }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     const copy = new ArrayBuffer(bytes.byteLength)
@@ -204,9 +204,11 @@ function Photo({ bytes }: { bytes: Uint8Array }) {
     return () => URL.revokeObjectURL(next)
   }, [bytes])
   if (!url) return null
+  const illustration = kind === 'day'
   return (
-    <figure className="photo">
-      <img src={url} alt="Фотография" />
+    <figure className={illustration ? 'photo illustration' : 'photo'}>
+      <img src={url} alt={illustration ? 'Иллюстрация дня' : 'Фотография'} />
+      {illustration ? <figcaption>Зарисовка дня</figcaption> : null}
     </figure>
   )
 }
@@ -216,7 +218,7 @@ function materialize(journal: Journal, images: Uint8Array): Array<Omit<Journal['
     ...day,
     blocks: day.blocks.map((block) => {
       if (block.t === 'p') return block
-      return { t: 'img' as const, bytes: images.slice(block.o, block.o + block.n) }
+      return { t: 'img' as const, bytes: images.slice(block.o, block.o + block.n), k: block.k }
     }),
   }))
 }

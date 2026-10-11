@@ -1,6 +1,6 @@
 export type ParagraphBlock = { t: 'p'; text: string }
 
-export type PhotoBlock = { t: 'img'; o: number; n: number }
+export type PhotoBlock = { t: 'img'; o: number; n: number; k?: 'day' }
 
 export type Block = ParagraphBlock | PhotoBlock
 
