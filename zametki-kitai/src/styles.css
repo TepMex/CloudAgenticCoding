@@ -223,6 +223,71 @@ button { cursor: pointer; }
   line-height: 1.2;
 }
 
+.trip-map {
+  margin: 2px 0 14px;
+}
+
+.trip-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+}
+
+.land-china {
+  fill: #f7f1e6;
+  stroke: rgba(36, 28, 22, 0.72);
+  stroke-width: 1.15;
+  stroke-linejoin: round;
+}
+
+.land-neighbor {
+  fill: #efe3d0;
+  stroke: rgba(36, 28, 22, 0.42);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+
+.land-russia {
+  fill: #e3d4c0;
+  stroke: none;
+}
+
+.route-halo {
+  fill: none;
+  stroke: #f3ecdf;
+  stroke-width: 3.6;
+  stroke-linecap: round;
+}
+
+.route {
+  fill: none;
+  stroke: #8a3a32;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+}
+
+.pin {
+  fill: #8a3a32;
+  stroke: #f7f1e6;
+  stroke-width: 1.5;
+}
+
+.leader {
+  stroke: rgba(36, 28, 22, 0.4);
+  stroke-width: 0.7;
+}
+
+.city-label {
+  fill: #241c16;
+  font-weight: 500;
+}
+
+.country-label {
+  fill: rgba(36, 28, 22, 0.46);
+  font-weight: 500;
+}
+
 .day p {
   margin: 0 0 0.95em;
   font-size: 1.125rem;

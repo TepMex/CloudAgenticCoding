@@ -13,6 +13,7 @@ A private reading page for one person’s travel notes from China in September 2
 5. A wrong passphrase shows an error and does not reveal the journal.
 6. After a correct passphrase, the reader can move between days and read the whole trip on one page.
 7. Closing the journal drops the decrypted text from the page.
+8. At the start of each day, show a simplified map of China. Mark the cities of that day's journey and draw schematic arrows between them, in travel order. When a stop is in a neighboring country, draw that country too. A place named only in passing (a ticket bought for later, a province in a list) is not a stop. Hami, Chengjiang, and Guiyang are stops on the days the prose actually travels through them.
 
 ## Interfaces
 
@@ -66,6 +67,7 @@ NOTES_PASSWORD='…' bun scripts/seal-notes.ts <notes-dir> public/journal.bin
 2. **Journal.** Masthead with the trip title and date range, a day index, and a single reading column. Choosing a day scrolls to it. The current day stays marked while scrolling.
 3. **Close.** «Закрыть» returns to the gate and discards the decrypted journal.
 4. The day index is a sticky column on a wide screen and a horizontal strip on a narrow screen.
+5. **Map.** Each day opens with a line-drawn map: China in ink on the paper, cinnabar dots and arrows for that day's stops. Kazakhstan, the Russian borderland, or Mongolia are added only on the days that need them. The map's accessible name lists the stops in order.
 
 ## Out of scope
 
@@ -81,3 +83,4 @@ NOTES_PASSWORD='…' bun scripts/seal-notes.ts <notes-dir> public/journal.bin
 4. `bun run build` writes `dist/index.html`.
 5. In the browser, a wrong passphrase shows the error and no note text. The author’s passphrase shows the day list, a day’s prose, and a photo. «Закрыть» returns to the gate.
 6. The zip archive is not in the repository. The app is listed in `scripts/ci-apps.sh` and the root `README.md`.
+7. A one-city day shows a dot and no arrow. A travel day shows arrows in route order. A day in Kazakhstan includes Kazakhstan; the Isilkul day also includes the Russian side of the border; the Hami day includes Mongolia.
