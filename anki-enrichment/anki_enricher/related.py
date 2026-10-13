@@ -101,6 +101,10 @@ def _hanzi_characters(value: str) -> frozenset[str]:
     return frozenset(result)
 
 
+def hanzi_characters(value: str) -> frozenset[str]:
+    return _hanzi_characters(value)
+
+
 def _split_metadata(text: str) -> tuple[list[str], str]:
     lines = text.splitlines(keepends=True)
     index = 0

@@ -1,12 +1,13 @@
 # Anki Enrichment
 
 В проекте два AnkiConnect-инструмента, которые обновляют существующие notes и не
-пересоздают cards:
+пересоздают cards, плюс один read-only отчёт:
 
 - `ru_translation.py` добавляет русские переводы;
-- `same_hanzi_pinyin.py` добавляет `SameHanzi` и `SamePinyinMatrix`.
+- `same_hanzi_pinyin.py` добавляет `SameHanzi` и `SamePinyinMatrix`;
+- `known_char_sentences.py` находит предложения только из хорошо выученных иероглифов.
 
-Оба используют `config.yaml`, требуют запущенный Anki с AnkiConnect и перед
+Инструменты записи используют `config.yaml`, требуют запущенный Anki с AnkiConnect и перед
 записью требуют подтверждение резервной копии.
 
 ## SameHanzi и SamePinyinMatrix
@@ -134,6 +135,27 @@ python3 ru_translation.py --enrich \
   --query 'deck:"Mandarin HSK 1000-5000"' \
   --limit 10 --backup-confirmed
 ```
+
+## Предложения из известных иероглифов
+
+`known_char_sentences.py` ничего не пишет в Anki. Он собирает иероглифы из поля
+`Simplified` у notes обеих китайских колод (`related.history_query`), у которых
+хотя бы одна карточка имеет интервал **строго больше** 360 дней, и печатает
+notes выбранной колоды (`anki.query` / `--query`), где `SentenceSimplified` состоит
+только из этих иероглифов.
+
+Пунктуация, пробелы, латиница и HTML в предложении игнорируются: учитываются только
+CJK-иероглифы. Пустое или отсутствующее `SentenceSimplified` пропускается.
+
+```bash
+python3 known_char_sentences.py
+python3 known_char_sentences.py --query 'deck:"Mandarin HSK 1000-5000"' --limit 10
+python3 known_char_sentences.py --min-interval 360
+```
+
+`--limit` ограничивает число совпадений в `matches`; `match_count` — полное число
+совпадений. `--history-query` и `--sentence-field` переопределяют лексикон и поле
+предложения. Поле слова берётся из `related.hanzi_field`.
 
 ## Проверки
 

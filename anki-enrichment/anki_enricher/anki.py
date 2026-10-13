@@ -55,6 +55,9 @@ class AnkiConnect:
     def find_notes(self, query: str) -> list[int]:
         return [int(value) for value in self.invoke("findNotes", query=query)]
 
+    def find_cards(self, query: str) -> list[int]:
+        return [int(value) for value in self.invoke("findCards", query=query)]
+
     def notes_info(self, note_ids: Iterable[int]) -> list[dict[str, Any]]:
         ids = list(note_ids)
         result: list[dict[str, Any]] = []
@@ -76,7 +79,10 @@ class AnkiConnect:
 
     def cards_info(self, card_ids: Iterable[int]) -> list[dict[str, Any]]:
         ids = list(card_ids)
-        return list(self.invoke("cardsInfo", cards=ids)) if ids else []
+        result: list[dict[str, Any]] = []
+        for start in range(0, len(ids), 500):
+            result.extend(self.invoke("cardsInfo", cards=ids[start : start + 500]))
+        return result
 
     def get_ease_factors(self, card_ids: Iterable[int]) -> list[int]:
         ids = list(card_ids)
