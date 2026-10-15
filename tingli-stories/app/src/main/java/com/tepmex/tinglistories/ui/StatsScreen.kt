@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tepmex.tinglistories.domain.listensLabel
 import com.tepmex.tinglistories.domain.showStoryTitle
+import com.tepmex.tinglistories.domain.storyStats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +70,10 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                         modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    StatsChart(
+                        points = storyStats(library),
+                        modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
                 itemsIndexed(library.stories, key = { _, story -> story.id }) { index, story ->
