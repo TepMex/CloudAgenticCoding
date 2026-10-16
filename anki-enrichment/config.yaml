@@ -18,6 +18,8 @@
     "model": "glm-5.2",
     "api_key_env": "OLLAMA_API_KEY",
     "json_response_format": true,
+    "reasoning_effort": "none",
+    "temperature": 0.0,
     "timeout_seconds": 60,
     "max_retries": 3
   },
@@ -27,6 +29,20 @@
     "verify_scheduling": true,
     "cache_dir": "cache",
     "log_dir": "logs"
+  },
+  "tts": {
+    "base_url": "https://api.proxyapi.ru/v1",
+    "model": "openai/gpt-4o-mini-tts",
+    "api_key_env": "PROXYAPI_API_KEY",
+    "query": "deck:\"Refold Mandarin 1k Simplified\"",
+    "source_field": "SentenceMeaningRu",
+    "target_field": "SentenceMeaningRuAudio",
+    "voices": ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"],
+    "instructions": "Читай по-русски, спокойно и разборчиво.",
+    "response_format": "mp3",
+    "timeout_seconds": 60,
+    "max_retries": 3,
+    "overwrite_existing": false
   },
   "related": {
     "history_query": "(deck:\"Refold Mandarin 1k Simplified\" OR deck:\"Mandarin HSK 1000-5000\")",

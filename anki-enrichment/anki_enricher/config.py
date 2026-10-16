@@ -68,6 +68,41 @@ class RelatedConfig:
         return self.same_hanzi_field, self.matrix_field
 
 
+DEFAULT_TTS_VOICES = (
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "fable",
+    "nova",
+    "onyx",
+    "sage",
+    "shimmer",
+)
+
+TTS_MODEL_ALIASES = {
+    "gpt-4o-tts-mini": "openai/gpt-4o-mini-tts",
+    "gpt-4o-mini-tts": "openai/gpt-4o-mini-tts",
+}
+
+
+@dataclass(frozen=True)
+class TTSConfig:
+    base_url: str = "https://api.proxyapi.ru/v1"
+    model: str = "openai/gpt-4o-mini-tts"
+    api_key_env: str = "PROXYAPI_API_KEY"
+    query: str = 'deck:"Refold Mandarin 1k Simplified"'
+    source_field: str = "SentenceMeaningRu"
+    target_field: str = "SentenceMeaningRuAudio"
+    voices: tuple[str, ...] = DEFAULT_TTS_VOICES
+    instructions: str = "Читай по-русски, спокойно и разборчиво."
+    response_format: str = "mp3"
+    timeout_seconds: float = 60
+    max_retries: int = 3
+    overwrite_existing: bool = False
+
+
 @dataclass(frozen=True)
 class Config:
     anki: AnkiConfig
@@ -75,6 +110,7 @@ class Config:
     llm: LLMConfig
     processing: ProcessingConfig
     related: RelatedConfig = RelatedConfig()
+    tts: TTSConfig = TTSConfig()
 
 
 def load_dotenv(path: Path) -> None:
@@ -90,6 +126,40 @@ def load_dotenv(path: Path) -> None:
         value = value.strip().strip("\"'")
         if key and key not in os.environ:
             os.environ[key] = value
+
+
+def canonical_tts_model(name: str) -> str:
+    cleaned = name.strip()
+    return TTS_MODEL_ALIASES.get(cleaned, cleaned)
+
+
+def _tts_config(value: Any) -> TTSConfig:
+    if value is None:
+        return TTSConfig()
+    if not isinstance(value, dict):
+        raise ConfigError("Config object 'tts' must be an object")
+    voices_value = value.get("voices", DEFAULT_TTS_VOICES)
+    if not isinstance(voices_value, (list, tuple)) or not voices_value:
+        raise ConfigError("Config value 'tts.voices' must be a non-empty list")
+    voices = tuple(str(voice).strip() for voice in voices_value)
+    if any(not voice for voice in voices):
+        raise ConfigError("Config value 'tts.voices' contains an empty voice")
+    return TTSConfig(
+        base_url=str(value.get("base_url", TTSConfig.base_url)).rstrip("/"),
+        model=canonical_tts_model(str(value.get("model", TTSConfig.model))),
+        api_key_env=str(value.get("api_key_env", TTSConfig.api_key_env)),
+        query=str(value.get("query", TTSConfig.query)),
+        source_field=str(value.get("source_field", TTSConfig.source_field)),
+        target_field=str(value.get("target_field", TTSConfig.target_field)),
+        voices=voices,
+        instructions=str(value.get("instructions", TTSConfig.instructions)),
+        response_format=str(value.get("response_format", TTSConfig.response_format)),
+        timeout_seconds=float(value.get("timeout_seconds", TTSConfig.timeout_seconds)),
+        max_retries=int(value.get("max_retries", TTSConfig.max_retries)),
+        overwrite_existing=bool(
+            value.get("overwrite_existing", TTSConfig.overwrite_existing)
+        ),
+    )
 
 
 def _section(data: dict[str, Any], name: str) -> dict[str, Any]:
@@ -147,6 +217,7 @@ def load_config(path: Path) -> Config:
                 cache_dir=root / str(processing.get("cache_dir", "cache")),
                 log_dir=root / str(processing.get("log_dir", "logs")),
             ),
+            tts=_tts_config(data.get("tts")),
             related=RelatedConfig(
                 history_query=(
                     str(related_value["history_query"]).strip() or None

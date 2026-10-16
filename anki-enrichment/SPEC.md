@@ -286,6 +286,12 @@ class TTSProvider:
         ...
 ```
 
+Для колоды Refold это делает `sentence_meaning_ru_audio.py`: источник —
+`SentenceMeaningRu`, назначение — `SentenceMeaningRuAudio`, провайдер — ProxyAPI
+`POST /v1/audio/speech`, модель `openai/gpt-4o-mini-tts`. Голос для каждой заметки
+выбирается случайно из настроенного списка. Повторный запуск не озвучивает поле,
+в котором уже есть `[sound:...]`.
+
 ---
 
 # Кеш TTS

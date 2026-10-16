@@ -4,6 +4,7 @@
 пересоздают cards, плюс один read-only отчёт:
 
 - `ru_translation.py` добавляет русские переводы;
+- `sentence_meaning_ru_audio.py` озвучивает `SentenceMeaningRu`;
 - `same_hanzi_pinyin.py` добавляет `SameHanzi` и `SamePinyinMatrix`;
 - `known_char_sentences.py` находит предложения только из хорошо выученных иероглифов.
 
@@ -135,6 +136,26 @@ python3 ru_translation.py --enrich \
   --query 'deck:"Mandarin HSK 1000-5000"' \
   --limit 10 --backup-confirmed
 ```
+
+## Озвучка русского предложения
+
+`sentence_meaning_ru_audio.py` читает `SentenceMeaningRu` и записывает mp3 в новое
+поле `SentenceMeaningRuAudio` той же заметки. Запрос по умолчанию — колода
+`Refold Mandarin 1k Simplified` (`tts.query`), а не `anki.query`. Пустой перевод
+пропускается, уже заполненное поле не перезаписывается.
+
+Модель ProxyAPI — `openai/gpt-4o-mini-tts` (имя `gpt-4o-tts-mini` в конфиге
+тоже принимается). Для каждой заметки голос выбирается случайно из `tts.voices`.
+Ключ берётся из `PROXYAPI_API_KEY`.
+
+```bash
+python3 sentence_meaning_ru_audio.py --dry-run --limit 10
+python3 sentence_meaning_ru_audio.py --enrich --limit 10 --backup-confirmed
+```
+
+Без флага скрипт делает то же, что `--dry-run`: ничего не синтезирует и не пишет
+в Anki. Чтобы ролик играл на карточке, добавьте `{{SentenceMeaningRuAudio}}` в
+шаблон.
 
 ## Предложения из известных иероглифов
 

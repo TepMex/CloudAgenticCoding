@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import urllib.error
 import urllib.request
@@ -76,6 +77,17 @@ class AnkiConnect:
 
     def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         self.invoke("updateNoteFields", note={"id": note_id, "fields": fields})
+
+    def media_file_names(self, pattern: str) -> set[str]:
+        return {str(name) for name in self.invoke("getMediaFilesNames", pattern=pattern)}
+
+    def store_media_file(self, filename: str, data: bytes) -> str:
+        stored = self.invoke(
+            "storeMediaFile",
+            filename=filename,
+            data=base64.b64encode(data).decode("ascii"),
+        )
+        return str(stored or filename)
 
     def cards_info(self, card_ids: Iterable[int]) -> list[dict[str, Any]]:
         ids = list(card_ids)
