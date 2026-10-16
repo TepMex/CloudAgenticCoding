@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
@@ -38,7 +39,7 @@ class StatsChartTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun chartDrawsListensAveragesAndThePercentOnOnePlot() {
+    fun chartDrawsTheIndicatorAndBothListenWindows() {
         compose.setContent {
             TingliTheme {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -47,19 +48,22 @@ class StatsChartTest {
             }
         }
 
-        compose.onNodeWithText("Прослушивания").assertIsDisplayed()
-        compose.onNodeWithText("Среднее 5").assertIsDisplayed()
-        compose.onNodeWithText("Среднее 10").assertIsDisplayed()
-        compose.onNodeWithText("Верные, %").assertIsDisplayed()
-        compose.onNodeWithText("Левая ось — число прослушиваний.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Показатель").assertIsDisplayed()
+        compose.onNodeWithText("Окно 5").assertIsDisplayed()
+        compose.onNodeWithText("Окно 10").assertIsDisplayed()
+        compose.onNodeWithText("Окно 5 и окно 10", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Средний показатель 66,7").assertIsDisplayed()
+        compose.onNodeWithText("Без ответа не учтено 20 прослушиваний.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("20 прослушиваний, без ответа").assertIsDisplayed()
+        compose.onAllNodesWithText("100 · 1 прослушивание")[0].assertIsDisplayed()
+        compose.onNodeWithText("Верные, %").assertDoesNotExist()
         compose.onNodeWithTag(StatsChartTag).assertIsDisplayed()
 
         val bitmap = chartBitmap()
         save(drawScreen(), "stats-chart-light.png")
-        assertTrue("listen line is visible", countNear(bitmap, 0xFF8E3428.toInt()) > 12)
-        assertTrue("five-story average is visible", countNear(bitmap, 0xFF1F6B4A.toInt()) > 12)
-        assertTrue("ten-story average is visible", countNear(bitmap, 0xFF24557A.toInt()) > 8)
-        assertTrue("percent line is visible", countNear(bitmap, 0xFFB86A14.toInt()) > 8)
+        assertTrue("indicator line is visible", countNear(bitmap, 0xFF8E3428.toInt()) > 12)
+        assertTrue("window of 5 is visible", countNear(bitmap, 0xFF1F6B4A.toInt()) > 12)
+        assertTrue("window of 10 is visible", countNear(bitmap, 0xFF24557A.toInt()) > 8)
     }
 
     @Test
@@ -72,14 +76,13 @@ class StatsChartTest {
                 }
             }
         }
-        compose.onNodeWithText("Среднее 5").assertIsDisplayed()
-        compose.onNodeWithText("Среднее 10").assertIsDisplayed()
+        compose.onNodeWithText("Окно 5").assertIsDisplayed()
+        compose.onNodeWithText("Окно 10").assertIsDisplayed()
         val bitmap = chartBitmap()
         save(drawScreen(), "stats-chart-dark.png")
         assertTrue(countNear(bitmap, 0xFFE7B2A8.toInt()) > 12)
         assertTrue(countNear(bitmap, 0xFF9ED4B8.toInt()) > 12)
         assertTrue(countNear(bitmap, 0xFF8FB8DC.toInt()) > 8)
-        assertTrue(countNear(bitmap, 0xFFE4C07A.toInt()) > 8)
     }
 
     @Test
@@ -93,7 +96,7 @@ class StatsChartTest {
         }
         compose.onNodeWithText("Импортируйте архив, чтобы увидеть статистику.").assertIsDisplayed()
         compose.onNodeWithTag(StatsChartTag).assertDoesNotExist()
-        compose.onNodeWithText("Прослушивания").assertDoesNotExist()
+        compose.onNodeWithText("Показатель").assertDoesNotExist()
     }
 
     private fun chartBitmap(): Bitmap {
@@ -142,8 +145,8 @@ class StatsChartTest {
 }
 
 private fun chartLibrary(): Library {
-    val listens = listOf(1, 2, 3, 4, 12, 2, 2, 2, 2, 2, 8, 1)
-    val stories = listens.mapIndexed { index, _ ->
+    val scores = listOf(4, 2, 3, 1, 4, 2, 3, 1, 4, 2, 3, 1, 4, 2, 4)
+    val stories = List(scores.size + 1) { index ->
         Story(
             id = index + 1,
             title = "故事${index + 1}",
@@ -153,14 +156,15 @@ private fun chartLibrary(): Library {
             hasQuestionsAudio = true,
         )
     }
-    val progress = listens.mapIndexed { index, count ->
-        val evaluation = when (index) {
-            9 -> Evaluation(2, 4, "ok", emptyList())
-            10 -> Evaluation(4, 4, "ok", emptyList())
-            11 -> Evaluation(0, 4, "ok", emptyList())
-            else -> null
+    val progress = buildMap {
+        put(1, StoryProgress(listenCount = 1, evaluation = Evaluation(scores[0], 4, "ok", emptyList())))
+        put(2, StoryProgress(listenCount = 20))
+        scores.drop(1).forEachIndexed { offset, score ->
+            put(
+                offset + 3,
+                StoryProgress(listenCount = 1, evaluation = Evaluation(score, 4, "ok", emptyList())),
+            )
         }
-        (index + 1) to StoryProgress(listenCount = count, evaluation = evaluation)
-    }.toMap()
+    }
     return Library(level = "HSK 4", stories = stories, progress = progress)
 }

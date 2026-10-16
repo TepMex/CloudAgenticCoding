@@ -24,9 +24,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.tepmex.tinglistories.domain.countedListenCount
+import com.tepmex.tinglistories.domain.formatStat
+import com.tepmex.tinglistories.domain.listenScore
 import com.tepmex.tinglistories.domain.listensLabel
+import com.tepmex.tinglistories.domain.meanIndicator
+import com.tepmex.tinglistories.domain.StoryProgress
 import com.tepmex.tinglistories.domain.showStoryTitle
+import com.tepmex.tinglistories.domain.statsAccounting
 import com.tepmex.tinglistories.domain.storyStats
+import com.tepmex.tinglistories.domain.unansweredListenCount
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,14 +58,35 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
             )
         } else {
+            val points = storyStats(library)
+            val mean = meanIndicator(points)
             LazyColumn(
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 item {
+                    if (mean != null) {
+                        Text(
+                            "Средний показатель ${formatStat(mean)}",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    }
                     Text(
-                        "Всего ${listensLabel(library.totalListens)}",
-                        style = MaterialTheme.typography.titleLarge,
+                        statsAccounting(
+                            countedListenCount(library),
+                            points.size,
+                            unansweredListenCount(library),
+                        ),
+                        style = if (mean == null) {
+                            MaterialTheme.typography.titleLarge
+                        } else {
+                            MaterialTheme.typography.bodyLarge
+                        },
+                        color = if (mean == null) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                     Text(
                         "Пройдено ${library.completedCount} из ${library.stories.size}",
@@ -66,18 +94,22 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Прослушивание — каждое нажатие Play, и для истории, и для вопросов.",
+                        "Показатель — процент верных ответов, делённый на число прослушиваний. История без ответа в расчёт не входит.",
                         modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    StatsChart(
-                        points = storyStats(library),
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
+                    if (points.isNotEmpty()) {
+                        StatsChart(
+                            points = points,
+                            modifier = Modifier.padding(bottom = 16.dp),
+                        )
+                    }
                 }
                 itemsIndexed(library.stories, key = { _, story -> story.id }) { index, story ->
                     val progress = library.progressOf(story.id)
+                    val score = listenScore(progress)
+                    val excluded = progress.evaluation == null
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -98,13 +130,35 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
                             Spacer(Modifier.weight(1f))
                         }
                         Text(
-                            listensLabel(progress.listenCount),
+                            statsRowValue(progress, score),
+                            modifier = Modifier.padding(start = 8.dp),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = if (excluded || score == null) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 }
             }
         }
+    }
+}
+
+private fun statsRowValue(progress: StoryProgress, score: Double?): String {
+    if (score != null) return "${formatStat(score)} · ${listensLabel(progress.listenCount)}"
+    if (progress.evaluation == null) {
+        return if (progress.listenCount > 0) {
+            "${listensLabel(progress.listenCount)}, без ответа"
+        } else {
+            "без ответа"
+        }
+    }
+    return if (progress.listenCount > 0) {
+        "${listensLabel(progress.listenCount)}, нет процента"
+    } else {
+        "нет показателя"
     }
 }
