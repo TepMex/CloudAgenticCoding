@@ -45,20 +45,18 @@ internal const val StatsChartTag = "stats-chart"
 
 @Immutable
 internal data class StatsChartPalette(
-    val listens: Color,
-    val average5: Color,
-    val average10: Color,
-    val percent: Color,
+    val indicator: Color,
+    val window5: Color,
+    val window10: Color,
 )
 
 @Composable
 internal fun statsChartPalette(): StatsChartPalette {
     val dark = isSystemInDarkTheme()
     return StatsChartPalette(
-        listens = MaterialTheme.colorScheme.primary,
-        average5 = MaterialTheme.colorScheme.secondary,
-        average10 = if (dark) Color(0xFF8FB8DC) else Color(0xFF24557A),
-        percent = if (dark) Color(0xFFE4C07A) else Color(0xFFB86A14),
+        indicator = MaterialTheme.colorScheme.primary,
+        window5 = MaterialTheme.colorScheme.secondary,
+        window10 = if (dark) Color(0xFF8FB8DC) else Color(0xFF24557A),
     )
 }
 
@@ -75,10 +73,9 @@ fun StatsChart(points: List<StatsPoint>, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
-            LegendItem(palette.listens, "Прослушивания")
-            LegendItem(palette.average5, "Среднее 5")
-            LegendItem(palette.average10, "Среднее 10")
-            LegendItem(palette.percent, "Верные, %")
+            LegendItem(palette.indicator, "Показатель")
+            LegendItem(palette.window5, "Окно 5")
+            LegendItem(palette.window10, "Окно 10")
         }
         Canvas(
             Modifier
@@ -90,7 +87,7 @@ fun StatsChart(points: List<StatsPoint>, modifier: Modifier = Modifier) {
             drawStatsPlot(points, palette, axisColor, gridColor)
         }
         Text(
-            "Левая ось — число прослушиваний. Правая — процент верных ответов. Среднее считается по текущей истории и предыдущим, когда в окне уже 5 или 10 историй.",
+            "Окно 5 и окно 10 — среднее этого показателя по последним 5 и 10 прослушиваниям. Каждое прослушивание несёт показатель своей истории.",
             modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -132,17 +129,16 @@ private fun DrawScope.drawStatsPlot(
     }
     val axis = listenAxis(chartPeak(points))
     val leftReserve = axis.ticks.maxOf { labelPaint.measureText(it.toString()) } + 8.dp.toPx()
-    val rightReserve = labelPaint.measureText("100%") + 8.dp.toPx()
+    val rightPad = 8.dp.toPx()
     val labelHeight = labelPaint.fontMetrics.let { it.descent - it.ascent }
     val plotLeft = leftReserve
-    val plotRight = size.width - rightReserve
+    val plotRight = size.width - rightPad
     val plotTop = labelHeight / 2f + 4.dp.toPx()
     val plotBottom = size.height - labelHeight - 8.dp.toPx()
     if (plotRight <= plotLeft || plotBottom <= plotTop) return
 
-    val listenTop = axis.top.toFloat()
-    fun yListen(value: Float): Float = plotBottom - (plotBottom - plotTop) * (value / listenTop)
-    fun yPercent(value: Float): Float = plotBottom - (plotBottom - plotTop) * (value / 100f)
+    val valueTop = axis.top.toFloat()
+    fun yOf(value: Float): Float = plotBottom - (plotBottom - plotTop) * (value / valueTop)
     fun xAt(index: Int): Float {
         if (points.size <= 1) return (plotLeft + plotRight) / 2f
         return plotLeft + (plotRight - plotLeft) * index / (points.size - 1)
@@ -150,48 +146,39 @@ private fun DrawScope.drawStatsPlot(
 
     val grid = gridColor.copy(alpha = 0.85f)
     for (tick in axis.ticks) {
-        val y = yListen(tick.toFloat())
+        val y = yOf(tick.toFloat())
         drawLine(grid, Offset(plotLeft, y), Offset(plotRight, y), strokeWidth = 1.dp.toPx())
-        drawAxisLabel(tick.toString(), 0f, y, labelPaint, Align.LEFT)
-    }
-    for (tick in listOf(0, 50, 100)) {
-        drawAxisLabel("$tick%", size.width, yPercent(tick.toFloat()), labelPaint, Align.RIGHT)
+        drawAxisLabel(tick.toString(), 0f, y, labelPaint)
     }
 
-    val percentValues = points.map { it.correctPercent }
-    val shortValues = points.map { it.average5 }
-    val longValues = points.map { it.average10 }
-    drawSeries(percentValues, palette.percent, 2.dp.toPx(), ::xAt, ::yPercent)
-    drawSeries(longValues, palette.average10, 2.dp.toPx(), ::xAt) { yListen(it) }
-    drawSeries(shortValues, palette.average5, 2.dp.toPx(), ::xAt) { yListen(it) }
+    drawSeries(points.map { it.window10 }, palette.window10, 2.dp.toPx(), ::xAt, ::yOf)
+    drawSeries(points.map { it.window5 }, palette.window5, 2.dp.toPx(), ::xAt, ::yOf)
     drawSeries(
-        points.map<StatsPoint, Double?> { it.listens.toDouble() },
-        palette.listens,
+        points.map<StatsPoint, Double?> { it.indicator },
+        palette.indicator,
         2.5.dp.toPx(),
         ::xAt,
-    ) { yListen(it) }
+        ::yOf,
+    )
 
     labelPaint.textAlign = Paint.Align.CENTER
     val baseline = size.height - labelPaint.fontMetrics.descent
     for (index in catalogLabelIndices(points.size)) {
-        val label = (index + 1).toString().padStart(2, '0')
+        val label = points[index].catalogNumber.toString().padStart(2, '0')
         val width = labelPaint.measureText(label)
         val x = xAt(index).coerceIn(width / 2f, size.width - width / 2f)
         drawContext.canvas.nativeCanvas.drawText(label, x, baseline, labelPaint)
     }
 }
 
-private enum class Align { LEFT, RIGHT }
-
 private fun DrawScope.drawAxisLabel(
     text: String,
     anchorX: Float,
     centerY: Float,
     paint: Paint,
-    align: Align,
 ) {
     val previous = paint.textAlign
-    paint.textAlign = if (align == Align.RIGHT) Paint.Align.RIGHT else Paint.Align.LEFT
+    paint.textAlign = Paint.Align.LEFT
     val baseline = centerY - (paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f
     drawContext.canvas.nativeCanvas.drawText(text, anchorX, baseline, paint)
     paint.textAlign = previous

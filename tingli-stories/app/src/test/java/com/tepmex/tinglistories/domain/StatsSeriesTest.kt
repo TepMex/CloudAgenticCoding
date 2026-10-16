@@ -7,50 +7,94 @@ import org.junit.Test
 
 class StatsSeriesTest {
     @Test
-    fun trailingMeansStartOnlyWhenTheWindowIsFull() {
-        val values = listOf(1, 2, 3, 4, 5, 6)
-        val short = trailingAverage(values, 5)
-        assertEquals(listOf(null, null, null, null, 3.0, 4.0), short)
-        assertEquals(List(6) { null }, trailingAverage(values, 10))
-
-        val ten = (1..10).toList()
-        val long = trailingAverage(ten, 10)
-        assertNull(long[8])
-        assertEquals(5.5, long[9]!!, 0.0001)
+    fun listenScoreDividesPercentByListensAndSkipsAnUnansweredStory() {
+        assertNull(listenScore(StoryProgress(listenCount = 4)))
+        assertNull(listenScore(StoryProgress(evaluation = Evaluation(1, 0, "ok", emptyList()), listenCount = 2)))
+        assertNull(listenScore(graded(2, 4, listens = 0)))
+        assertEquals(50.0 / 3.0, listenScore(graded(2, 4, listens = 3))!!, 0.0001)
+        assertEquals(0.0, listenScore(graded(0, 4, listens = 4))!!, 0.0001)
+        assertEquals(50.0, listenScore(graded(9, 4, listens = 2))!!, 0.0001)
+        assertEquals(100.0, listenScore(graded(4, 4, listens = 1))!!, 0.0001)
     }
 
     @Test
-    fun correctPercentFollowsTheGradeAndSkipsAMissingOne() {
-        assertNull(correctPercent(StoryProgress(listenCount = 4)))
-        assertNull(correctPercent(StoryProgress(evaluation = Evaluation(1, 0, "ok", emptyList()))))
-        assertEquals(50.0, correctPercent(graded(2, 4))!!, 0.0001)
-        assertEquals(0.0, correctPercent(graded(0, 4))!!, 0.0001)
-        assertEquals(100.0, correctPercent(graded(9, 4))!!, 0.0001)
-    }
-
-    @Test
-    fun storyStatsKeepsCatalogOrderAndBreaksThePercentLine() {
+    fun windowOfFiveListensSkipsAStoryWithNoAnswer() {
         val library = libraryOf(
-            listens = listOf(1, 2, 3, 4, 5, 6),
-            grades = listOf(graded(2, 4), null, graded(4, 4), null, null, graded(1, 0)),
+            listens = listOf(3, 2, 10, 4),
+            grades = listOf(graded(2, 4), graded(4, 4), null, graded(0, 4)),
         )
         val points = storyStats(library)
-        assertEquals(listOf(1, 2, 3, 4, 5, 6), points.map { it.listens })
-        assertEquals(3.0, points[4].average5!!, 0.0001)
-        assertEquals(4.0, points[5].average5!!, 0.0001)
-        assertNull(points[3].average5)
-        assertNull(points[5].average10)
-        assertEquals(50.0, points[0].correctPercent!!, 0.0001)
-        assertNull(points[1].correctPercent)
-        assertEquals(100.0, points[2].correctPercent!!, 0.0001)
-        assertNull(points[5].correctPercent)
+        assertEquals(listOf(1, 2, 4), points.map { it.catalogNumber })
+        assertEquals(50.0 / 3.0, points[0].indicator, 0.0001)
+        assertEquals(50.0, points[1].indicator, 0.0001)
+        assertEquals(0.0, points[2].indicator, 0.0001)
 
-        val runs = valueRuns(points.map { it.correctPercent })
-        assertEquals(listOf(0..0, 2..2), runs)
+        assertNull(points[0].window5)
+        assertEquals(30.0, points[1].window5!!, 0.0001)
+        assertEquals(10.0, points[2].window5!!, 0.0001)
+        assertNull(points[0].window10)
+        assertNull(points[1].window10)
+        assertNull(points[2].window10)
+
+        val runs = valueRuns(points.map { it.window5 })
+        assertEquals(listOf(1..2), runs)
+
+        assertEquals(9, countedListenCount(library))
+        assertEquals(10, unansweredListenCount(library))
+        assertEquals(
+            "Учтено 9 прослушиваний. В расчёте 3 истории с ответом. Без ответа не учтено 10 прослушиваний.",
+            statsAccounting(9, 3, 10),
+        )
     }
 
     @Test
-    fun listenAxisCoversThePeakWithRoomForBothAverages() {
+    fun windowOfTenUsesOnlyCountedListensAndAPartialOlderStory() {
+        val listens = List(12) { 1 }
+        val grades = listens.indices.map { index ->
+            if (index == 4) null else graded(4, 4, listens = 1)
+        }
+        val points = storyStats(libraryOf(listens, grades))
+        assertEquals(11, points.size)
+        assertEquals(listOf(1, 2, 3, 4, 6), points.take(5).map { it.catalogNumber })
+        assertNull(points[8].window10)
+        assertEquals(100.0, points[9].window10!!, 0.0001)
+        assertEquals(100.0, points[10].window10!!, 0.0001)
+        assertNull(points[3].window5)
+        assertEquals(100.0, points[4].window5!!, 0.0001)
+    }
+
+    @Test
+    fun aGradeWithoutQuestionsOrListensAddsNoPoint() {
+        val library = libraryOf(
+            listens = listOf(5, 0, 2),
+            grades = listOf(
+                StoryProgress(listenCount = 5, evaluation = Evaluation(1, 0, "ok", emptyList())),
+                graded(4, 4, listens = 0),
+                graded(2, 4, listens = 2),
+            ),
+        )
+        val points = storyStats(library)
+        assertEquals(1, points.size)
+        assertEquals(3, points[0].catalogNumber)
+        assertEquals(25.0, points[0].indicator, 0.0001)
+        assertEquals(2, countedListenCount(library))
+        assertEquals(0, unansweredListenCount(library))
+    }
+
+    @Test
+    fun trailingWindowWeightsEachListenByItsStoryIndicator() {
+        val values = listOf(10.0, 40.0)
+        val listens = listOf(8, 2)
+        val short = trailingListenWindow(listens, values, 5)
+        assertEquals(10.0, short[0]!!, 0.0001)
+        assertEquals((10.0 * 3 + 40.0 * 2) / 5.0, short[1]!!, 0.0001)
+        val long = trailingListenWindow(listens, values, 10)
+        assertNull(long[0])
+        assertEquals((10.0 * 8 + 40.0 * 2) / 10.0, long[1]!!, 0.0001)
+    }
+
+    @Test
+    fun listenAxisCoversThePeakOfTheIndicatorAndTheWindows() {
         assertEquals(ListenAxis(1, listOf(0, 1)), listenAxis(0.0))
         assertEquals(ListenAxis(4, listOf(0, 1, 2, 3, 4)), listenAxis(3.2))
         assertEquals(ListenAxis(10, listOf(0, 5, 10)), listenAxis(10.0))
@@ -60,7 +104,7 @@ class StatsSeriesTest {
         assertEquals(40, axis.ticks.last())
 
         val points = listOf(
-            StatsPoint(listens = 2, average5 = 6.0, average10 = null, correctPercent = 100.0),
+            StatsPoint(catalogNumber = 1, indicator = 2.0, window5 = 6.0, window10 = null),
         )
         assertEquals(6.0, chartPeak(points), 0.0001)
         assertEquals(listOf(0, 2, 4, 6), listenAxis(chartPeak(points)).ticks)
@@ -80,23 +124,36 @@ class StatsSeriesTest {
     }
 
     @Test
-    fun chartDescriptionMentionsTheSeriesAndTheMeanPercent() {
+    fun chartDescriptionMentionsTheIndicatorAndSkipsAnEmptyLibrary() {
         val empty = storyStats(Library())
         assertEquals(
-            "График прослушиваний, средних по 5 и 10 историям и процента верных ответов. Проверенных историй нет.",
+            "График показателя: процент верных ответов, делённый на число прослушиваний. " +
+                "Окна 5 и 10 — среднее по последним прослушиваниям. Историй с ответом нет.",
             statsChartDescription(empty),
         )
         val graded = storyStats(
-            libraryOf(listOf(1, 3), listOf(graded(1, 4), graded(3, 4))),
+            libraryOf(
+                listens = listOf(3, 2, 10, 4),
+                grades = listOf(graded(2, 4), graded(4, 4), null, graded(0, 4)),
+            ),
         )
         assertEquals(
-            "График прослушиваний, средних по 5 и 10 историям и процента верных ответов. Средний процент верных: 50.",
+            "График показателя: процент верных ответов, делённый на число прослушиваний. " +
+                "Окна 5 и 10 — среднее по последним прослушиваниям. Средний показатель: 22.",
             statsChartDescription(graded),
         )
+        assertEquals("16,7", formatStat(50.0 / 3.0))
+        assertEquals("50", formatStat(50.0))
+        assertEquals("22,2", formatStat(meanIndicator(storyStats(
+            libraryOf(
+                listens = listOf(3, 2, 10, 4),
+                grades = listOf(graded(2, 4), graded(4, 4), null, graded(0, 4)),
+            ),
+        ))!!))
     }
 
-    private fun graded(score: Int, max: Int) = StoryProgress(
-        listenCount = 1,
+    private fun graded(score: Int, max: Int, listens: Int = 1) = StoryProgress(
+        listenCount = listens,
         evaluation = Evaluation(score, max, "ok", emptyList()),
     )
 

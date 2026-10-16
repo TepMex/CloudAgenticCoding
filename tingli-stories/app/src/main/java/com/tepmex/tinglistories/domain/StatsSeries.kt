@@ -6,54 +6,52 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-const val LISTEN_AVERAGE_SHORT = 5
-const val LISTEN_AVERAGE_LONG = 10
+const val LISTEN_WINDOW_SHORT = 5
+const val LISTEN_WINDOW_LONG = 10
 
-/** One catalog position on the statistics chart. Averages and the percent may be absent. */
+/**
+ * One answered story on the statistics chart.
+ * [indicator] is the percent of correct answers divided by the listen count.
+ * [window5] and [window10] average that indicator over the last 5 and 10
+ * counted listens and stay absent until the window is full.
+ */
 data class StatsPoint(
-    val listens: Int,
-    val average5: Double?,
-    val average10: Double?,
-    val correctPercent: Double?,
+    val catalogNumber: Int,
+    val indicator: Double,
+    val window5: Double?,
+    val window10: Double?,
 )
 
-/** Integer ticks for the listen axis. [top] is the highest tick. */
+/** Integer ticks for the indicator axis. [top] is the highest tick. */
 data class ListenAxis(
     val top: Int,
     val ticks: List<Int>,
 )
 
+private data class ScoredStory(
+    val catalogNumber: Int,
+    val listens: Int,
+    val indicator: Double,
+)
+
 /**
- * Catalog order, one point per story.
- * [StatsPoint.average5] and [StatsPoint.average10] are trailing means of the listen
- * count and stay absent until the window is full. [StatsPoint.correctPercent] is
- * absent when the story has no usable grade.
+ * Answered stories only, in catalog order.
+ * A story with no grade, a grade max of 0, or no listens is left out, so its
+ * plays do not fill a window and do not break the line.
  */
 fun storyStats(library: Library): List<StatsPoint> {
-    val listens = library.stories.map { library.progressOf(it.id).listenCount.coerceAtLeast(0) }
-    val short = trailingAverage(listens, LISTEN_AVERAGE_SHORT)
-    val long = trailingAverage(listens, LISTEN_AVERAGE_LONG)
-    return library.stories.indices.map { index ->
+    val scored = scoredStories(library)
+    val listens = scored.map { it.listens }
+    val indicators = scored.map { it.indicator }
+    val short = trailingListenWindow(listens, indicators, LISTEN_WINDOW_SHORT)
+    val long = trailingListenWindow(listens, indicators, LISTEN_WINDOW_LONG)
+    return scored.mapIndexed { index, story ->
         StatsPoint(
-            listens = listens[index],
-            average5 = short[index],
-            average10 = long[index],
-            correctPercent = correctPercent(library.progressOf(library.stories[index].id)),
+            catalogNumber = story.catalogNumber,
+            indicator = story.indicator,
+            window5 = short[index],
+            window10 = long[index],
         )
-    }
-}
-
-/** Mean of this value and the ones before it. The first `window - 1` places stay empty. */
-fun trailingAverage(values: List<Int>, window: Int): List<Double?> {
-    require(window >= 1) { "window must be at least 1" }
-    return List(values.size) { index ->
-        if (index + 1 < window) {
-            null
-        } else {
-            var sum = 0
-            for (offset in index - window + 1..index) sum += values[offset]
-            sum.toDouble() / window.toDouble()
-        }
     }
 }
 
@@ -64,14 +62,81 @@ fun correctPercent(progress: StoryProgress): Double? {
     return grade.score.coerceIn(0, grade.max) * 100.0 / grade.max.toDouble()
 }
 
-/** Highest listen value among the raw counts and both averages. */
+/**
+ * Percent of correct answers divided by the listen count.
+ * Absent when [correctPercent] is absent or the story was never played.
+ */
+fun listenScore(progress: StoryProgress): Double? {
+    val percent = correctPercent(progress) ?: return null
+    val listens = progress.listenCount
+    if (listens <= 0) return null
+    return percent / listens.toDouble()
+}
+
+/** Plays that enter [listenScore]. Listens without an answer are not here. */
+fun countedListenCount(library: Library): Int =
+    scoredStories(library).sumOf { it.listens }
+
+/** Plays on stories that have no grade yet. */
+fun unansweredListenCount(library: Library): Int =
+    library.stories.sumOf { story ->
+        val progress = library.progressOf(story.id)
+        if (progress.evaluation == null) progress.listenCount.coerceAtLeast(0) else 0
+    }
+
+/** Mean of the per-story indicator. Empty when nothing was answered. */
+fun meanIndicator(points: List<StatsPoint>): Double? =
+    if (points.isEmpty()) null else points.map { it.indicator }.average()
+
+fun statsAccounting(countedListens: Int, scoredStories: Int, unansweredListens: Int): String {
+    val base = "Учтено ${listensLabel(countedListens)}. В расчёте ${storiesLabel(scoredStories)} с ответом."
+    if (unansweredListens <= 0) return base
+    return "$base Без ответа не учтено ${listensLabel(unansweredListens)}."
+}
+
+/** One decimal when needed, with a comma. Non-positive values become 0. */
+fun formatStat(value: Double): String {
+    val scaled = (value.coerceAtLeast(0.0) * 10.0).roundToInt()
+    val whole = scaled / 10
+    val frac = scaled % 10
+    return if (frac == 0) whole.toString() else "$whole,$frac"
+}
+
+/**
+ * Mean of [values] over the last [window] listens, ending at each index.
+ * Every listen of a story carries that story’s value. The oldest story in the
+ * window may contribute only some of its listens. The result stays empty until
+ * [window] listens have accumulated.
+ */
+fun trailingListenWindow(listens: List<Int>, values: List<Double>, window: Int): List<Double?> {
+    require(window >= 1) { "window must be at least 1" }
+    require(listens.size == values.size) { "listens and values must match" }
+    return List(values.size) { index ->
+        var remaining = window
+        var weighted = 0.0
+        var covered = 0
+        var cursor = index
+        while (cursor >= 0 && remaining > 0) {
+            val take = minOf(listens[cursor].coerceAtLeast(0), remaining)
+            if (take > 0) {
+                weighted += values[cursor] * take
+                covered += take
+                remaining -= take
+            }
+            cursor--
+        }
+        if (covered < window) null else weighted / window.toDouble()
+    }
+}
+
+/** Highest value among the indicator and both windows. */
 fun chartPeak(points: List<StatsPoint>): Double {
     var peak = 0.0
     for (point in points) {
-        if (point.listens > peak) peak = point.listens.toDouble()
-        val short = point.average5
+        if (point.indicator > peak) peak = point.indicator
+        val short = point.window5
         if (short != null && short > peak) peak = short
-        val long = point.average10
+        val long = point.window10
         if (long != null && long > peak) peak = long
     }
     return peak
@@ -121,14 +186,25 @@ fun valueRuns(values: List<Double?>): List<IntRange> {
 }
 
 fun statsChartDescription(points: List<StatsPoint>): String {
-    val graded = points.mapNotNull { it.correctPercent }
-    val percentSentence = if (graded.isEmpty()) {
-        "Проверенных историй нет."
+    val sentence = if (points.isEmpty()) {
+        "Историй с ответом нет."
     } else {
-        "Средний процент верных: ${graded.average().roundToInt()}."
+        "Средний показатель: ${points.map { it.indicator }.average().roundToInt()}."
     }
-    return "График прослушиваний, средних по 5 и 10 историям и процента верных ответов. $percentSentence"
+    return "График показателя: процент верных ответов, делённый на число прослушиваний. " +
+        "Окна 5 и 10 — среднее по последним прослушиваниям. $sentence"
 }
+
+private fun scoredStories(library: Library): List<ScoredStory> =
+    library.stories.mapIndexedNotNull { index, story ->
+        val progress = library.progressOf(story.id)
+        val indicator = listenScore(progress) ?: return@mapIndexedNotNull null
+        ScoredStory(
+            catalogNumber = index + 1,
+            listens = progress.listenCount,
+            indicator = indicator,
+        )
+    }
 
 private fun niceStep(rough: Double): Int {
     val safe = rough.coerceAtLeast(1.0)
