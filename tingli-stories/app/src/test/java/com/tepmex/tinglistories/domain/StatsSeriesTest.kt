@@ -82,6 +82,41 @@ class StatsSeriesTest {
     }
 
     @Test
+    fun circleStaysBrightAtTheMeanAndWithoutAnIndicator() {
+        assertEquals(
+            setOf(1, 4),
+            dimmedStoryIds(
+                libraryOf(
+                    listens = listOf(3, 2, 10, 4),
+                    grades = listOf(graded(2, 4), graded(4, 4), null, graded(0, 4)),
+                ),
+            ),
+        )
+        assertEquals(
+            emptySet<Int>(),
+            dimmedStoryIds(libraryOf(listOf(2, 2), listOf(graded(4, 4), graded(4, 4)))),
+        )
+        assertEquals(
+            emptySet<Int>(),
+            dimmedStoryIds(libraryOf(listOf(3), listOf(graded(2, 4)))),
+        )
+        assertEquals(
+            emptySet<Int>(),
+            dimmedStoryIds(libraryOf(listOf(0, 2), listOf(graded(4, 4), graded(0, 4)))),
+        )
+        assertEquals(
+            setOf(2),
+            dimmedStoryIds(
+                libraryOf(
+                    listOf(1, 1, 1),
+                    listOf(graded(4, 4), graded(0, 4), graded(2, 4)),
+                ),
+            ),
+        )
+        assertEquals(emptySet<Int>(), dimmedStoryIds(Library()))
+    }
+
+    @Test
     fun trailingWindowWeightsEachListenByItsStoryIndicator() {
         val values = listOf(10.0, 40.0)
         val listens = listOf(8, 2)

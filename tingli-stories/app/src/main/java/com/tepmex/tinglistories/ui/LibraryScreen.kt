@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.tinglistories.domain.StoryProgress
 import com.tepmex.tinglistories.domain.audioCoverageNote
+import com.tepmex.tinglistories.domain.dimmedStoryIds
 import com.tepmex.tinglistories.domain.listenMark
 import com.tepmex.tinglistories.domain.listenMarkDescription
 import com.tepmex.tinglistories.domain.showStoryTitle
@@ -87,6 +88,7 @@ fun LibraryScreen(
             EmptyLibrary(onImport = onImport, onSample = onSample, enabled = !state.busy)
         } else {
             val note = audioCoverageNote(library)
+            val dimmed = dimmedStoryIds(library)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
@@ -145,7 +147,8 @@ fun LibraryScreen(
                             }
                             ListenMarkBadge(
                                 progress,
-                                Modifier.testTag("listen-mark-${story.id}"),
+                                dimmed = story.id in dimmed,
+                                modifier = Modifier.testTag("listen-mark-${story.id}"),
                             )
                         }
                     }
@@ -156,16 +159,33 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun ListenMarkBadge(progress: StoryProgress, modifier: Modifier = Modifier) {
+private fun ListenMarkBadge(
+    progress: StoryProgress,
+    dimmed: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val mark = listenMark(progress)
-    val fillColor = MaterialTheme.colorScheme.secondaryContainer
-    val rimColor = MaterialTheme.colorScheme.secondary
+    val fillColor = if (dimmed) {
+        MaterialTheme.colorScheme.outline
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val rimColor = if (dimmed) {
+        MaterialTheme.colorScheme.outline
+    } else {
+        MaterialTheme.colorScheme.secondary
+    }
+    val digitColor = if (dimmed) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
     val trackColor = MaterialTheme.colorScheme.outline
     Box(
         modifier = modifier
             .size(48.dp)
             .semantics {
-                contentDescription = listenMarkDescription(progress)
+                contentDescription = listenMarkDescription(progress, dimmed)
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -212,7 +232,7 @@ private fun ListenMarkBadge(progress: StoryProgress, modifier: Modifier = Modifi
             Text(
                 text = digits,
                 modifier = Modifier.clearAndSetSemantics {},
-                color = MaterialTheme.colorScheme.onSurface,
+                color = digitColor,
                 style = if (digits.length >= 3) {
                     MaterialTheme.typography.labelLarge
                 } else {

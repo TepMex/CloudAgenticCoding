@@ -185,8 +185,11 @@ fun listenMark(progress: StoryProgress): ListenMark {
     )
 }
 
-/** Spoken label for the library circle. A blank circle says there is no attempt yet. */
-fun listenMarkDescription(progress: StoryProgress): String {
+/**
+ * Spoken label for the library circle. A blank circle says there is no attempt yet.
+ * [dimmed] adds that the indicator sits below the mean of completed stories.
+ */
+fun listenMarkDescription(progress: StoryProgress, dimmed: Boolean = false): String {
     val mark = listenMark(progress)
     val grade = progress.evaluation
     if (mark.count == null && grade == null) return "Нет ответов"
@@ -197,5 +200,6 @@ fun listenMarkDescription(progress: StoryProgress): String {
         val score = grade.score.coerceIn(0, max)
         parts += "верных $score из $max"
     }
+    if (dimmed) parts += "ниже среднего"
     return parts.joinToString(", ")
 }
