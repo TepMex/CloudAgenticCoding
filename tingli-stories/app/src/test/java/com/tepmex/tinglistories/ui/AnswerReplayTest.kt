@@ -3,6 +3,11 @@ package com.tepmex.tinglistories.ui
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -34,23 +39,25 @@ class AnswerReplayTest {
         var submits = 0
         compose.setContent {
             TingliTheme {
-                AnswerScreen(
-                    state = TingliUiState(
-                        ready = true,
-                        library = library(completed = true),
-                        playing = Playing(storyId = 1, kind = AudioKind.STORY),
-                        playbackPositionMs = 42_000,
-                        playbackDurationMs = 125_000,
-                    ),
-                    story = story(audio = true),
-                    onBack = {},
-                    onDraft = { _, _ -> },
-                    onSubmit = { submits++ },
-                    onReset = {},
-                    onNext = {},
-                    onReplay = { replays++ },
-                    onSeek = {},
-                )
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    AnswerScreen(
+                        state = TingliUiState(
+                            ready = true,
+                            library = library(completed = true),
+                            playing = Playing(storyId = 1, kind = AudioKind.STORY),
+                            playbackPositionMs = 42_000,
+                            playbackDurationMs = 125_000,
+                        ),
+                        story = story(audio = true),
+                        onBack = {},
+                        onDraft = { _, _ -> },
+                        onSubmit = { submits++ },
+                        onReset = {},
+                        onNext = {},
+                        onReplay = { replays++ },
+                        onSeek = {},
+                    )
+                }
             }
         }
         compose.onNodeWithText("Текст истории").assertIsDisplayed()
