@@ -6,20 +6,16 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-const val LISTEN_WINDOW_SHORT = 5
-const val LISTEN_WINDOW_LONG = 10
-
 /**
  * One answered story on the statistics chart.
  * [indicator] is the percent of correct answers divided by the listen count.
- * [window5] and [window10] average that indicator over the last 5 and 10
- * counted listens and stay absent until the window is full.
+ * [green] is true when that indicator is not strictly below the mean of the chart.
+ * The library circle uses the same split: green stays bright, gray is below the mean.
  */
 data class StatsPoint(
     val catalogNumber: Int,
     val indicator: Double,
-    val window5: Double?,
-    val window10: Double?,
+    val green: Boolean,
 )
 
 /** Integer ticks for the indicator axis. [top] is the highest tick. */
@@ -30,27 +26,28 @@ data class ListenAxis(
 
 private data class ScoredStory(
     val catalogNumber: Int,
-    val listens: Int,
     val indicator: Double,
 )
 
 /**
+ * Not strictly below [mean]. A story that equals the mean stays green,
+ * matching a library circle that is muted only when its indicator is lower.
+ */
+fun atOrAboveMean(indicator: Double, mean: Double): Boolean = indicator >= mean
+
+/**
  * Answered stories only, in catalog order.
- * A story with no grade, a grade max of 0, or no listens is left out, so its
- * plays do not fill a window and do not break the line.
+ * A story with no grade, a grade max of 0, or no listens is left out.
  */
 fun storyStats(library: Library): List<StatsPoint> {
     val scored = scoredStories(library)
-    val listens = scored.map { it.listens }
-    val indicators = scored.map { it.indicator }
-    val short = trailingListenWindow(listens, indicators, LISTEN_WINDOW_SHORT)
-    val long = trailingListenWindow(listens, indicators, LISTEN_WINDOW_LONG)
-    return scored.mapIndexed { index, story ->
+    if (scored.isEmpty()) return emptyList()
+    val mean = scored.map { it.indicator }.average()
+    return scored.map { story ->
         StatsPoint(
             catalogNumber = story.catalogNumber,
             indicator = story.indicator,
-            window5 = short[index],
-            window10 = long[index],
+            green = atOrAboveMean(story.indicator, mean),
         )
     }
 }
@@ -73,17 +70,6 @@ fun listenScore(progress: StoryProgress): Double? {
     return percent / listens.toDouble()
 }
 
-/** Plays that enter [listenScore]. Listens without an answer are not here. */
-fun countedListenCount(library: Library): Int =
-    scoredStories(library).sumOf { it.listens }
-
-/** Plays on stories that have no grade yet. */
-fun unansweredListenCount(library: Library): Int =
-    library.stories.sumOf { story ->
-        val progress = library.progressOf(story.id)
-        if (progress.evaluation == null) progress.listenCount.coerceAtLeast(0) else 0
-    }
-
 /** Mean of the per-story indicator. Empty when nothing was answered. */
 fun meanIndicator(points: List<StatsPoint>): Double? =
     if (points.isEmpty()) null else points.map { it.indicator }.average()
@@ -98,14 +84,8 @@ fun dimmedStoryIds(library: Library): Set<Int> {
     val mean = meanIndicator(storyStats(library)) ?: return emptySet()
     return library.stories.mapNotNull { story ->
         val score = listenScore(library.progressOf(story.id)) ?: return@mapNotNull null
-        if (score < mean) story.id else null
+        if (atOrAboveMean(score, mean)) null else story.id
     }.toSet()
-}
-
-fun statsAccounting(countedListens: Int, scoredStories: Int, unansweredListens: Int): String {
-    val base = "Учтено ${listensLabel(countedListens)}. В расчёте ${storiesLabel(scoredStories)} с ответом."
-    if (unansweredListens <= 0) return base
-    return "$base Без ответа не учтено ${listensLabel(unansweredListens)}."
 }
 
 /** One decimal when needed, with a comma. Non-positive values become 0. */
@@ -116,45 +96,9 @@ fun formatStat(value: Double): String {
     return if (frac == 0) whole.toString() else "$whole,$frac"
 }
 
-/**
- * Mean of [values] over the last [window] listens, ending at each index.
- * Every listen of a story carries that story’s value. The oldest story in the
- * window may contribute only some of its listens. The result stays empty until
- * [window] listens have accumulated.
- */
-fun trailingListenWindow(listens: List<Int>, values: List<Double>, window: Int): List<Double?> {
-    require(window >= 1) { "window must be at least 1" }
-    require(listens.size == values.size) { "listens and values must match" }
-    return List(values.size) { index ->
-        var remaining = window
-        var weighted = 0.0
-        var covered = 0
-        var cursor = index
-        while (cursor >= 0 && remaining > 0) {
-            val take = minOf(listens[cursor].coerceAtLeast(0), remaining)
-            if (take > 0) {
-                weighted += values[cursor] * take
-                covered += take
-                remaining -= take
-            }
-            cursor--
-        }
-        if (covered < window) null else weighted / window.toDouble()
-    }
-}
-
-/** Highest value among the indicator and both windows. */
-fun chartPeak(points: List<StatsPoint>): Double {
-    var peak = 0.0
-    for (point in points) {
-        if (point.indicator > peak) peak = point.indicator
-        val short = point.window5
-        if (short != null && short > peak) peak = short
-        val long = point.window10
-        if (long != null && long > peak) peak = long
-    }
-    return peak
-}
+/** Highest indicator. A chart with no bars has a peak of zero. */
+fun chartPeak(points: List<StatsPoint>): Double =
+    points.maxOfOrNull { it.indicator.coerceAtLeast(0.0) } ?: 0.0
 
 /** Nice integer scale that covers [peak]. A flat zero series still has a top of 1. */
 fun listenAxis(peak: Double): ListenAxis {
@@ -181,32 +125,15 @@ fun catalogLabelIndices(count: Int): List<Int> {
     return labels
 }
 
-/** Inclusive runs of present values. A null splits the line. */
-fun valueRuns(values: List<Double?>): List<IntRange> {
-    val runs = mutableListOf<IntRange>()
-    var start = -1
-    values.forEachIndexed { index, value ->
-        if (value == null) {
-            if (start >= 0) {
-                runs += (start until index)
-                start = -1
-            }
-        } else if (start < 0) {
-            start = index
-        }
-    }
-    if (start >= 0) runs += (start until values.size)
-    return runs
-}
-
 fun statsChartDescription(points: List<StatsPoint>): String {
-    val sentence = if (points.isEmpty()) {
-        "Историй с ответом нет."
-    } else {
-        "Средний показатель: ${points.map { it.indicator }.average().roundToInt()}."
+    if (points.isEmpty()) return "Пройденных историй нет."
+    val mean = points.map { it.indicator }.average()
+    val bars = points.joinToString("; ") { point ->
+        val tone = if (point.green) "зелёный" else "серый"
+        "${point.catalogNumber.toString().padStart(2, '0')} ${formatStat(point.indicator)} $tone"
     }
-    return "График показателя: процент верных ответов, делённый на число прослушиваний. " +
-        "Окна 5 и 10 — среднее по последним прослушиваниям. $sentence"
+    return "Столбцы: процент верных ответов, делённый на число прослушиваний. " +
+        "Среднее ${formatStat(mean)}. Зелёный — не ниже среднего, серый — ниже. $bars"
 }
 
 private fun scoredStories(library: Library): List<ScoredStory> =
@@ -215,7 +142,6 @@ private fun scoredStories(library: Library): List<ScoredStory> =
         val indicator = listenScore(progress) ?: return@mapIndexedNotNull null
         ScoredStory(
             catalogNumber = index + 1,
-            listens = progress.listenCount,
             indicator = indicator,
         )
     }

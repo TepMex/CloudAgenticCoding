@@ -20,6 +20,7 @@ import com.tepmex.tinglistories.domain.importMessage
 import com.tepmex.tinglistories.domain.nextStoryId
 import com.tepmex.tinglistories.domain.parseEvaluation
 import com.tepmex.tinglistories.domain.shouldCountPlay
+import com.tepmex.tinglistories.domain.shouldRecordListen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -169,7 +170,7 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun play(storyId: Int, kind: AudioKind) {
+    fun play(storyId: Int, kind: AudioKind, countListen: Boolean = true) {
         val story = _state.value.library.story(storyId) ?: return
         if (!shouldCountPlay(story, kind)) return
         val token = ++playToken
@@ -184,7 +185,13 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     null
                 } else {
-                    val library = withContext(Dispatchers.IO) { store.recordListen(storyId) }
+                    val library = if (
+                        shouldRecordListen(_state.value.library.progressOf(storyId), countListen)
+                    ) {
+                        withContext(Dispatchers.IO) { store.recordListen(storyId) }
+                    } else {
+                        _state.value.library
+                    }
                     _state.update { snapshot ->
                         snapshot.copy(
                             library = library,
@@ -319,7 +326,7 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
                         confirmReset = false,
                         draftStoryId = storyId,
                         draftAnswers = List(count) { "" },
-                        message = "Ответ сброшен",
+                        message = "Ответ сброшен. Прослушивания обнулены.",
                     )
                 }
             }

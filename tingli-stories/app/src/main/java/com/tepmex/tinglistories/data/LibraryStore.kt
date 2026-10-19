@@ -4,7 +4,6 @@ import com.tepmex.tinglistories.domain.AudioKind
 import com.tepmex.tinglistories.domain.Evaluation
 import com.tepmex.tinglistories.domain.Library
 import com.tepmex.tinglistories.domain.Story
-import com.tepmex.tinglistories.domain.StoryProgress
 import com.tepmex.tinglistories.domain.alignedAnswers
 import com.tepmex.tinglistories.domain.isJsonName
 import com.tepmex.tinglistories.domain.mergeProgress
@@ -108,6 +107,7 @@ class LibraryStore(private val root: File) {
         val library = readOrEmpty()
         if (library.story(storyId) == null) return library
         val previous = library.progressOf(storyId)
+        if (previous.completed) return library
         val next = library.copy(
             progress = library.progress + (storyId to previous.copy(listenCount = previous.listenCount + 1)),
         )
@@ -130,10 +130,8 @@ class LibraryStore(private val root: File) {
 
     fun resetAnswer(storyId: Int): Library = synchronized(lock) {
         val library = readOrEmpty()
-        val previous = library.progress[storyId] ?: return library
-        val next = library.copy(
-            progress = library.progress + (storyId to StoryProgress(listenCount = previous.listenCount)),
-        )
+        if (library.progress[storyId] == null) return library
+        val next = library.copy(progress = library.progress - storyId)
         write(next)
         next
     }

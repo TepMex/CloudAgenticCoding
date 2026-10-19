@@ -47,10 +47,34 @@ class LibraryStoreTest {
         assertEquals("会计", reloaded.progressOf(1).answers.first())
 
         val reset = store.resetAnswer(1)
-        assertEquals(1, reset.progressOf(1).listenCount)
+        assertEquals(0, reset.progressOf(1).listenCount)
         assertFalse(reset.progressOf(1).completed)
         assertTrue(reset.progressOf(1).answers.isEmpty())
         assertEquals("换工作", LibraryStore(root).load().story(1)?.title)
+    }
+
+    @Test
+    fun listenCountFreezesAfterAGradeAndResetStartsAgainAtZero() {
+        val root = tempRoot()
+        val store = LibraryStore(root)
+        store.importZip(pack(question = "几只猫？"))
+        store.recordListen(3)
+        store.recordListen(3)
+        store.saveAttempt(3, listOf("一只"), Evaluation(1, 1, "Да", emptyList()))
+        val frozen = store.recordListen(3)
+        assertEquals(2, frozen.progressOf(3).listenCount)
+        assertTrue(frozen.progressOf(3).completed)
+        val again = store.recordListen(3)
+        assertEquals(2, again.progressOf(3).listenCount)
+
+        val reset = store.resetAnswer(3)
+        assertEquals(0, reset.progressOf(3).listenCount)
+        assertFalse(reset.progressOf(3).completed)
+        assertTrue(reset.progressOf(3).answers.isEmpty())
+        assertNull(reset.progressOf(3).evaluation)
+        val restarted = store.recordListen(3)
+        assertEquals(1, restarted.progressOf(3).listenCount)
+        assertFalse(restarted.progressOf(3).completed)
     }
 
     @Test
