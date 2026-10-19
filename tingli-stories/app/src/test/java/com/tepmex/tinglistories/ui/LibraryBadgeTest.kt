@@ -68,7 +68,7 @@ class LibraryBadgeTest {
         compose.onNodeWithContentDescription("верных 4 из 4", useUnmergedTree = true)
             .assertIsDisplayed()
         compose.onNodeWithContentDescription(
-            "3 прослушивания, верных 0 из 4",
+            "3 прослушивания, верных 0 из 4, ниже среднего",
             useUnmergedTree = true,
         ).assertIsDisplayed()
         compose.onAllNodesWithContentDescription("Нет ответов", useUnmergedTree = true)
@@ -118,6 +118,68 @@ class LibraryBadgeTest {
         save(drawScreen(), "library-listen-rings-light.png")
     }
 
+    @Test
+    fun belowAverageCircleUsesAMutedFill() {
+        compose.setContent {
+            TingliTheme {
+                LibraryScreen(
+                    state = TingliUiState(ready = true, library = contrastLibrary()),
+                    onOpen = {},
+                    onImport = {},
+                    onSample = {},
+                    onStats = {},
+                    onSettings = {},
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription(
+            "1 прослушивание, верных 4 из 4",
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            "4 прослушивания, верных 4 из 4, ниже среднего",
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            "1 прослушивание, верных 3 из 4",
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+
+        val bright = pixel("listen-mark-1", 0.5f, 0.78f)
+        val muted = pixel("listen-mark-2", 0.5f, 0.78f)
+        assertTrue(
+            "a below-average fill is quieter than a fill at the same score, " +
+                "bright=${hex(bright)} muted=${hex(muted)}",
+            distance(bright, muted) > 40,
+        )
+        save(drawScreen(), "library-muted-circles-dark.png")
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w360dp-h800dp-notnight-xhdpi")
+    fun belowAverageCircleStaysMutedOnPaper() {
+        compose.setContent {
+            TingliTheme {
+                LibraryScreen(
+                    state = TingliUiState(ready = true, library = contrastLibrary()),
+                    onOpen = {},
+                    onImport = {},
+                    onSample = {},
+                    onStats = {},
+                    onSettings = {},
+                )
+            }
+        }
+        val bright = pixel("listen-mark-1", 0.5f, 0.78f)
+        val muted = pixel("listen-mark-2", 0.5f, 0.78f)
+        assertTrue(
+            "paper theme keeps a below-average fill quieter, bright=${hex(bright)} muted=${hex(muted)}",
+            distance(bright, muted) > 40,
+        )
+        save(drawScreen(), "library-muted-circles-light.png")
+    }
+
     private fun drawScreen(): Bitmap {
         compose.waitForIdle()
         val view = compose.activity.window.decorView.findViewById<android.view.View>(android.R.id.content)
@@ -129,6 +191,19 @@ class LibraryBadgeTest {
     }
 
     private fun hex(color: Int): String = color.toUInt().toString(16)
+
+    private fun pixel(tag: String, xFrac: Float, yFrac: Float): Int {
+        val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val screen = drawScreen()
+        val density = Density(compose.activity)
+        val width = bounds.right - bounds.left
+        val height = bounds.bottom - bounds.top
+        val x = with(density) { (bounds.left + width * xFrac).toPx() }.toInt()
+            .coerceIn(0, screen.width - 1)
+        val y = with(density) { (bounds.top + height * yFrac).toPx() }.toInt()
+            .coerceIn(0, screen.height - 1)
+        return screen.getPixel(x, y)
+    }
 
     private fun sample(tag: String): Sample {
         val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
@@ -187,6 +262,26 @@ private fun sampleLibrary(): Library {
             3 to StoryProgress(listenCount = 7),
             4 to StoryProgress(listenCount = 0, evaluation = Evaluation(4, 4, "ok", emptyList())),
             5 to StoryProgress(listenCount = 3, evaluation = Evaluation(0, 4, "ok", emptyList())),
+        ),
+    )
+}
+
+private fun contrastLibrary(): Library {
+    fun story(id: Int, title: String) = Story(
+        id = id,
+        title = title,
+        text = "文本",
+        questions = List(4) { Question("问", "答") },
+        hasStoryAudio = true,
+        hasQuestionsAudio = true,
+    )
+    return Library(
+        level = "HSK 4",
+        stories = listOf(story(1, "高"), story(2, "低"), story(3, "中")),
+        progress = mapOf(
+            1 to StoryProgress(listenCount = 1, evaluation = Evaluation(4, 4, "ok", emptyList())),
+            2 to StoryProgress(listenCount = 4, evaluation = Evaluation(4, 4, "ok", emptyList())),
+            3 to StoryProgress(listenCount = 1, evaluation = Evaluation(3, 4, "ok", emptyList())),
         ),
     )
 }

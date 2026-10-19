@@ -88,6 +88,20 @@ fun unansweredListenCount(library: Library): Int =
 fun meanIndicator(points: List<StatsPoint>): Double? =
     if (points.isEmpty()) null else points.map { it.indicator }.average()
 
+/**
+ * Story ids whose library circle is muted.
+ * A graded story is muted when its indicator is strictly below the mean of
+ * every story that has one. No indicator keeps the ordinary circle, including
+ * a grade with no listens. A story at the mean stays bright.
+ */
+fun dimmedStoryIds(library: Library): Set<Int> {
+    val mean = meanIndicator(storyStats(library)) ?: return emptySet()
+    return library.stories.mapNotNull { story ->
+        val score = listenScore(library.progressOf(story.id)) ?: return@mapNotNull null
+        if (score < mean) story.id else null
+    }.toSet()
+}
+
 fun statsAccounting(countedListens: Int, scoredStories: Int, unansweredListens: Int): String {
     val base = "Учтено ${listensLabel(countedListens)}. В расчёте ${storiesLabel(scoredStories)} с ответом."
     if (unansweredListens <= 0) return base

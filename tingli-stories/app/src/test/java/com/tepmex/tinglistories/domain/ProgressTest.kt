@@ -152,6 +152,13 @@ class ProgressTest {
                 StoryProgress(listenCount = 0, evaluation = Evaluation(4, 4, "ok", emptyList())),
             ),
         )
+        assertEquals(
+            "3 прослушивания, верных 0 из 4, ниже среднего",
+            listenMarkDescription(
+                StoryProgress(listenCount = 3, evaluation = Evaluation(0, 4, "ok", emptyList())),
+                dimmed = true,
+            ),
+        )
     }
 
     @Test
