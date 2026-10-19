@@ -90,6 +90,16 @@ class ProgressTest {
     }
 
     @Test
+    fun aReplayDoesNotCountAndAGradeFreezesTheCounter() {
+        val open = StoryProgress(listenCount = 2)
+        val graded = open.copy(evaluation = Evaluation(1, 1, "ok", emptyList()))
+        assertTrue(shouldRecordListen(open, requested = true))
+        assertFalse(shouldRecordListen(graded, requested = true))
+        assertFalse(shouldRecordListen(open, requested = false))
+        assertFalse(shouldRecordListen(graded, requested = false))
+    }
+
+    @Test
     fun listenLabelsFollowRussianPlural() {
         assertEquals("1 прослушивание", listensLabel(1))
         assertEquals("2 прослушивания", listensLabel(2))

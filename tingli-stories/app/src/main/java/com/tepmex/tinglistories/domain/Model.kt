@@ -59,6 +59,13 @@ fun shouldCountPlay(story: Story, kind: AudioKind): Boolean = when (kind) {
     AudioKind.QUESTIONS -> story.hasQuestionsAudio
 }
 
+/**
+ * A play is stored only before the grade, and only when the caller asked to count it.
+ * **Прослушать ещё раз** passes [requested] false, so it never moves the counter.
+ */
+fun shouldRecordListen(progress: StoryProgress, requested: Boolean): Boolean =
+    requested && !progress.completed
+
 /** Story text plus every prompt and reference. Grades survive a reimport only when this matches. */
 fun contentKey(story: Story): String = buildString {
     append(story.text)

@@ -163,7 +163,7 @@ fun ListenScreen(
 private const val SEEK_STEP_MS = 10_000
 
 @Composable
-private fun PlaybackBar(
+internal fun PlaybackBar(
     caption: String,
     positionMs: Int,
     durationMs: Int,

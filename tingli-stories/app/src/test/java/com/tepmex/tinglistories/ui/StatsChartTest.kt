@@ -10,18 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.unit.Density
 import com.tepmex.tinglistories.domain.Evaluation
 import com.tepmex.tinglistories.domain.Library
 import com.tepmex.tinglistories.domain.Question
 import com.tepmex.tinglistories.domain.Story
 import com.tepmex.tinglistories.domain.StoryProgress
-import java.io.File
 import kotlin.math.abs
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -39,7 +36,7 @@ class StatsChartTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun chartDrawsTheIndicatorAndBothListenWindows() {
+    fun chartDrawsGreenBarsAboveTheMeanAndGrayBarsBelowIt() {
         compose.setContent {
             TingliTheme {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -48,27 +45,25 @@ class StatsChartTest {
             }
         }
 
-        compose.onNodeWithText("Показатель").assertIsDisplayed()
-        compose.onNodeWithText("Окно 5").assertIsDisplayed()
-        compose.onNodeWithText("Окно 10").assertIsDisplayed()
-        compose.onNodeWithText("Окно 5 и окно 10", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Средний показатель 66,7").assertIsDisplayed()
-        compose.onNodeWithText("Без ответа не учтено 20 прослушиваний.", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("20 прослушиваний, без ответа").assertIsDisplayed()
-        compose.onAllNodesWithText("100 · 1 прослушивание")[0].assertIsDisplayed()
-        compose.onNodeWithText("Верные, %").assertDoesNotExist()
         compose.onNodeWithTag(StatsChartTag).assertIsDisplayed()
+        compose.onNodeWithContentDescription("02 50 зелёный", substring = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("04 0 серый", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Окно 5").assertDoesNotExist()
+        compose.onNodeWithText("Окно 10").assertDoesNotExist()
+        compose.onNodeWithText("Средний показатель", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("без ответа", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("故事1").assertDoesNotExist()
 
-        val bitmap = chartBitmap()
-        save(drawScreen(), "stats-chart-light.png")
-        assertTrue("indicator line is visible", countNear(bitmap, 0xFF8E3428.toInt()) > 12)
-        assertTrue("window of 5 is visible", countNear(bitmap, 0xFF1F6B4A.toInt()) > 12)
-        assertTrue("window of 10 is visible", countNear(bitmap, 0xFF24557A.toInt()) > 8)
+        val bitmap = drawScreen()
+        save(bitmap, "stats-bars-light.png")
+        assertTrue("green bars are visible", countNear(bitmap, 0xFF1F6B4A.toInt()) > 400)
+        assertTrue("gray bars are visible", countNear(bitmap, 0xFF5C564C.toInt()) > 400)
+        assertTrue("the old cinnabar line is gone", countNear(bitmap, 0xFF8E3428.toInt()) < 40)
     }
 
     @Test
     @Config(sdk = [34], qualifiers = "w360dp-h800dp-night-xhdpi")
-    fun darkChartKeepsTheSameSeries() {
+    fun darkChartUsesTheLearningScreenGreenAndGray() {
         compose.setContent {
             TingliTheme {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -76,13 +71,11 @@ class StatsChartTest {
                 }
             }
         }
-        compose.onNodeWithText("Окно 5").assertIsDisplayed()
-        compose.onNodeWithText("Окно 10").assertIsDisplayed()
-        val bitmap = chartBitmap()
-        save(drawScreen(), "stats-chart-dark.png")
-        assertTrue(countNear(bitmap, 0xFFE7B2A8.toInt()) > 12)
-        assertTrue(countNear(bitmap, 0xFF9ED4B8.toInt()) > 12)
-        assertTrue(countNear(bitmap, 0xFF8FB8DC.toInt()) > 8)
+        compose.onNodeWithContentDescription("зелёный", substring = true).assertIsDisplayed()
+        val bitmap = drawScreen()
+        save(bitmap, "stats-bars-dark.png")
+        assertTrue(countNear(bitmap, 0xFF9ED4B8.toInt()) > 400)
+        assertTrue(countNear(bitmap, 0xFFD0C6B8.toInt()) > 400)
     }
 
     @Test
@@ -96,18 +89,22 @@ class StatsChartTest {
         }
         compose.onNodeWithText("Импортируйте архив, чтобы увидеть статистику.").assertIsDisplayed()
         compose.onNodeWithTag(StatsChartTag).assertDoesNotExist()
-        compose.onNodeWithText("Показатель").assertDoesNotExist()
     }
 
-    private fun chartBitmap(): Bitmap {
-        val bounds = compose.onNodeWithTag(StatsChartTag).getUnclippedBoundsInRoot()
-        val screen = drawScreen()
-        val density = Density(compose.activity)
-        val left = with(density) { bounds.left.toPx() }.toInt().coerceIn(0, screen.width - 1)
-        val top = with(density) { bounds.top.toPx() }.toInt().coerceIn(0, screen.height - 1)
-        val right = with(density) { bounds.right.toPx() }.toInt().coerceIn(left + 1, screen.width)
-        val bottom = with(density) { bounds.bottom.toPx() }.toInt().coerceIn(top + 1, screen.height)
-        return Bitmap.createBitmap(screen, left, top, right - left, bottom - top)
+    @Test
+    fun unansweredStoriesLeaveTheChartEmpty() {
+        compose.setContent {
+            TingliTheme {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    StatsScreen(
+                        state = TingliUiState(ready = true, library = chartLibrary().copy(progress = emptyMap())),
+                        onBack = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Нет пройденных историй.").assertIsDisplayed()
+        compose.onNodeWithTag(StatsChartTag).assertDoesNotExist()
     }
 
     private fun countNear(bitmap: Bitmap, argb: Int): Int {
@@ -136,17 +133,20 @@ class StatsChartTest {
     }
 
     private fun save(bitmap: Bitmap, name: String) {
-        val dir = File("/opt/cursor/artifacts")
-        if (!dir.isDirectory) return
-        File(dir, name).outputStream().use { out ->
-            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out))
-        }
+        val bytes = java.io.ByteArrayOutputStream()
+        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes))
+        val proc = ProcessBuilder(
+            "bash",
+            "-c",
+            "mkdir -p /opt/cursor/artifacts && cat > \"/opt/cursor/artifacts/$name\"",
+        ).start()
+        proc.outputStream.use { it.write(bytes.toByteArray()) }
+        check(proc.waitFor() == 0) { "could not save $name" }
     }
 }
 
 private fun chartLibrary(): Library {
-    val scores = listOf(4, 2, 3, 1, 4, 2, 3, 1, 4, 2, 3, 1, 4, 2, 4)
-    val stories = List(scores.size + 1) { index ->
+    val stories = List(4) { index ->
         Story(
             id = index + 1,
             title = "故事${index + 1}",
@@ -156,15 +156,11 @@ private fun chartLibrary(): Library {
             hasQuestionsAudio = true,
         )
     }
-    val progress = buildMap {
-        put(1, StoryProgress(listenCount = 1, evaluation = Evaluation(scores[0], 4, "ok", emptyList())))
-        put(2, StoryProgress(listenCount = 20))
-        scores.drop(1).forEachIndexed { offset, score ->
-            put(
-                offset + 3,
-                StoryProgress(listenCount = 1, evaluation = Evaluation(score, 4, "ok", emptyList())),
-            )
-        }
-    }
+    val progress = mapOf(
+        1 to StoryProgress(listenCount = 3, evaluation = Evaluation(2, 4, "ok", emptyList())),
+        2 to StoryProgress(listenCount = 2, evaluation = Evaluation(4, 4, "ok", emptyList())),
+        3 to StoryProgress(listenCount = 10),
+        4 to StoryProgress(listenCount = 4, evaluation = Evaluation(0, 4, "ok", emptyList())),
+    )
     return Library(level = "HSK 4", stories = stories, progress = progress)
 }

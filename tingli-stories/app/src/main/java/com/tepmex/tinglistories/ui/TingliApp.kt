@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tepmex.tinglistories.domain.AudioKind
 
 @Composable
 fun TingliApp(viewModel: TingliViewModel) {
@@ -58,7 +59,7 @@ fun TingliApp(viewModel: TingliViewModel) {
         AlertDialog(
             onDismissRequest = viewModel::cancelReset,
             title = { Text("Сбросить ответ?") },
-            text = { Text("Оценка исчезнет, историю можно будет ответить заново. Счётчик прослушиваний останется.") },
+            text = { Text("Оценка и ответы исчезнут, счётчик прослушиваний станет нулём. История снова не пройдена.") },
             confirmButton = { TextButton(onClick = viewModel::confirmReset) { Text("Сбросить") } },
             dismissButton = { TextButton(onClick = viewModel::cancelReset) { Text("Отмена") } },
         )
@@ -107,6 +108,8 @@ fun TingliApp(viewModel: TingliViewModel) {
                                 onSubmit = { viewModel.submit(story.id) },
                                 onReset = viewModel::requestReset,
                                 onNext = { viewModel.goNext(story.id) },
+                                onReplay = { viewModel.play(story.id, AudioKind.STORY, countListen = false) },
+                                onSeek = viewModel::seekPlayback,
                             )
                         }
                         Screen.Stats -> StatsScreen(state = state, onBack = viewModel::back)
