@@ -40,6 +40,7 @@ ANDROID_APPS=(
   duoshao-qian
   hanzi-info-gf14
   byok-assisted-reader
+  extensive-reading-tutor
   tingli-stories
   hei-launcher
   corne-game
