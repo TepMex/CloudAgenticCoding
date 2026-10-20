@@ -43,6 +43,7 @@ ANDROID_APPS=(
   tingli-stories
   hei-launcher
   corne-game
+  inbox
 )
 
 # Repo-root files copied onto the site on every publish.

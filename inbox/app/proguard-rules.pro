@@ -1,0 +1,3 @@
+-keep class com.tepmex.inbox.data.** { *; }
+-keep class com.tepmex.inbox.notify.ReminderReceiver { *; }
+-keep class com.tepmex.inbox.notify.BootReceiver { *; }
