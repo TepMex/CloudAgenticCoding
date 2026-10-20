@@ -15,8 +15,8 @@ The UI is Russian. The layout is built for the largest system font size: text us
 
 ## Requirements
 
-1. Open on the capture screen: a multiline text field and an **Отправить** button. The button is enabled only when the field is not blank (after trim).
-2. Sending saves the trimmed text, clears the field immediately, and keeps focus so the next thought can be typed. The saved text appears in **Входящие**.
+1. Open on the capture screen: a multiline text field. Sending is done only through the center control in the bottom menu (no separate **Отправить** button above the menu).
+2. Sending saves the trimmed text, clears the field immediately, and keeps focus so the next thought can be typed. The saved text appears in **Входящие**. Blank or whitespace-only text does not send.
 3. Bottom menu order, left to right: reminders (clock), inbox, center action, archive, settings (gear). The center control is always larger than the other four (`ooOoo`). Capture is the default screen.
 4. On the capture screen the center control is a paper plane and sends the current text. It is inactive while the field is blank. On any other screen the center control is a written sheet and opens the capture screen. The draft is kept across screens.
 5. **Входящие** lists unprocessed captures, newest first. Tap one to open **Обработать**, which shows the full text and two actions: **Обработано** and **Напомнить**.
@@ -70,7 +70,7 @@ Active inbox rows and pending reminders are not duplicated in the archive. The a
 
 ## UI / UX
 
-- Capture fills the space above **Отправить** and the menu. The field uses `bodyLarge` so the system font scale does the sizing. No fixed text heights.
+- Capture fills the space above the menu. The field uses `bodyLarge` so the system font scale does the sizing. No fixed text heights.
 - Bottom menu is icon-only (clock, inbox, plane or sheet, archive, gear) with TalkBack labels. Side targets are at least 56dp; the center circle is 72dp. The bar grows with insets instead of clipping.
 - Screen titles name Напоминания, Входящие, Архив, Настройки, and Обработать. Capture has no title, so the field stays large.
 - Process actions are full-width and stacked. Date and time use the platform pickers so large fonts stay in the system dialog.
@@ -92,5 +92,5 @@ Active inbox rows and pending reminders are not duplicated in the archive. The a
 4. Delivering the alarm moves the row to the archive, stores the delivery time, and posts a notification when permission is granted. A second delivery does not duplicate the row.
 5. Archive order is newest close-time first. Pending reminders and open inbox rows are absent.
 6. Center plane sends only from capture and only when there is text. Center sheet from any other screen opens capture without clearing the draft.
-7. At font scale 1.3 and 2.0 the five menu controls remain visible and tappable, the send button stays above the keyboard, and process actions stay on screen.
+7. At font scale 1.3 and 2.0 the five menu controls remain visible and tappable above the keyboard, and process actions stay on screen.
 8. `./gradlew test` passes and `./gradlew assembleRelease` produces a sideload-signed APK.

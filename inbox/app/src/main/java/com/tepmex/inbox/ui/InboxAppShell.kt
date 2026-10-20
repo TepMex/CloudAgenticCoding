@@ -110,7 +110,7 @@ fun InboxAppShell(
             popExitTransition = { ExitTransition.None },
         ) {
             composable(Routes.CAPTURE) {
-                CaptureScreen(viewModel = viewModel, onSend = send)
+                CaptureScreen(viewModel = viewModel)
             }
             composable(Routes.INBOX) {
                 InboxScreen(
