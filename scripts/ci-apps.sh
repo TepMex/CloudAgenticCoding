@@ -15,7 +15,6 @@ WEB_APPS=(
   same-element
   mock-br-lk
   zametki-kitai
-  extensive-reading-tutor
 )
 
 ANDROID_APPS=(
@@ -41,6 +40,7 @@ ANDROID_APPS=(
   duoshao-qian
   hanzi-info-gf14
   byok-assisted-reader
+  extensive-reading-tutor
   tingli-stories
   hei-launcher
   corne-game
