@@ -35,7 +35,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `pair-comp-elo` | [pair-comp-elo](https://tepmex.github.io/CloudAgenticCoding/pair-comp-elo/) | Pair Comp Elo · pairwise ranking with Elo + decay (APK) |
 | `running-log` | [running-log](https://tepmex.github.io/CloudAgenticCoding/running-log/) | running-log · Mi Band running journal (APK) |
 | `ideal-timing` | [ideal-timing](https://tepmex.github.io/CloudAgenticCoding/ideal-timing/) | ideal-timing · 16h day clock from Mi Fitness wake-up (APK) |
-| `hei-launcher` | [hei-launcher](https://tepmex.github.io/CloudAgenticCoding/hei-launcher/) | hei-launcher · text-only Android home screen (APK) |
+| `hei-launcher` | [hei-launcher](https://tepmex.github.io/CloudAgenticCoding/hei-launcher/) | hei-launcher · text-only Android home screen with a life pixel bar and Mi Fitness averages (APK) |
 | `corne-game` | [corne-game](https://tepmex.github.io/CloudAgenticCoding/corne-game/) | Corne · split-keyboard touch-typing trainer (APK) |
 | `inbox` | [inbox](https://tepmex.github.io/CloudAgenticCoding/inbox/) | INBOX · instant capture for notes and reminders (APK) |
 | `wo-de-luyou` | [wo-de-luyou](https://tepmex.github.io/CloudAgenticCoding/wo-de-luyou/) | wo-de-luyou · 我的旅游 travel dictionary (APK) |

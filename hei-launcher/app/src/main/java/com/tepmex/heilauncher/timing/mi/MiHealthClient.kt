@@ -50,12 +50,45 @@ class MiHealthClient(
                 "limit" to windowDays,
             ),
         )
-        val payload = result.optJSONObject("result") ?: JSONObject()
-        val list = payload.optJSONArray("data_list") ?: return@withContext emptyList()
         buildList {
-            for (i in 0 until list.length()) {
-                val item = list.optJSONObject(i) ?: continue
+            for (item in dataList(result)) {
                 SleepRecordParser.parseAggregatedItem(item)?.let { add(it) }
+            }
+        }
+    }
+
+    /**
+     * One page of daily aggregates (`steps`, `sleep`, …) between the two epochs.
+     * [limit] should be at least the number of days in the window.
+     */
+    suspend fun fetchAggregatedItems(
+        relativeUid: Long,
+        key: String,
+        startEpochSec: Long,
+        endEpochSec: Long,
+        limit: Int,
+    ): List<JSONObject> = withContext(Dispatchers.IO) {
+        val result = request(
+            method = "GET",
+            path = MiConstants.AGGREGATED_FITNESS_BY_TIME,
+            params = mapOf(
+                "relative_uid" to relativeUid,
+                "key" to key,
+                "tag" to MiConstants.DATA_TAG_DAILY_REPORT,
+                "start_time" to startEpochSec,
+                "end_time" to endEpochSec,
+                "limit" to limit.coerceAtLeast(1),
+            ),
+        )
+        dataList(result)
+    }
+
+    private fun dataList(result: JSONObject): List<JSONObject> {
+        val payload = result.optJSONObject("result") ?: return emptyList()
+        val list = payload.optJSONArray("data_list") ?: return emptyList()
+        return buildList {
+            for (i in 0 until list.length()) {
+                list.optJSONObject(i)?.let { add(it) }
             }
         }
     }

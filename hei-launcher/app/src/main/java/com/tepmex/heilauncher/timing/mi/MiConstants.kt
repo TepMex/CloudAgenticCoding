@@ -36,6 +36,7 @@ object MiConstants {
     const val LATEST_FITNESS_DATA = "/app/v1/data/get_latest_fitness_data"
 
     const val DATA_KEY_SLEEP = "sleep"
+    const val DATA_KEY_STEPS = "steps"
     const val DATA_TAG_DAILY_REPORT = "daily_report"
 
     val RUNNING_SPORT_KEYS = setOf("outdoor_running", "treadmill")

@@ -11,6 +11,7 @@ class GraphViewModelFactory(private val graph: AppGraph) : ViewModelProvider.Fac
         val model = when (modelClass) {
             HomeViewModel::class.java -> HomeViewModel(graph)
             SettingsViewModel::class.java -> SettingsViewModel(graph)
+            FitnessViewModel::class.java -> FitnessViewModel(graph.timingRepository)
             else -> throw IllegalArgumentException("Unknown model ${modelClass.name}")
         }
         return model as T
