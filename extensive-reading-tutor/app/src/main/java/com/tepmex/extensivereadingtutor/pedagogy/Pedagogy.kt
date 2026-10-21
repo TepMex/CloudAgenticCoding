@@ -30,6 +30,13 @@ data class PedagogicalStrategy(
                 "Do not turn every lesson into a vocabulary quiz.",
             ),
         )
+
+        val V2 = PedagogicalStrategy(
+            version = PromptPack.STRATEGY_VERSION,
+            prepareTemplateVersion = PromptPack.PREPARE_VERSION,
+            evaluateTemplateVersion = PromptPack.EVALUATE_VERSION,
+            rules = listOf("strategy-v2 uses PromptPack and OUTPUT_SCHEMA. The application owns state."),
+        )
     }
 }
 
@@ -165,7 +172,7 @@ private data class WireConcept(
 )
 
 @Serializable
-private data class EvalQuestionWire(
+private data class LegacyEvalQuestionWire(
     val questionId: String,
     val type: String,
     val prompt: String,
@@ -184,7 +191,7 @@ private data class EvaluatePayload(
     val difficulty: String?,
     val unclearNotes: String?,
     val freeComment: String?,
-    val questions: List<EvalQuestionWire>,
+    val questions: List<LegacyEvalQuestionWire>,
     val memory: MemoryPacketWire,
 )
 
@@ -251,7 +258,7 @@ object Prompts {
             unclearNotes = submission.unclearNotes,
             freeComment = submission.freeComment,
             questions = questions.map { question ->
-                EvalQuestionWire(
+                LegacyEvalQuestionWire(
                     questionId = question.id.value,
                     type = question.type.name,
                     prompt = question.prompt,

@@ -1,6 +1,6 @@
 # Architecture
 
-The device holds the book and the learning record. A model is asked two questions per fragment and is not given a way to write the database.
+The device holds the book and the learning record. A new lesson asks the model to prepare and later to evaluate. «Объяснить сейчас» may add one narrow explain call. That call does not write knowledge and does not move the cursor. The model is not given a way to write the database.
 
 ```text
 MainActivity / TutorViewModel
@@ -61,8 +61,10 @@ REVIEW_READY --complete--> COMPLETED
 | Start lesson | fragment, `CREATED` lesson, active pointer | no |
 | Begin prepare | status `PREPARING` | no |
 | Model prepare | — | yes, may repeat |
-| Commit prepare | call, questions, introduction, `INTRO_READY` | no |
-| Draft or submit | draft or submission | no |
+| Commit prepare | call, questions, introduction, shown-hint assistance, `INTRO_READY` | no |
+| Explain selection | explain record only | yes, only after «Объяснить сейчас» |
+| Reveal explanation | reveal time and, before submit, an assistance event | no |
+| Draft or submit | draft, or submission plus immutable selection and assistance freeze | no |
 | Begin evaluate | status `EVALUATING` | no |
 | Model review | — | yes, may repeat |
 | Commit review | call, review, proposals, observations, knowledge, `REVIEW_READY` | no |
@@ -100,5 +102,5 @@ app/src/main/java/com/tepmex/extensivereadingtutor/
 
 - The EPUB extractor does not understand every publisher's markup. The original file is kept so a better extractor can replace it behind `EpubTextExtractor`.
 - A retry can produce a different review than the lost response. The app keeps the one that committed.
-- Knowledge rules are coarse on purpose. They are easy to recompute and easy to replace without rewriting the ledger.
+- v2 knowledge rules are versioned heuristics. They are easy to recompute and easy to replace without rewriting the ledger. Passing the unit tests does not show that a live model teaches well.
 - The debug screen will be thrown away. Use cases are the API that the next UI should call.

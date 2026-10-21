@@ -65,8 +65,20 @@ A stable label for an expression, pattern, or reading habit that observations ca
 _Avoid_: Dictionary entry, word id
 
 **Knowledge state**:
-The current reading of one concept and one skill, recomputed from observations.
+The current reading of one concept and one skill, recomputed from evidence units.
 _Avoid_: Truth, probability, level
+
+**Selection**:
+A span the learner marked in the current fragment, with an optional comment and a timing of `WITH_REVIEW` or `NOW`.
+_Avoid_: Word card, quiz item
+
+**Evidence unit**:
+One attempt's collapsed observations for one concept or diagnostic key and one skill, after help has been taken into account.
+_Avoid_: Observation count, score
+
+**Assistance**:
+Help the app actually showed before submit: a hint, or a revealed `NOW` explanation. A stored response that was not revealed is not assistance.
+_Avoid_: Hint request count, external dictionary
 
 **Strategy**:
 The versioned rules and prompt templates that tell the model how to teach. It is not the lesson history.

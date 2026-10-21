@@ -31,6 +31,7 @@ import com.tepmex.extensivereadingtutor.llm.LessonAi
 import com.tepmex.extensivereadingtutor.llm.ObservationDraft
 import com.tepmex.extensivereadingtutor.llm.PrepareLessonInput
 import com.tepmex.extensivereadingtutor.llm.PreparedDraft
+import com.tepmex.extensivereadingtutor.domain.QuestionRubric
 import com.tepmex.extensivereadingtutor.llm.QuestionDraft
 import com.tepmex.extensivereadingtutor.llm.ReviewDraft
 import com.tepmex.extensivereadingtutor.storage.InMemoryTutorStore
@@ -39,6 +40,7 @@ import com.tepmex.extensivereadingtutor.storage.TutorStore
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -92,8 +94,9 @@ class TutorScenariosTest {
         assertEquals(reviewed.review, secondPass.review)
         assertEquals(1, harness.store.read { it.observations(LOCAL_LEARNER) }.size)
         val knowledge = harness.learner.knowledge(LOCAL_LEARNER).single()
-        assertEquals("zh:雷打不动", knowledge.conceptId!!.value)
+        assertEquals("zh:idiom:雷打不动", knowledge.conceptId!!.value)
         assertEquals(1, knowledge.errorCount)
+        assertEquals(0, knowledge.independentSuccessUnits)
         val completed = resumed.completeLesson(first.id).unwrap()
         assertEquals(SessionStatus.COMPLETED, completed.status)
         assertNull(resumed.getActiveLesson(book))
@@ -112,7 +115,11 @@ class TutorScenariosTest {
         val secondPrepared = resumed.prepareLesson(next.id).unwrap()
         assertEquals("model-b", harness.store.read { it.callsForSession(next.id) }.single().model)
         assertEquals("model-a", harness.store.read { it.callsForSession(first.id) }.single { it.operation.name == "PREPARE_LESSON" }.model)
-        assertTrue(harness.ai.prepareInputs.last().memory.concepts.any { it.label == "雷打不动" })
+        val secondPacket = harness.ai.prepareInputs.last().userPayload.orEmpty()
+        assertFalse(secondPacket.contains("zh:idiom:雷打不动"))
+        assertFalse(secondPacket.contains("NEEDS_REVIEW"))
+        assertFalse(secondPacket.contains("\"status\""))
+        assertTrue(secondPacket.contains(nextFragment.originalText))
         assertTrue(harness.ai.prepareInputs.last().fragmentText == secondPrepared.let {
             harness.store.read { db -> db.fragment(next.fragmentId) }!!.originalText
         })
@@ -244,13 +251,13 @@ class BoomStore(private val inner: TutorStore) : TutorStore {
     override suspend fun <T> read(block: (StoreSession) -> T): T = inner.read(block)
 }
 
-class ScriptedLessonAi : LessonAi {
+open class ScriptedLessonAi : LessonAi {
     val prepareInputs = mutableListOf<PrepareLessonInput>()
     var prepareCalls = 0
     var evaluateCalls = 0
     var failEvaluate = false
 
-    override suspend fun prepareLesson(input: PrepareLessonInput): AppResult<PreparedDraft> {
+    open override suspend fun prepareLesson(input: PrepareLessonInput): AppResult<PreparedDraft> {
         prepareCalls += 1
         prepareInputs += input
         val quote = if ("雷打不动" in input.fragmentText) "雷打不动" else input.fragmentText.take(1)
@@ -259,7 +266,22 @@ class ScriptedLessonAi : LessonAi {
                 introduction = "Прочитайте фрагмент самостоятельно.",
                 hints = listOf("Полного перевода пока нет."),
                 questions = listOf(
-                    QuestionDraft(QuestionType.IDIOM, "Как вы понимаете это место?", SkillType.IDIOM_COMPREHENSION, quote, quote),
+                    QuestionDraft(
+                        QuestionType.IDIOM,
+                        "Как вы понимаете это место?",
+                        SkillType.IDIOM_COMPREHENSION,
+                        quote,
+                        quote,
+                        localId = "q1",
+                        sourceQuotes = listOf(quote),
+                        rubric = QuestionRubric(
+                            expectedMeaning = "Смысл выражения в этом фрагменте.",
+                            requiredPoints = listOf("опора на цитату"),
+                            acceptableAlternatives = emptyList(),
+                            unsupportedInferences = emptyList(),
+                            evidenceQuotes = listOf(quote),
+                        ),
+                    ),
                 ),
                 rawJson = "{}",
                 usage = TokenUsage(10, 20, 30),
@@ -269,7 +291,7 @@ class ScriptedLessonAi : LessonAi {
         )
     }
 
-    override suspend fun evaluateAnswers(input: EvaluateLessonInput): AppResult<EvaluationDraft> {
+    open override suspend fun evaluateAnswers(input: EvaluateLessonInput): AppResult<EvaluationDraft> {
         evaluateCalls += 1
         if (failEvaluate) {
             failEvaluate = false
@@ -278,7 +300,7 @@ class ScriptedLessonAi : LessonAi {
         val reviews = input.questions.map { question ->
             val answer = input.submission.answers.first { it.questionId == question.id }.text
             val wrong = "бесстраш" in answer
-            ReviewDraft(question.id.value, if (wrong) AnswerVerdict.INCORRECT else AnswerVerdict.CORRECT, "Пояснение.", if (wrong) "Смысл другой." else "", !wrong, emptyList())
+            ReviewDraft(question.id.value, if (wrong) AnswerVerdict.INCORRECT else AnswerVerdict.CORRECT, "Пояснение опирается на цитату фрагмента.", if (wrong) "Смысл другой." else "", true, emptyList())
         }
         val observations = input.questions.map { question ->
             val answer = input.submission.answers.first { it.questionId == question.id }.text
@@ -298,7 +320,7 @@ class ScriptedLessonAi : LessonAi {
         val bad = ObservationDraft(
             input.questions.first().id.value, "没有这个词", SkillType.VOCABULARY_RECOGNITION,
             ObservationType.UNKNOWN_VOCABULARY, Outcome.NEGATIVE, input.submission.answers.first().text.take(1),
-            "不存在的句子", "Цитаты нет.", Confidence.LOW, """{"bad":true}""",
+            "不存在的句子", "Цитаты нет.", Confidence.MEDIUM, """{"bad":true}""",
         )
         return AppResult.Ok(
             EvaluationDraft(reviews, observations + bad, emptyList(), listOf("Вернуться к идиоме."), "{}", TokenUsage(4, 6, 10), input.providerKind, input.model),

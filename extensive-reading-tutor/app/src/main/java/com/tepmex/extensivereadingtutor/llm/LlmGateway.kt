@@ -38,6 +38,8 @@ data class LlmRequest(
     val timeoutMillis: Long,
     val extraBodyJson: String = "",
     val purpose: String = "",
+    val jsonSchema: String? = null,
+    val jsonSchemaName: String? = null,
 )
 
 data class LlmCallSettings(
@@ -95,6 +97,11 @@ data class PrepareLessonInput(
     val precedingText: String?,
     val fragmentText: String,
     val memory: MemoryPacket,
+    val systemPrompt: String? = null,
+    val userPayload: String? = null,
+    val maxOutputTokens: Int = 2000,
+    val jsonSchema: String? = null,
+    val schemaName: String? = null,
 )
 
 data class QuestionDraft(
@@ -103,6 +110,11 @@ data class QuestionDraft(
     val targetSkill: SkillType,
     val targetExpression: String?,
     val sourceQuote: String,
+    val localId: String? = null,
+    val purpose: com.tepmex.extensivereadingtutor.domain.QuestionPurpose = com.tepmex.extensivereadingtutor.domain.QuestionPurpose.COMPREHENSION,
+    val sourceQuotes: List<String> = emptyList(),
+    val rubric: com.tepmex.extensivereadingtutor.domain.QuestionRubric? = null,
+    val conceptRef: String? = null,
 )
 
 data class PreparedDraft(
@@ -113,6 +125,10 @@ data class PreparedDraft(
     val usage: TokenUsage?,
     val providerKind: String,
     val model: String,
+    val hintPlans: List<com.tepmex.extensivereadingtutor.domain.HintPlan> = emptyList(),
+    val requestFingerprint: String = "",
+    val systemPrompt: String = "",
+    val userPayload: String = "",
 )
 
 data class EvaluateLessonInput(
@@ -125,6 +141,11 @@ data class EvaluateLessonInput(
     val questions: List<com.tepmex.extensivereadingtutor.domain.LessonQuestion>,
     val submission: com.tepmex.extensivereadingtutor.domain.StudentSubmission,
     val memory: MemoryPacket,
+    val systemPrompt: String? = null,
+    val userPayload: String? = null,
+    val maxOutputTokens: Int = 2000,
+    val jsonSchema: String? = null,
+    val schemaName: String? = null,
 )
 
 data class ReviewDraft(
@@ -134,6 +155,21 @@ data class ReviewDraft(
     val errorNotes: String,
     val evidenceSufficient: Boolean,
     val examples: List<String>,
+    val demonstratedMeaning: String = "",
+    val nuance: String? = null,
+    val productionFeedback: String? = null,
+    val rubricIssue: String? = null,
+)
+
+data class SelectionReviewDraft(
+    val selectionId: String,
+    val selectionRevision: Int,
+    val status: com.tepmex.extensivereadingtutor.domain.SelectionReviewStatus,
+    val explanation: String,
+    val contextualMeaning: String? = null,
+    val nuance: String? = null,
+    val example: String? = null,
+    val sourceQuotes: List<String> = emptyList(),
 )
 
 data class ObservationDraft(
@@ -147,6 +183,13 @@ data class ObservationDraft(
     val interpretation: String,
     val confidence: Confidence,
     val payloadJson: String,
+    val conceptRef: String? = null,
+    val diagnosticKey: String? = null,
+    val evidenceSource: com.tepmex.extensivereadingtutor.domain.EvidenceSource = com.tepmex.extensivereadingtutor.domain.EvidenceSource.ANSWER,
+    val evidenceMode: com.tepmex.extensivereadingtutor.domain.EvidenceMode = com.tepmex.extensivereadingtutor.domain.EvidenceMode.DEMONSTRATED,
+    val assistanceAssessment: com.tepmex.extensivereadingtutor.domain.AssistanceLevel = com.tepmex.extensivereadingtutor.domain.AssistanceLevel.UNKNOWN,
+    val selectionId: String? = null,
+    val selectionRevision: Int? = null,
 )
 
 data class RejectedObservationDraft(val payloadJson: String, val reason: String)
@@ -160,11 +203,46 @@ data class EvaluationDraft(
     val usage: TokenUsage?,
     val providerKind: String,
     val model: String,
+    val selectionReviews: List<SelectionReviewDraft> = emptyList(),
+    val feedbackResponse: String? = null,
+    val continuityNotes: List<com.tepmex.extensivereadingtutor.domain.ContinuityNote> = emptyList(),
+    val requestFingerprint: String = "",
+    val systemPrompt: String = "",
+    val userPayload: String = "",
+)
+
+data class ExplainSelectionInput(
+    val providerConfigId: String,
+    val providerKind: String,
+    val model: String,
+    val strategy: com.tepmex.extensivereadingtutor.pedagogy.PedagogicalStrategy,
+    val userPayload: String,
+    val systemPrompt: String,
+    val selectionId: String,
+    val selectionRevision: Int,
+)
+
+data class ExplainDraft(
+    val selectionId: String,
+    val selectionRevision: Int,
+    val status: com.tepmex.extensivereadingtutor.domain.SelectionReviewStatus,
+    val explanation: String,
+    val contextualMeaning: String?,
+    val nuance: String?,
+    val example: String?,
+    val sourceQuotes: List<String>,
+    val rawJson: String,
+    val usage: TokenUsage?,
+    val providerKind: String,
+    val model: String,
+    val requestFingerprint: String,
 )
 
 interface LessonAi {
     suspend fun prepareLesson(input: PrepareLessonInput): AppResult<PreparedDraft>
     suspend fun evaluateAnswers(input: EvaluateLessonInput): AppResult<EvaluationDraft>
+    suspend fun explainSelection(input: ExplainSelectionInput): AppResult<ExplainDraft> =
+        AppResult.Err(DomainError.LessonNotReady("Объяснение выделения не настроено."))
 }
 
 fun interface ProviderLookup {
@@ -178,55 +256,126 @@ class GatewayLessonAi(
     private val json: Json = lessonJson,
 ) : LessonAi {
     override suspend fun prepareLesson(input: PrepareLessonInput): AppResult<PreparedDraft> {
-        val user = Prompts.prepareUser(
+        val user = input.userPayload ?: Prompts.prepareUser(
             input.preferences,
             input.chapterTitle,
             input.precedingText,
             input.fragmentText,
             input.memory,
         )
+        val system = input.systemPrompt ?: Prompts.systemPrepare(input.strategy)
         val response = complete(
             input.providerConfigId,
             input.model,
-            Prompts.systemPrepare(input.strategy),
+            system,
             user,
             temperature = 0.4,
             purpose = "prepare",
+            maxOutputTokens = input.maxOutputTokens,
+            jsonSchema = input.jsonSchema,
+            schemaName = input.schemaName,
         )
         if (response is AppResult.Err) return response
         val body = (response as AppResult.Ok).value
-        val parsed = parsePrepared(json, body.content)
+        if (body.finishReason.equals("length", ignoreCase = true)) {
+            return AppResult.Err(DomainError.InvalidModelOutput("Ответ модели обрезан и не сохранён."))
+        }
+        val parsed = if (input.userPayload != null) parsePreparedV2(body.content) else parsePrepared(json, body.content)
         if (parsed is AppResult.Err) return parsed
         val draft = (parsed as AppResult.Ok).value
         return AppResult.Ok(
-            draft.copy(rawJson = body.content, usage = body.usage, providerKind = input.providerKind, model = input.model),
+            draft.copy(
+                rawJson = body.content,
+                usage = body.usage,
+                providerKind = input.providerKind,
+                model = input.model,
+                requestFingerprint = com.tepmex.extensivereadingtutor.pedagogy.requestFingerprint(input.model, 0.4, input.maxOutputTokens, system, user),
+                systemPrompt = system,
+                userPayload = user,
+            ),
         )
     }
 
     override suspend fun evaluateAnswers(input: EvaluateLessonInput): AppResult<EvaluationDraft> {
-        val user = Prompts.evaluateUser(
+        val user = input.userPayload ?: Prompts.evaluateUser(
             input.preferences,
             input.fragmentText,
             input.questions,
             input.submission,
             input.memory,
         )
+        val system = input.systemPrompt ?: Prompts.systemEvaluate(input.strategy)
         val response = complete(
             input.providerConfigId,
             input.model,
-            Prompts.systemEvaluate(input.strategy),
+            system,
             user,
             temperature = 0.2,
             purpose = "evaluate",
+            maxOutputTokens = input.maxOutputTokens,
+            jsonSchema = input.jsonSchema,
+            schemaName = input.schemaName,
         )
         if (response is AppResult.Err) return response
         val body = (response as AppResult.Ok).value
+        if (body.finishReason.equals("length", ignoreCase = true)) {
+            return AppResult.Err(DomainError.InvalidModelOutput("Ответ модели обрезан и не сохранён."))
+        }
         val expected = input.questions.map { it.id.value }.toSet()
-        val parsed = parseEvaluation(json, body.content, expected)
+        val parsed = if (input.userPayload != null) {
+            parseEvaluationV2(body.content, expected)
+        } else {
+            parseEvaluation(json, body.content, expected)
+        }
         if (parsed is AppResult.Err) return parsed
         val draft = (parsed as AppResult.Ok).value
         return AppResult.Ok(
-            draft.copy(rawJson = body.content, usage = body.usage, providerKind = input.providerKind, model = input.model),
+            draft.copy(
+                rawJson = body.content,
+                usage = body.usage,
+                providerKind = input.providerKind,
+                model = input.model,
+                requestFingerprint = com.tepmex.extensivereadingtutor.pedagogy.requestFingerprint(input.model, 0.2, input.maxOutputTokens, system, user),
+                systemPrompt = system,
+                userPayload = user,
+            ),
+        )
+    }
+
+    override suspend fun explainSelection(input: ExplainSelectionInput): AppResult<ExplainDraft> {
+        val response = complete(
+            input.providerConfigId,
+            input.model,
+            input.systemPrompt,
+            input.userPayload,
+            temperature = 0.2,
+            purpose = "explain-selection",
+            maxOutputTokens = com.tepmex.extensivereadingtutor.pedagogy.OutputLimits.EXPLAIN_MAX_TOKENS,
+            jsonSchema = com.tepmex.extensivereadingtutor.pedagogy.EXPLAIN_SCHEMA_JSON,
+            schemaName = "explain-selection-v1",
+        )
+        if (response is AppResult.Err) return response
+        val body = (response as AppResult.Ok).value
+        if (body.finishReason.equals("length", ignoreCase = true)) {
+            return AppResult.Err(DomainError.InvalidModelOutput("Ответ модели обрезан и не сохранён."))
+        }
+        val parsed = parseExplainV2(body.content, input.selectionId, input.selectionRevision)
+        if (parsed is AppResult.Err) return parsed
+        val draft = (parsed as AppResult.Ok).value
+        return AppResult.Ok(
+            draft.copy(
+                rawJson = body.content,
+                usage = body.usage,
+                providerKind = input.providerKind,
+                model = input.model,
+                requestFingerprint = com.tepmex.extensivereadingtutor.pedagogy.requestFingerprint(
+                    input.model,
+                    0.2,
+                    com.tepmex.extensivereadingtutor.pedagogy.OutputLimits.EXPLAIN_MAX_TOKENS,
+                    input.systemPrompt,
+                    input.userPayload,
+                ),
+            ),
         )
     }
 
@@ -237,6 +386,9 @@ class GatewayLessonAi(
         user: String,
         temperature: Double,
         purpose: String,
+        maxOutputTokens: Int = 2000,
+        jsonSchema: String? = null,
+        schemaName: String? = null,
     ): AppResult<LlmResponse> {
         val resolved = providers.provider(providerConfigId)
         if (resolved is AppResult.Err) return resolved
@@ -253,8 +405,10 @@ class GatewayLessonAi(
                 model = model,
                 messages = messages,
                 temperature = temperature,
-                maxOutputTokens = 2000,
+                maxOutputTokens = maxOutputTokens,
                 jsonObjectMode = provider.capabilities.jsonObjectMode,
+                jsonSchema = jsonSchema,
+                jsonSchemaName = schemaName,
                 timeoutMillis = call.timeoutMillis,
                 extraBodyJson = call.extraBodyJson,
                 purpose = purpose,
@@ -512,7 +666,7 @@ class OpenAiCompatibleProvider(
             remember(request, url, started, startedNanos, false, null, LlmFailureKind.BAD_RESPONSE.name, emptyList(), emptyList(), "", "Не указан адрес API.")
             return AppResult.Err(DomainError.LlmFailed(LlmFailureKind.BAD_RESPONSE, "Не указан адрес API."))
         }
-        val payload = when (val built = chatPayload(request, capabilities.jsonObjectMode)) {
+        val payload = when (val built = chatPayload(request, capabilities.jsonObjectMode, capabilities.strictJsonSchema)) {
             is AppResult.Err -> {
                 val message = (built.error as? DomainError.LlmFailed)?.detail ?: "Неверные дополнительные поля."
                 remember(request, url, started, startedNanos, false, null, "INVALID_EXTRA", emptyList(), emptyList(), request.extraBodyJson, message)

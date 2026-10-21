@@ -202,7 +202,7 @@ class KnowledgeProjector {
 
 class LearnerService(
     private val store: TutorStore,
-    private val projector: KnowledgeProjector = KnowledgeProjector(),
+    private val projector: KnowledgeProjectorV2 = KnowledgeProjectorV2(),
     private val clock: AppClock,
     private val ids: IdGenerator,
 ) {
@@ -221,6 +221,13 @@ class LearnerService(
                         reason = reason.trim(),
                         createdAt = clock.now(),
                     ),
+                )
+            }
+            val session = db.session(observation.sessionId)
+            if (session != null) {
+                db.saveContinuityNotes(
+                    session.bookId,
+                    db.continuityNotes(session.bookId).filter { it.sessionId != observation.sessionId },
                 )
             }
             replaceProjection(db, observation.learnerId)
@@ -248,7 +255,7 @@ class LearnerService(
         val retracted = observations.mapNotNull { item ->
             db.retraction(item.id)?.observationId
         }.toSet()
-        db.replaceKnowledge(learnerId, projector.project(observations, retracted))
+        db.replaceKnowledge(learnerId, projector.project(observations, retracted, clock.now()))
     }
 }
 

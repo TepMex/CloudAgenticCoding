@@ -12,9 +12,16 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
 import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tepmex.extensivereadingtutor.domain.AiCallId
+import com.tepmex.extensivereadingtutor.domain.AssistanceEvent
+import com.tepmex.extensivereadingtutor.domain.AttemptFreeze
+import com.tepmex.extensivereadingtutor.domain.ContinuityNote
+import com.tepmex.extensivereadingtutor.domain.ExplainRecord
+import com.tepmex.extensivereadingtutor.domain.LearnerSelection
+import com.tepmex.extensivereadingtutor.storage.PedagogyCodec
 import com.tepmex.extensivereadingtutor.domain.AiCallRecord
 import com.tepmex.extensivereadingtutor.domain.AiOperation
 import com.tepmex.extensivereadingtutor.domain.AnswerDraft
@@ -91,7 +98,13 @@ private data class SpanWire(val quote: String, val blockId: String? = null, val 
 private data class MetaWire(val identifier: String? = null, val publisher: String? = null, val description: String? = null, val rawLanguage: String? = null)
 
 @Serializable
-private data class CapWire(val jsonObjectMode: Boolean = true, val reportsUsage: Boolean = true, val systemRole: Boolean = true)
+private data class CapWire(
+    val jsonObjectMode: Boolean = true,
+    val reportsUsage: Boolean = true,
+    val systemRole: Boolean = true,
+    val strictJsonSchema: Boolean = false,
+    val contextWindowTokens: Int? = null,
+)
 
 private fun spans(values: List<SourceSpan>): String = json.encodeToString(
     ListSerializer(SpanWire.serializer()),
@@ -360,6 +373,9 @@ data class ProviderEntity(
 @Entity(tableName = "counters")
 data class CounterEntity(@PrimaryKey val name: String, val value: Long)
 
+@Entity(tableName = "pedagogy_documents", primaryKeys = ["kind", "ownerId"])
+data class PedagogyDocumentEntity(val kind: String, val ownerId: String, val payloadJson: String)
+
 @Dao
 interface TutorDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -580,6 +596,21 @@ interface TutorDao {
 
     @Query("DELETE FROM completed_ranges WHERE bookId = :bookId")
     fun deleteCompletedForBook(bookId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun upsertDocument(entity: PedagogyDocumentEntity)
+
+    @Query("SELECT * FROM pedagogy_documents WHERE kind = :kind AND ownerId = :ownerId")
+    fun document(kind: String, ownerId: String): PedagogyDocumentEntity?
+
+    @Query("DELETE FROM pedagogy_documents WHERE ownerId IN (:ownerIds)")
+    fun deleteDocuments(ownerIds: List<String>)
+
+    @Query("SELECT id FROM observations WHERE sessionId IN (:sessionIds)")
+    fun observationIds(sessionIds: List<String>): List<String>
+
+    @Query("SELECT id FROM ai_calls WHERE sessionId IN (:sessionIds)")
+    fun callIds(sessionIds: List<String>): List<String>
 }
 
 @Database(
@@ -589,9 +620,9 @@ interface TutorDao {
         SessionEntity::class, QuestionEntity::class, DraftEntity::class, SubmissionEntity::class,
         AnswerEntity::class, ReviewEntity::class, QuestionReviewEntity::class, ProposalEntity::class,
         ObservationEntity::class, RetractionEntity::class, ConceptEntity::class, KnowledgeEntity::class,
-        CallEntity::class, ProviderEntity::class, CounterEntity::class,
+        CallEntity::class, ProviderEntity::class, CounterEntity::class, PedagogyDocumentEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class TutorDatabase : RoomDatabase() {
@@ -602,12 +633,20 @@ abstract class TutorDatabase : RoomDatabase() {
             context,
             TutorDatabase::class.java,
             "tutor.db",
-        ).addCallback(object : Callback() {
+        ).addMigrations(MIGRATION_1_2).addCallback(object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_book ON lesson_sessions(bookId) WHERE status != 'COMPLETED'")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_fragment ON lesson_sessions(fragmentId) WHERE status != 'COMPLETED'")
             }
         }).build()
+    }
+}
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS pedagogy_documents (kind TEXT NOT NULL, ownerId TEXT NOT NULL, payloadJson TEXT NOT NULL, PRIMARY KEY(kind, ownerId))",
+        )
     }
 }
 
@@ -751,14 +790,21 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
     override fun activeSession(bookId: BookId): LessonSession? = dao.activeSession(bookId.value)?.let(::assemble)
     override fun allSessions(): List<LessonSession> = dao.allSessions().map(::assemble)
 
-    override fun insertQuestions(questions: List<LessonQuestion>) = guard {
-        dao.insertQuestions(questions.map {
-            QuestionEntity(it.id.value, it.sessionId.value, it.type.name, it.prompt, it.targetSkill.name, it.targetExpression, spans(it.sourceAnchors), it.order)
-        })
+    override fun insertQuestions(questions: List<LessonQuestion>) {
+        guard {
+            dao.insertQuestions(questions.map {
+                QuestionEntity(it.id.value, it.sessionId.value, it.type.name, it.prompt, it.targetSkill.name, it.targetExpression, spans(it.sourceAnchors), it.order)
+            })
+            questions.firstOrNull()?.let { dao.upsertDocument(PedagogyDocumentEntity("questions", it.sessionId.value, PedagogyCodec.questions(questions))) }
+        }
     }
 
-    override fun questions(sessionId: SessionId): List<LessonQuestion> = dao.questions(sessionId.value).map {
-        LessonQuestion(QuestionId(it.id), SessionId(it.sessionId), QuestionType.valueOf(it.type), it.prompt, SkillType.valueOf(it.targetSkill), it.targetExpression, spans(it.sourceAnchorsJson), it.orderIndex)
+    override fun questions(sessionId: SessionId): List<LessonQuestion> {
+        val stored = dao.document("questions", sessionId.value)?.payloadJson
+        if (stored != null) return PedagogyCodec.questions(stored)
+        return dao.questions(sessionId.value).map {
+            LessonQuestion(QuestionId(it.id), SessionId(it.sessionId), QuestionType.valueOf(it.type), it.prompt, SkillType.valueOf(it.targetSkill), it.targetExpression, spans(it.sourceAnchorsJson), it.orderIndex)
+        }
     }
 
     override fun saveDraft(draft: AnswerDraft) {
@@ -794,9 +840,11 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
         dao.insertQuestionReviews(review.results.map {
             QuestionReviewEntity(review.sessionId.value, it.questionId.value, it.verdict.name, it.explanation, it.errorNotes, it.evidenceSufficient, strings(it.examples))
         })
+        dao.upsertDocument(PedagogyDocumentEntity("review", review.sessionId.value, PedagogyCodec.review(review)))
     }
 
     override fun review(sessionId: SessionId): LessonReview? {
+        dao.document("review", sessionId.value)?.let { return PedagogyCodec.review(it.payloadJson) }
         val row = dao.review(sessionId.value) ?: return null
         return LessonReview(
             SessionId(row.sessionId),
@@ -835,11 +883,15 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
                 observation.evaluationVersion, observation.createdAt.millis(), observation.sequence,
             ),
         )
+        dao.upsertDocument(PedagogyDocumentEntity("observation", observation.id.value, PedagogyCodec.observation(observation)))
     }
 
-    override fun observation(id: ObservationId): LearnerObservation? = dao.observation(id.value)?.toDomain()
+    override fun observation(id: ObservationId): LearnerObservation? =
+        dao.document("observation", id.value)?.let { PedagogyCodec.observation(it.payloadJson) } ?: dao.observation(id.value)?.toDomain()
 
-    override fun observations(learnerId: LearnerId): List<LearnerObservation> = dao.observations(learnerId.value).map { it.toDomain() }
+    override fun observations(learnerId: LearnerId): List<LearnerObservation> = dao.observations(learnerId.value).map { row ->
+        dao.document("observation", row.id)?.let { PedagogyCodec.observation(it.payloadJson) } ?: row.toDomain()
+    }
 
     override fun retraction(observationId: ObservationId): ObservationRetraction? = dao.retraction(observationId.value)?.let {
         ObservationRetraction(it.id, ObservationId(it.observationId), it.reason, it.createdAt.instant())
@@ -864,15 +916,19 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
                 it.lastObservedAt?.millis(), it.evidenceStrength.name, strings(it.observationIds.map { id -> id.value }),
             )
         })
+        dao.upsertDocument(PedagogyDocumentEntity("knowledge", learnerId.value, PedagogyCodec.knowledge(states)))
     }
 
-    override fun knowledge(learnerId: LearnerId): List<LearnerKnowledgeState> = dao.knowledge(learnerId.value).map {
+    override fun knowledge(learnerId: LearnerId): List<LearnerKnowledgeState> {
+        dao.document("knowledge", learnerId.value)?.let { return PedagogyCodec.knowledge(it.payloadJson) }
+        return dao.knowledge(learnerId.value).map {
         LearnerKnowledgeState(
             it.id, LearnerId(it.learnerId), it.language, it.conceptId?.let(::ConceptId), it.diagnosticKey,
             SkillType.valueOf(it.skillType), KnowledgeStatus.valueOf(it.status), it.successCount, it.weakCount,
             it.errorCount, it.lastOutcome?.let { name -> Outcome.valueOf(name) }, it.lastObservedAt.instantOrNull(),
-            EvidenceStrength.valueOf(it.evidenceStrength), strings(it.observationIdsJson).map(::ObservationId),
+            EvidenceStrength.valueOf(it.evidenceStrength),             strings(it.observationIdsJson).map(::ObservationId),
         )
+        }
     }
 
     override fun insertCall(call: AiCallRecord) {
@@ -898,14 +954,96 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
         dao.upsertProvider(
             ProviderEntity(
                 config.id, config.displayName, config.kind.name, config.baseUrl,
-                json.encodeToString(CapWire.serializer(), CapWire(config.capabilities.jsonObjectMode, config.capabilities.reportsUsage, config.capabilities.systemRole)),
+                json.encodeToString(
+                    CapWire.serializer(),
+                    CapWire(
+                        config.capabilities.jsonObjectMode,
+                        config.capabilities.reportsUsage,
+                        config.capabilities.systemRole,
+                        config.capabilities.strictJsonSchema,
+                        config.capabilities.contextWindowTokens,
+                    ),
+                ),
             ),
         )
     }
 
     override fun provider(id: String): ProviderConfig? = dao.provider(id)?.let {
         val caps = json.decodeFromString(CapWire.serializer(), it.capabilitiesJson)
-        ProviderConfig(it.id, it.displayName, ProviderKind.valueOf(it.kind), it.baseUrl, LlmCapabilities(caps.jsonObjectMode, caps.reportsUsage, caps.systemRole))
+        ProviderConfig(
+            it.id,
+            it.displayName,
+            ProviderKind.valueOf(it.kind),
+            it.baseUrl,
+            LlmCapabilities(caps.jsonObjectMode, caps.reportsUsage, caps.systemRole, caps.strictJsonSchema, caps.contextWindowTokens),
+        )
+    }
+
+    override fun recentQuestionTypes(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String> {
+        val types = mutableListOf<String>()
+        for (row in dao.sessionsForLearner(learnerId.value)) {
+            if (row.id == excludeSession?.value) continue
+            for (question in questions(SessionId(row.id))) {
+                types += question.type.name
+                if (types.size >= limit) return types
+            }
+        }
+        return types
+    }
+
+    private fun doc(kind: String, ownerId: String): String? = dao.document(kind, ownerId)?.payloadJson
+
+    private fun put(kind: String, ownerId: String, payload: String) {
+        dao.upsertDocument(PedagogyDocumentEntity(kind, ownerId, payload))
+    }
+
+    override fun selections(sessionId: SessionId): List<LearnerSelection> =
+        doc("selections", sessionId.value)?.let(PedagogyCodec::selections).orEmpty()
+
+    override fun saveSelection(selection: LearnerSelection) {
+        val current = selections(selection.sessionId).filter { it.id != selection.id } + selection
+        put("selections", selection.sessionId.value, PedagogyCodec.selections(current))
+    }
+
+    override fun attemptFreeze(sessionId: SessionId): AttemptFreeze? = doc("freeze", sessionId.value)?.let(PedagogyCodec::freeze)
+
+    override fun saveAttemptFreeze(freeze: AttemptFreeze) {
+        if (doc("freeze", freeze.sessionId.value) != null) throw StoreConstraintException("freeze")
+        put("freeze", freeze.sessionId.value, PedagogyCodec.freeze(freeze))
+    }
+
+    override fun assistanceEvents(sessionId: SessionId): List<AssistanceEvent> =
+        doc("assistance", sessionId.value)?.let(PedagogyCodec::assistance).orEmpty()
+
+    override fun insertAssistance(event: AssistanceEvent) {
+        put("assistance", event.sessionId.value, PedagogyCodec.assistance(assistanceEvents(event.sessionId) + event))
+    }
+
+    override fun explainRecords(sessionId: SessionId): List<ExplainRecord> =
+        doc("explains", sessionId.value)?.let(PedagogyCodec::explains).orEmpty()
+
+    override fun saveExplainRecord(record: ExplainRecord) {
+        val current = explainRecords(record.sessionId).filter { it.id != record.id } + record
+        put("explains", record.sessionId.value, PedagogyCodec.explains(current))
+    }
+
+    override fun continuityNotes(bookId: BookId): List<ContinuityNote> =
+        doc("continuity", bookId.value)?.let(PedagogyCodec::continuity).orEmpty()
+
+    override fun saveContinuityNotes(bookId: BookId, notes: List<ContinuityNote>) {
+        put("continuity", bookId.value, PedagogyCodec.continuity(notes))
+    }
+
+    override fun inputSnapshot(sessionId: SessionId, operation: String): String? = doc("snapshot-$operation", sessionId.value)
+
+    override fun saveInputSnapshot(sessionId: SessionId, operation: String, json: String) {
+        if (inputSnapshot(sessionId, operation) == null) put("snapshot-$operation", sessionId.value, json)
+    }
+
+    override fun provenance(callId: AiCallId): String? = doc("provenance", callId.value)
+
+    override fun saveProvenance(callId: AiCallId, json: String) {
+        put("provenance", callId.value, json)
     }
 
     override fun recentQuestionPrompts(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String> {
@@ -929,6 +1067,12 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
 
     override fun eraseLearningHistory(bookId: BookId, now: Instant) {
         val id = bookId.value
+        val sessionIds = dao.allSessions().filter { it.bookId == id }.map { it.id }
+        if (sessionIds.isNotEmpty()) {
+            dao.deleteDocuments(sessionIds + dao.observationIds(sessionIds) + dao.callIds(sessionIds) + listOf(id))
+        } else {
+            dao.deleteDocuments(listOf(id))
+        }
         dao.deleteRetractionsForBook(id)
         dao.deleteObservationsForBook(id)
         dao.deleteProposalsForBook(id)

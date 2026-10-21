@@ -16,8 +16,8 @@ Android tutor for one learner who reads a real book in a foreign language with a
 8. Draft answers persist before submit. A network failure does not delete them. Submit locks them.
 9. A review can be saved when some observation proposals are rejected. Rejected proposals do not enter the ledger. Applying the same result twice does not duplicate observations.
 10. Observations are append-only. A retraction keeps the row and drops it from the knowledge projection.
-11. Knowledge state is recomputed from the ledger with the rules in `docs/adr/0006-recomputable-knowledge.md`.
-12. The next lesson receives a bounded memory packet: the full fragment, a short preceding tail, preferences, relevant knowledge, and recent question prompts.
+11. Knowledge state is recomputed from the ledger. Lessons stored as `strategy-v1` keep the rules in `docs/adr/0006-recomputable-knowledge.md`. New lessons use `strategy-v2` and `docs/adr/0007-evidence-not-mastery-labels.md`: evidence units, assistance, and the versioned `policy-v2` thresholds.
+12. Prepare receives the full fragment, a short preceding tail, preferences, and a memory packet capped at 8 KiB of serialized JSON UTF-8 bytes. Evaluate receives the task, the answers, the introduction, the help that was shown, and frozen selections. It does not receive mastery labels.
 13. The learner can switch provider and model. Old calls keep the provider and model they used.
 14. API keys are encrypted with a keystore key. They are not logged, not placed in lesson tables, and not part of a history export.
 15. Removing a book from the shelf and erasing its learning history are different operations.
@@ -32,9 +32,9 @@ Android tutor for one learner who reads a real book in a foreign language with a
 | Launcher | `com.tepmex.extensivereadingtutor.MainActivity` |
 | Open EPUB | `ACTION_OPEN_DOCUMENT` and `ACTION_VIEW` for `application/epub+zip` |
 | Lesson API | `LessonService` methods below |
-| Model | `LessonAi.prepareLesson`, `LessonAi.evaluateAnswers` |
+| Model | `LessonAi.prepareLesson`, `LessonAi.evaluateAnswers`, and `LessonAi.explainSelection` when the learner asks to explain a selection now |
 | HTTP | `LlmProvider.generate` via OpenAI-compatible `chat/completions` |
-| Database | Room `tutor.db`, schema version 1 |
+| Database | Room `tutor.db`, schema version 2. Migration 1→2 adds `pedagogy_documents` and does not drop lesson rows. |
 | Settings | DataStore `tutor_settings` for base URL, model name, extra JSON, and timeout seconds |
 | Journal | `LlmExchangeLog` file `llm-exchanges.json`, newest 40 |
 | Secrets | `SecretStore`, Android Keystore AES-GCM on device |
@@ -67,7 +67,7 @@ Result: submission stored, status `AWAITING_ANSWERS`. A second submit with the s
 `evaluateAnswers(sessionId)`  
 Precondition: submission present and status `AWAITING_ANSWERS` or `EVALUATING`. If a review is already stored, it is returned and the model is not called.  
 Result: `REVIEW_READY`, review saved, valid observations inserted, knowledge rebuilt.  
-Errors: nothing submitted, transport failure, review JSON that does not cover every question. Those failures leave the submission in place and the status at `EVALUATING`.
+Errors: nothing submitted, transport failure, truncated JSON, review JSON that does not cover every question or every frozen selection. A coverage or truncation failure does not commit a partial review. Transport failure leaves the submission in place. For a v2 lesson the status stays `EVALUATING` only after the evaluate call has started; a budget failure before that call leaves the submission and the draft in place.
 
 `completeLesson(sessionId)`  
 Precondition: `REVIEW_READY`, review saved, observation pass finished.  
@@ -81,6 +81,12 @@ Result: cursor, active lesson id, completed fragment ids.
 
 `recoverInterruptedSessions()`  
 Local only. `PREPARING` with no saved lesson returns to `CREATED`. `EVALUATING` with a saved review becomes `REVIEW_READY`. `EVALUATING` without a review stays, with the submission intact.
+
+`markSelection` / `markUtf16` / `updateSelection` / `deleteSelection`  
+A selection is an app-owned range inside the current fragment. `WITH_REVIEW` is the default and does not call the model. `NOW` calls `explainSelection` only when the learner asks. UTF-16 offsets snap off surrogate pairs before they become code-point anchors. A range longer than 480 code points is rejected and is not truncated. Selections made before submit are frozen with the submission. A later `NOW` mark does not change that freeze.
+
+`explainSelection` / `revealExplanation`  
+The explain call does not change lesson status or the cursor. Saving the response is not a reveal. A reveal before submit records help. A transport failure records no help. Repeating the same selection revision returns the stored response. A changed revision does not reuse the old response.
 
 ### Offsets
 
@@ -98,18 +104,19 @@ A proposal is rejected when the type and outcome disagree, the book quote is not
 
 ### Knowledge rules
 
-Projection ignores retracted observations and sorts by time, then sequence.
+v1 lessons still use the observation counts in `docs/adr/0006-recomputable-knowledge.md`. v2 projection ignores retracted rows and collapses observations that share an attempt, a concept or diagnostic key, and a skill into one evidence unit. Raw success and error counts stay on the row and do not raise status.
 
-- One observation, or only weak ones, or only errors: `LEARNING`.
-- Any error, and at least one positive, and fewer than two positives after the latest error: `NEEDS_REVIEW`.
-- At least two positives and the latest outcome positive, without needing a clean lifetime: `LIKELY_KNOWN`.
-- The latest three outcomes positive, across at least two lessons: `STABLE`.
-- Evidence strength is `LOW` (one observation), `MEDIUM` (two), or `HIGH` (three or more). It is not a probability.
-- Rows are keyed by language, concept or diagnostic type, and skill. Active production does not update a comprehension row.
+- One independent positive: `LEARNING`.
+- Two independent positives in two contexts, with two of them after the latest independent error: `LIKELY_KNOWN`.
+- Three independent positives, three contexts, two study days, and at least seven days between the first and last of those successes, with the last three diagnostic units positive: `STABLE`. These are `policy-v2` starting values, not a validated memory model.
+- An error after a success: `NEEDS_REVIEW`. Errors alone: `LEARNING` with the reason «пока затрудняется».
+- A self-report does not by itself remove `STABLE`. Help does not lower a row by itself. Missing data is an absent row, not «не знает».
+- Study days use the saved timezone. Legacy rows without one do not invent a zone and cannot satisfy the day count.
+- Rows are keyed by learner, language, concept or diagnostic key, skill, and sense scope. `CONTEXTUAL_ONLY` does not mean every sense of the word. Active production does not update a comprehension row.
 
 ### Context budget
 
-The fragment text is copied in full. Preceding text is at most 400 code points. Memory text is at most 3500 characters. Rows already marked likely known or stable are included only when their label appears in the fragment, and they lose the budget first. Nothing in memory is loaded from a vector index.
+The fragment text is copied in full. Preceding text is at most 400 code points. Prepare memory is at most 8 KiB of UTF-8 JSON, counted in bytes. The builder also estimates the whole request against the provider window, reserves output tokens, and keeps a safety margin. When the tokenizer is unknown the estimate is UTF-8 bytes divided by four, and the report says the estimate is uncertain. The fallback window is 16384 tokens: the v2 system prompt, schema, and output reserve do not fit in 8192 under that estimate. A provider that advertises a smaller window still gets an explicit error instead of a trimmed fragment. Optional memory is dropped before preceding context. If the fragment itself does not fit, prepare returns an error. Frozen selections are mandatory on evaluate and are not trimmed to fit. Nothing in memory is loaded from a vector index. Book continuity notes are off unless `continuityNotesEnabled` is set; the preceding text is the continuity that is sent.
 
 ### Model JSON
 
@@ -127,7 +134,9 @@ Evaluate:
 
 Question types: `MAIN_IDEA`, `DETAIL_LOOKUP`, `CONTEXT_VOCABULARY`, `IDIOM`, `GRAMMAR`, `INFERENCE_CHECK`, `ACTIVE_PRODUCTION`.
 
-Book text and answers travel in the user message as data. The system message is the strategy text only.
+v1 JSON above is what already-prepared `strategy-v1` lessons still parse. New lessons ask for `prepare-v2`, `evaluate-v2`, and `explain-selection-v1`. Those schemas live in `pedagogy/JsonSchema.kt` and are appended to the system message. The user message is only the serialized input. Default prepare size is 1–3 questions and 0–2 hints. A pre-answer hint cannot be `ANSWER_GIVEN`. Every question review needs a verdict and a non-empty explanation. Verdicts shown in the UI are «Верно», «Частично верно», «Неверно», «Нет ответа», and «Нельзя надёжно оценить».
+
+Book text and answers travel in the user message as data. The system message is the versioned prompt pack plus the schema.
 
 ## Data model
 
@@ -143,7 +152,7 @@ Book text and answers travel in the user message as data. The system message is 
 - **Review** — per-question verdict, explanation, error notes, evidence flag, examples, proposal ids, call id, time.
 - **Observation** — the fields in the product contract, plus a monotonic sequence.
 - **Retraction** — observation id, reason, time.
-- **Concept** — id `language:label`, language, label.
+- **Concept** — v1 id `language:label` stays as stored. New lexical and idiom ids are `language:kind:nfcLabel` with sense scope `CONTEXTUAL_ONLY`. Grammar ids come from the local catalogue, such as `zh.grammar.ba_disposal`.
 - **Knowledge state** — derived row and the observation ids it used.
 - **Preferences** — study language, explanation language, self-assessed level, difficulty, hint depth, target fragment size.
 - **Provider config** — id, display name, kind, base URL, capabilities. No secret.
@@ -158,8 +167,8 @@ The launcher is the phone UI. A bottom bar switches Книги, Учёба, Сл
 
 1. **Книги** lists EPUB still on the shelf. Filters are Читаю, Завершено, and Все. A book is finished when the cursor is past the last block. Progress is code points read over the book. The + button imports a DRM-free EPUB. The shelf is empty until that import.
 2. **Book** shows the cover, percent, Продолжить, chapter marks from block titles and the cursor, and recent lessons. Убрать с полки calls `removeFromLibrary` and does not erase history.
-3. **Lesson** has four visible steps on the existing state machine. Text is `CREATED`–`INTRO_READY` (Подготовить calls `prepareLesson`, К вопросам calls `revealQuestions`). Questions are `QUESTIONS_READY` or `AWAITING_ANSWERS` before a submission. Твои ответы is local until Отправить calls `submitAnswers` and then `evaluateAnswers`. Разбор is `REVIEW_READY` or a saved submission still waiting for a review. Дальше по книге calls `completeLesson`, which is still the only cursor move. Questions stay free text.
-4. **Word sheet** opens from a Han run in the fragment or a knowledge label. It shows that text, the sentence that contains it, and a knowledge row when the concept label matches. It is not a dictionary.
+3. **Lesson** has four visible steps on the existing state machine. Text is `CREATED`–`INTRO_READY` (Подготовить calls `prepareLesson`, К вопросам calls `revealQuestions`). The learner can drag any range, including across blocks, and mark «Не понимаю». The default timing is «Разобрать вместе с ответами». «Объяснить сейчас» is a separate action. Questions are `QUESTIONS_READY` or `AWAITING_ANSWERS` before a submission. Твои ответы adds an unclear-notes field and «Нужно подробнее», then Отправить calls `submitAnswers` and `evaluateAnswers`. Разбор shows the verdict and explanation for every answer, a nuance only when one was returned, production feedback separately, and one review per frozen selection. Дальше по книге calls `completeLesson`, which is still the only cursor move. Questions stay free text.
+4. **Word sheet** still opens from a tap on a Han run or a knowledge label. Dragging a range is the way to mark a difficulty. The sheet is not a dictionary.
 5. **Учёба** resumes the current book and lists knowledge in `NEEDS_REVIEW`.
 6. **Словарь** is the knowledge projection: words, `GRAMMAR_COMPREHENSION` rows, and skill counts, with search.
 7. **Профиль** counts shelf and ledger figures. The activity grid uses completed-lesson days and observation days.
@@ -178,7 +187,7 @@ Accounts, sync, shared study, voice, audio, a scheduler such as Anki, embeddings
 4. Drafts survive a new service instance. A second prepare does not call the model. A second evaluate does not add an observation.
 5. Crash cases match `recoverInterruptedSessions` and the status rules above.
 6. One bad quote rejects one proposal and still saves the review. A retraction removes that observation from the rebuilt projection and leaves the row.
-7. The second lesson's prepare payload includes the concept recorded by the first lesson and the full fragment. Changing the model id does not delete the first call.
+7. The second lesson's prepare payload includes the full next fragment. A concept from the previous lesson is included only when its label is relevant to that fragment. Changing the model id does not delete the first call.
 8. Changing the target size leaves the first fragment's hash unchanged.
 9. `./gradlew test assembleRelease` succeeds.
 10. A custom JSON object is merged into the chat body, including nested fields. An extra `messages` key does not call the network. The journal stores that attempt with `Authorization` redacted and keeps token counts from `usage`. A timeout typed in settings is the timeout passed to HTTP.

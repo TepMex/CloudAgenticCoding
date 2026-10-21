@@ -1,6 +1,13 @@
 package com.tepmex.extensivereadingtutor.storage
 
+import com.tepmex.extensivereadingtutor.domain.AiCallId
 import com.tepmex.extensivereadingtutor.domain.AiCallRecord
+import com.tepmex.extensivereadingtutor.domain.AssistanceEvent
+import com.tepmex.extensivereadingtutor.domain.AttemptFreeze
+import com.tepmex.extensivereadingtutor.domain.ContinuityNote
+import com.tepmex.extensivereadingtutor.domain.ExplainRecord
+import com.tepmex.extensivereadingtutor.domain.LearnerSelection
+import com.tepmex.extensivereadingtutor.domain.SelectionId
 import com.tepmex.extensivereadingtutor.domain.AnswerDraft
 import com.tepmex.extensivereadingtutor.domain.Book
 import com.tepmex.extensivereadingtutor.domain.BookBlock
@@ -109,6 +116,22 @@ interface StoreSession {
     fun provider(id: String): ProviderConfig?
 
     fun recentQuestionPrompts(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String>
+    fun recentQuestionTypes(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String>
     fun allocateSequence(): Long
     fun eraseLearningHistory(bookId: BookId, now: Instant)
+
+    fun selections(sessionId: SessionId): List<LearnerSelection>
+    fun saveSelection(selection: LearnerSelection)
+    fun attemptFreeze(sessionId: SessionId): AttemptFreeze?
+    fun saveAttemptFreeze(freeze: AttemptFreeze)
+    fun assistanceEvents(sessionId: SessionId): List<AssistanceEvent>
+    fun insertAssistance(event: AssistanceEvent)
+    fun explainRecords(sessionId: SessionId): List<ExplainRecord>
+    fun saveExplainRecord(record: ExplainRecord)
+    fun continuityNotes(bookId: BookId): List<ContinuityNote>
+    fun saveContinuityNotes(bookId: BookId, notes: List<ContinuityNote>)
+    fun inputSnapshot(sessionId: SessionId, operation: String): String?
+    fun saveInputSnapshot(sessionId: SessionId, operation: String, json: String)
+    fun provenance(callId: AiCallId): String?
+    fun saveProvenance(callId: AiCallId, json: String)
 }
