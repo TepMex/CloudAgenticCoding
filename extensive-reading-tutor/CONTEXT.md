@@ -75,3 +75,11 @@ _Avoid_: Persona, system prompt dump
 **Local learner**:
 The single learner stored on this device in the first version.
 _Avoid_: Account, user profile
+
+**Model exchange**:
+One HTTP attempt to the model, kept with its time, token counts, and the redacted request and response.
+_Avoid_: Lesson, chat turn
+
+**Extra fields**:
+A JSON object the learner adds to the Chat Completions body, for options such as reasoning effort. It does not replace the lesson messages.
+_Avoid_: System prompt, provider SDK

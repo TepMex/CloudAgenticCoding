@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,10 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -52,35 +55,69 @@ fun SettingsScreen(state: TutorUiState, model: TutorViewModel) {
             SurfaceCard {
                 Text(if (state.modelName.isBlank()) "OpenAI-compatible" else state.modelName, fontWeight = FontWeight.SemiBold, color = TutorText)
                 Text(
-                    if (endpoint.isBlank()) "Адрес не задан" else endpoint,
+                    (if (endpoint.isBlank()) "Адрес не задан" else endpoint) + " · ${state.timeoutSeconds.ifBlank { "60" }} с",
                     color = TutorMuted,
                     fontSize = 12.sp,
                 )
+                if (state.extraBodyJson.isNotBlank()) {
+                    Text("Дополнительные поля заданы", color = TutorSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
                 if (state.keyStored) {
                     Text("Ключ сохранён", color = TutorGreen, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Field("Базовый URL", state.baseUrl, "https://api.openai.com/v1") { model.editEndpoint(it, state.modelName, state.apiKey) }
+            Field("Базовый URL", state.baseUrl, "https://api.openai.com/v1") {
+                model.editConnection(it, state.modelName, state.apiKey, state.extraBodyJson, state.timeoutSeconds)
+            }
             Field(
                 "Ключ API",
                 state.apiKey,
                 if (state.keyStored) "Оставьте пустым, чтобы не менять" else "Нужен для запроса к модели",
                 visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-            ) { model.editEndpoint(state.baseUrl, state.modelName, it) }
+            ) { model.editConnection(state.baseUrl, state.modelName, it, state.extraBodyJson, state.timeoutSeconds) }
             Text(
                 if (showKey) "Скрыть ключ" else "Показать ключ",
                 color = TutorBlue,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(vertical = 6.dp).clickable { showKey = !showKey },
             )
-            Field("Модель", state.modelName, "gpt-4o") { model.editEndpoint(state.baseUrl, it, state.apiKey) }
+            Field("Модель", state.modelName, "gpt-4o") {
+                model.editConnection(state.baseUrl, it, state.apiKey, state.extraBodyJson, state.timeoutSeconds)
+            }
+            Field(
+                "Таймаут запроса, секунды",
+                state.timeoutSeconds,
+                "60",
+                keyboard = KeyboardType.Number,
+            ) { model.editConnection(state.baseUrl, state.modelName, state.apiKey, state.extraBodyJson, it) }
+            Text(
+                "Целое число от 1 до 1800. После сохранения действует и для занятия, и для проверки соединения.",
+                color = TutorMuted,
+                fontSize = 12.sp,
+            )
+            Field(
+                "Дополнительные поля JSON",
+                state.extraBodyJson,
+                """{"reasoning_effort":"medium"}""",
+                singleLine = false,
+            ) { model.editConnection(state.baseUrl, state.modelName, state.apiKey, it, state.timeoutSeconds) }
+            Text(
+                "Объект попадает в тело Chat Completions. Сюда можно записать reasoning, reasoning_effort, thinking и другие поля провайдера. model и messages задаёт приложение.",
+                color = TutorMuted,
+                fontSize = 12.sp,
+            )
             Spacer(Modifier.height(8.dp))
             PrimaryButton("Сохранить") { model.saveEndpoint() }
             Spacer(Modifier.height(8.dp))
             PrimaryButton("Проверить соединение") { model.probe() }
             state.probe?.let {
                 Text(it, color = TutorSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            SurfaceCard(onClick = model::openJournal) {
+                Text("Журнал запросов", fontWeight = FontWeight.SemiBold, color = TutorText)
+                Text("Время, токены, заголовки и тело", color = TutorMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
             }
             SectionLabel("Обучение")
             Text("Целевой уровень", color = TutorMuted, fontSize = 13.sp)
@@ -143,6 +180,8 @@ private fun Field(
     value: String,
     hint: String,
     visual: VisualTransformation = VisualTransformation.None,
+    singleLine: Boolean = true,
+    keyboard: KeyboardType = KeyboardType.Text,
     onValue: (String) -> Unit,
 ) {
     Text(label, color = TutorMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
@@ -150,10 +189,13 @@ private fun Field(
         value = value,
         onValueChange = onValue,
         visualTransformation = visual,
+        singleLine = singleLine,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         textStyle = TextStyle(color = TutorText, fontSize = 16.sp),
         cursorBrush = SolidColor(TutorBlue),
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = if (singleLine) 0.dp else 120.dp)
             .padding(bottom = 4.dp)
             .background(TutorCard, RoundedCornerShape(12.dp))
             .border(1.dp, TutorLine, RoundedCornerShape(12.dp))

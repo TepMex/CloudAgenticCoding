@@ -17,6 +17,8 @@ import com.tepmex.extensivereadingtutor.domain.SubjectiveDifficulty
 import com.tepmex.extensivereadingtutor.domain.SubmittedAnswer
 import com.tepmex.extensivereadingtutor.domain.defaultPreferences
 import com.tepmex.extensivereadingtutor.domain.explain
+import com.tepmex.extensivereadingtutor.llm.parseTimeoutSeconds
+import com.tepmex.extensivereadingtutor.llm.validateExtraBody
 import java.time.Instant
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -56,14 +58,77 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
 
     fun dismissWord() = _state.update { it.copy(word = null, selectedWord = null) }
 
-    fun editEndpoint(baseUrl: String, model: String, apiKey: String) {
-        _state.update { it.copy(baseUrl = baseUrl, modelName = model, apiKey = apiKey, probe = null) }
+    fun editConnection(baseUrl: String, model: String, apiKey: String, extraBodyJson: String, timeoutSeconds: String) {
+        _state.update {
+            it.copy(
+                baseUrl = baseUrl,
+                modelName = model,
+                apiKey = apiKey,
+                extraBodyJson = extraBodyJson,
+                timeoutSeconds = timeoutSeconds,
+                connectionDirty = true,
+                probe = null,
+            )
+        }
+    }
+
+    fun openJournal() {
+        _state.update { it.copy(route = Route.AiLog, exchanges = graph.exchanges.list().map { row -> row.toRow() }, word = null) }
+    }
+
+    fun closeJournal() {
+        _state.update { it.copy(route = Route.Settings) }
+    }
+
+    fun openExchange(id: String) {
+        val item = graph.exchanges.list().firstOrNull { it.id == id } ?: return
+        _state.update { it.copy(route = Route.AiExchange(id), exchange = item.toView()) }
+    }
+
+    fun closeExchange() = openJournal()
+
+    fun openRaw(side: RawSide) {
+        val id = _state.value.exchange?.id ?: return
+        _state.update { it.copy(route = Route.AiRaw(id, side)) }
+    }
+
+    fun closeRaw() {
+        val id = (_state.value.route as? Route.AiRaw)?.id ?: _state.value.exchange?.id ?: return
+        openExchange(id)
+    }
+
+    fun clearJournal() {
+        graph.exchanges.clear()
+        _state.update { it.copy(exchanges = emptyList(), exchange = null) }
     }
 
     fun saveEndpoint() = launch("Сохраняю модель") {
         val current = _state.value
-        graph.saveSettings(current.baseUrl, current.modelName, current.apiKey.ifBlank { null })
-        _state.update { it.copy(keyStored = graph.hasApiKey(), apiKey = "", probe = "Настройки сохранены.") }
+        val timeout = parseTimeoutSeconds(current.timeoutSeconds)
+        val extraError = validateExtraBody(current.extraBodyJson)
+        when {
+            timeout == null -> _state.update { it.copy(error = "Таймаут — целое число секунд от 1 до 1800.") }
+            extraError != null -> _state.update { it.copy(error = extraError) }
+            else -> {
+                graph.saveSettings(
+                    current.baseUrl,
+                    current.modelName,
+                    current.apiKey.ifBlank { null },
+                    current.extraBodyJson,
+                    timeout,
+                )
+                _state.update {
+                    it.copy(
+                        keyStored = graph.hasApiKey(),
+                        apiKey = "",
+                        extraBodyJson = current.extraBodyJson.trim(),
+                        timeoutSeconds = timeout.toString(),
+                        connectionDirty = false,
+                        probe = "Настройки сохранены.",
+                    )
+                }
+            }
+        }
     }
 
     fun probe() = launch("Проверяю соединение") {
@@ -249,8 +314,10 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
                 completedDays = loaded.completedDays,
                 observationDays = loaded.observationDays,
                 preferences = preferences,
-                baseUrl = if (current.route == Route.Settings && current.baseUrl.isNotBlank()) current.baseUrl else settings.baseUrl,
-                modelName = if (current.route == Route.Settings && current.modelName.isNotBlank()) current.modelName else settings.model,
+                baseUrl = if (current.connectionDirty) current.baseUrl else settings.baseUrl,
+                modelName = if (current.connectionDirty) current.modelName else settings.model,
+                extraBodyJson = if (current.connectionDirty) current.extraBodyJson else settings.extraBodyJson,
+                timeoutSeconds = if (current.connectionDirty) current.timeoutSeconds else settings.timeoutSeconds.toString(),
                 keyStored = graph.hasApiKey(),
             )
         }
