@@ -140,7 +140,7 @@ fun validateExtraBody(raw: String): String? {
     return null
 }
 
-fun chatPayload(request: LlmRequest, jsonObjectMode: Boolean): AppResult<String> {
+fun chatPayload(request: LlmRequest, jsonObjectMode: Boolean, strictSchema: Boolean = false): AppResult<String> {
     val extraError = validateExtraBody(request.extraBodyJson)
     if (extraError != null) {
         return AppResult.Err(DomainError.LlmFailed(LlmFailureKind.BAD_RESPONSE, extraError))
@@ -156,7 +156,16 @@ fun chatPayload(request: LlmRequest, jsonObjectMode: Boolean): AppResult<String>
                 })
             }
         })
-        if (request.jsonObjectMode && jsonObjectMode) {
+        if (strictSchema && !request.jsonSchema.isNullOrBlank()) {
+            put("response_format", buildJsonObject {
+                put("type", "json_schema")
+                put("json_schema", buildJsonObject {
+                    put("name", request.jsonSchemaName ?: "lesson")
+                    put("strict", true)
+                    put("schema", Json.parseToJsonElement(request.jsonSchema))
+                })
+            })
+        } else if (request.jsonObjectMode && jsonObjectMode) {
             put("response_format", buildJsonObject { put("type", "json_object") })
         }
     }

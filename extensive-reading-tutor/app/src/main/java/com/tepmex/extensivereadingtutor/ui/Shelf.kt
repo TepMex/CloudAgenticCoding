@@ -244,9 +244,10 @@ fun questionTypeLabel(type: QuestionType): String = when (type) {
 
 fun verdictLabel(verdict: AnswerVerdict): String = when (verdict) {
     AnswerVerdict.CORRECT -> "Верно"
-    AnswerVerdict.PARTIAL -> "Частично"
-    AnswerVerdict.INCORRECT -> "Нужно внимание"
-    AnswerVerdict.UNANSWERED -> "Без ответа"
+    AnswerVerdict.PARTIAL -> "Частично верно"
+    AnswerVerdict.INCORRECT -> "Неверно"
+    AnswerVerdict.UNANSWERED -> "Нет ответа"
+    AnswerVerdict.NOT_ASSESSABLE -> "Нельзя надёжно оценить"
 }
 
 fun knowledgeLabel(status: KnowledgeStatus): String = when (status) {

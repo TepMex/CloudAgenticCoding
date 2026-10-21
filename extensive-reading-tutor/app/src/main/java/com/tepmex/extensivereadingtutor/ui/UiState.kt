@@ -38,6 +38,26 @@ data class ReviewUi(
     val verdict: AnswerVerdict,
     val explanation: String,
     val notes: String,
+    val nuance: String? = null,
+    val productionFeedback: String? = null,
+)
+
+data class SelectionUi(
+    val id: String,
+    val revision: Int,
+    val quote: String,
+    val start: Int,
+    val end: Int,
+    val type: String,
+    val comment: String,
+    val explanation: String?,
+)
+
+data class SelectionReviewUi(
+    val quote: String,
+    val explanation: String,
+    val nuance: String?,
+    val status: String,
 )
 
 data class LessonPanel(
@@ -55,6 +75,11 @@ data class LessonPanel(
     val submitted: Boolean,
     val reviews: List<ReviewUi>,
     val recommendations: List<String>,
+    val selections: List<SelectionUi> = emptyList(),
+    val selectionReviews: List<SelectionReviewUi> = emptyList(),
+    val wantsMore: Boolean = false,
+    val unclear: String = "",
+    val feedback: String? = null,
 )
 
 data class WordSheetUi(
@@ -121,6 +146,10 @@ data class TutorUiState(
     val lesson: LessonPanel? = null,
     val checkingAnswers: Boolean = false,
     val selectedWord: String? = null,
+    val pendingStart: Int? = null,
+    val pendingEnd: Int? = null,
+    val selectionType: String = "GENERAL",
+    val selectionComment: String = "",
     val word: WordSheetUi? = null,
     val confirmRemove: Boolean = false,
     val busy: String? = null,

@@ -3,6 +3,9 @@ package com.tepmex.extensivereadingtutor.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,12 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tepmex.extensivereadingtutor.domain.AnswerVerdict
@@ -61,10 +65,10 @@ fun LessonScreen(state: TutorUiState, model: TutorViewModel) {
                 Text("Занятие ещё не открыто.", color = TutorMuted)
             } else {
                 when (step) {
-                    LessonStep.TEXT -> TextPhase(lesson, state.selectedWord, model)
+                    LessonStep.TEXT -> TextPhase(lesson, state, model)
                     LessonStep.QUESTIONS -> QuestionsPhase(lesson, model)
                     LessonStep.CHECK -> CheckPhase(lesson, model)
-                    LessonStep.REVIEW -> ReviewPhase(lesson, model)
+                    LessonStep.REVIEW -> ReviewPhase(lesson, state, model)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -94,7 +98,7 @@ private fun LessonDock(lesson: LessonPanel?, step: LessonStep, model: TutorViewM
 }
 
 @Composable
-private fun TextPhase(lesson: LessonPanel, selected: String?, model: TutorViewModel) {
+private fun TextPhase(lesson: LessonPanel, state: TutorUiState, model: TutorViewModel) {
     Text("Сегодня", color = TutorBlue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
     Spacer(Modifier.height(8.dp))
     if (lesson.introduction.isNotBlank()) {
@@ -110,14 +114,139 @@ private fun TextPhase(lesson: LessonPanel, selected: String?, model: TutorViewMo
         )
         Spacer(Modifier.height(12.dp))
     }
+    Text("Выделите непонятное место в тексте. Подсветка не меняет книгу.", color = TutorMuted, fontSize = 13.sp)
+    Spacer(Modifier.height(8.dp))
     SurfaceCard {
-        HanText(lesson.original, selected) { word, sentence -> model.openExpression(word, sentence) }
+        SelectablePassage(lesson.original, lesson.selections, { start, end -> model.selectRange(start, end) }) { word, sentence ->
+            model.openExpression(word, sentence)
+        }
+    }
+    if (state.pendingStart != null && state.pendingEnd != null) {
+        SelectionBar(state, lesson.submitted, model)
+    }
+    if (lesson.selections.isNotEmpty()) {
+        SectionLabel("Не понимаю")
+        lesson.selections.forEach { mark ->
+            SurfaceCard(Modifier.padding(bottom = 8.dp)) {
+                Text(mark.quote, color = TutorText, fontWeight = FontWeight.SemiBold)
+                if (mark.comment.isNotBlank()) {
+                    Text(mark.comment, color = TutorSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                mark.explanation?.let {
+                    Text(it, color = TutorText, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        "Объяснить сейчас",
+                        color = TutorBlue,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { model.explainSaved(mark.id) },
+                    )
+                    Text(
+                        "Убрать",
+                        color = TutorMuted,
+                        modifier = Modifier.clickable { model.removeSelection(mark.id) },
+                    )
+                }
+            }
+        }
     }
     if (lesson.hints.isNotEmpty()) {
         SectionLabel("Подсказки")
         lesson.hints.forEach { hint ->
             Text(hint, color = TutorSecondary, modifier = Modifier.padding(bottom = 6.dp))
         }
+    }
+}
+
+@Composable
+private fun SelectablePassage(
+    text: String,
+    marks: List<SelectionUi>,
+    onSelect: (Int, Int) -> Unit,
+    onWord: (String, String) -> Unit,
+) {
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var anchor by remember { mutableStateOf<Int?>(null) }
+    val annotated = buildAnnotatedString {
+        val ranges = marks.mapNotNull { mark ->
+            val start = utf16AtCodePoint(text, mark.start)
+            val end = utf16AtCodePoint(text, mark.end)
+            if (start < end && end <= text.length) start to end else null
+        }.sortedBy { it.first }
+        var cursor = 0
+        ranges.forEach { (start, end) ->
+            val safeStart = start.coerceAtLeast(cursor)
+            if (safeStart > cursor) append(text.substring(cursor, safeStart))
+            if (end > safeStart) {
+                withStyle(SpanStyle(background = TutorBlueSoft)) { append(text.substring(safeStart, end)) }
+            }
+            cursor = maxOf(cursor, end)
+        }
+        if (cursor < text.length) append(text.substring(cursor))
+    }
+    Text(
+        annotated,
+        fontSize = 20.sp,
+        lineHeight = 32.sp,
+        color = TutorText,
+        onTextLayout = { layout = it },
+        modifier = Modifier
+            .pointerInput(text) {
+                detectTapGestures { offset ->
+                    val index = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
+                    val word = hanRunAt(text, index) ?: return@detectTapGestures
+                    onWord(word, sentenceAround(text, word))
+                }
+            }
+            .pointerInput(text) {
+            detectDragGestures(
+                onDragStart = { offset -> anchor = layout?.getOffsetForPosition(offset) },
+                onDragEnd = { anchor = null },
+                onDragCancel = { anchor = null },
+                onDrag = { change, _ ->
+                    val start = anchor ?: return@detectDragGestures
+                    val end = layout?.getOffsetForPosition(change.position) ?: return@detectDragGestures
+                    change.consume()
+                    if (start != end) onSelect(minOf(start, end), maxOf(start, end))
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun SelectionBar(state: TutorUiState, submitted: Boolean, model: TutorViewModel) {
+    SurfaceCard(Modifier.padding(top = 10.dp)) {
+        Text("Не понимаю", fontWeight = FontWeight.SemiBold, color = TutorText)
+        Spacer(Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        ) {
+            listOf("GENERAL", "MEANING", "GRAMMAR", "REFERENCE", "CUSTOM").forEach { type ->
+                FilterChip(selectionTypeLabel(type), state.selectionType == type) { model.setSelectionType(type) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        AnswerField(state.selectionComment, "Уточнение, если нужно", model::setSelectionComment)
+        Spacer(Modifier.height(8.dp))
+        if (!submitted) {
+            PrimaryButton("Не понимаю") { model.saveSelection(false) }
+            Text(
+                "Разобрать вместе с ответами",
+                color = TutorMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(6.dp))
+        }
+        Text(
+            "Объяснить сейчас",
+            color = TutorBlue,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable { model.saveSelection(true) },
+        )
     }
 }
 
@@ -183,11 +312,25 @@ private fun CheckPhase(lesson: LessonPanel, model: TutorViewModel) {
         }
     }
     Spacer(Modifier.height(12.dp))
+    AnswerField(lesson.unclear, "Что осталось неясным", model::setUnclear)
+    Spacer(Modifier.height(8.dp))
+    Text(
+        if (lesson.wantsMore) "Нужно подробнее: да" else "Нужно подробнее",
+        color = if (lesson.wantsMore) TutorBlue else TutorText,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(99.dp))
+            .background(if (lesson.wantsMore) TutorBlueSoft else TutorCard)
+            .border(1.dp, if (lesson.wantsMore) TutorBlue else TutorLine, RoundedCornerShape(99.dp))
+            .clickable { model.setWantsMore(!lesson.wantsMore) }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
+    Spacer(Modifier.height(8.dp))
     AnswerField(lesson.comment, "Комментарий, если хочется", model::setComment)
 }
 
 @Composable
-private fun ReviewPhase(lesson: LessonPanel, model: TutorViewModel) {
+private fun ReviewPhase(lesson: LessonPanel, state: TutorUiState, model: TutorViewModel) {
     Text("Разбор", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TutorText)
     Spacer(Modifier.height(8.dp))
     if (lesson.reviews.isEmpty()) {
@@ -204,15 +347,39 @@ private fun ReviewPhase(lesson: LessonPanel, model: TutorViewModel) {
             Pill(verdictLabel(review.verdict), fg, bg)
             Spacer(Modifier.height(8.dp))
             Text(question?.prompt ?: "Вопрос", fontWeight = FontWeight.SemiBold, color = TutorText)
-            if (review.explanation.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(review.explanation, color = TutorSecondary, fontSize = 14.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(review.explanation, color = TutorText, fontSize = 15.sp)
+            review.nuance?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, color = TutorSecondary, fontSize = 14.sp)
+            }
+            review.productionFeedback?.let {
+                Spacer(Modifier.height(4.dp))
+                Text("Формулировка: $it", color = TutorAmber, fontSize = 14.sp)
             }
             if (review.notes.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
                 Text(review.notes, color = TutorMuted, fontSize = 13.sp)
             }
         }
+    }
+    if (lesson.selectionReviews.isNotEmpty()) {
+        SectionLabel("Выделенные места")
+        lesson.selectionReviews.forEach { review ->
+            SurfaceCard(Modifier.padding(bottom = 8.dp)) {
+                Text(review.quote, fontWeight = FontWeight.SemiBold, color = TutorText)
+                Spacer(Modifier.height(6.dp))
+                Text(review.explanation, color = TutorText, fontSize = 15.sp)
+                review.nuance?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(it, color = TutorSecondary, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+    lesson.feedback?.let {
+        SectionLabel("К самоотчёту")
+        Text(it, color = TutorText)
     }
     val expressions = lesson.questions.mapNotNull { it.expression?.takeIf { value -> value.isNotBlank() } }.distinct()
     if (expressions.isNotEmpty()) {
@@ -236,41 +403,17 @@ private fun ReviewPhase(lesson: LessonPanel, model: TutorViewModel) {
         SectionLabel("Дальше")
         lesson.recommendations.forEach { Text(it, color = TutorText, modifier = Modifier.padding(bottom = 4.dp)) }
     }
-}
-
-@Composable
-private fun HanText(text: String, selected: String?, onWord: (String, String) -> Unit) {
-    val annotated = buildAnnotatedString {
-        var index = 0
-        while (index < text.length) {
-            val codePoint = text.codePointAt(index)
-            if (isHan(codePoint)) {
-                val start = index
-                var end = index
-                while (end < text.length && isHan(text.codePointAt(end))) {
-                    end += Character.charCount(text.codePointAt(end))
-                }
-                val word = text.substring(start, end)
-                withLink(
-                    LinkAnnotation.Clickable(
-                        tag = word,
-                        styles = TextLinkStyles(
-                            SpanStyle(
-                                color = TutorText,
-                                background = if (word == selected) TutorBlueSoft else Color.Transparent,
-                            ),
-                        ),
-                    ) { _ -> onWord(word, sentenceAround(text, word)) },
-                ) { append(word) }
-                index = end
-            } else {
-                val count = Character.charCount(codePoint)
-                append(text.substring(index, index + count))
-                index += count
-            }
+    SectionLabel("Спросить о тексте")
+    Text("Новая пометка после отправки не меняет уже отправленный разбор.", color = TutorMuted, fontSize = 13.sp)
+    Spacer(Modifier.height(8.dp))
+    SurfaceCard {
+        SelectablePassage(lesson.original, lesson.selections, { start, end -> model.selectRange(start, end) }) { word, sentence ->
+            model.openExpression(word, sentence)
         }
     }
-    Text(annotated, fontSize = 20.sp, lineHeight = 32.sp, color = TutorText)
+    if (state.pendingStart != null && state.pendingEnd != null) {
+        SelectionBar(state, lesson.submitted, model)
+    }
 }
 
 @Composable
@@ -315,6 +458,44 @@ private fun verdictColors(verdict: AnswerVerdict): Pair<androidx.compose.ui.grap
     AnswerVerdict.PARTIAL -> TutorAmber to TutorAmberSoft
     AnswerVerdict.INCORRECT -> TutorRed to TutorRedSoft
     AnswerVerdict.UNANSWERED -> TutorSecondary to TutorTrack
+    AnswerVerdict.NOT_ASSESSABLE -> TutorMuted to TutorTrack
+}
+
+private fun selectionTypeLabel(type: String) = when (type) {
+    "MEANING" -> "Смысл"
+    "GRAMMAR" -> "Грамматика"
+    "REFERENCE" -> "Отсылка"
+    "CUSTOM" -> "Свой вопрос"
+    else -> "Общее"
+}
+
+private fun utf16AtCodePoint(text: String, codePoints: Int): Int {
+    var seen = 0
+    var index = 0
+    while (index < text.length && seen < codePoints) {
+        index += Character.charCount(text.codePointAt(index))
+        seen += 1
+    }
+    return index
+}
+
+private fun hanRunAt(text: String, utf16: Int): String? {
+    if (text.isEmpty()) return null
+    val index = utf16.coerceIn(0, text.length - 1)
+    val snapped = if (Character.isLowSurrogate(text[index]) && index > 0) index - 1 else index
+    if (!isHan(text.codePointAt(snapped))) return null
+    var start = snapped
+    while (start > 0) {
+        val previous = start - 1
+        val at = if (Character.isLowSurrogate(text[previous]) && previous > 0) previous - 1 else previous
+        if (!isHan(text.codePointAt(at))) break
+        start = at
+    }
+    var end = start
+    while (end < text.length && isHan(text.codePointAt(end))) {
+        end += Character.charCount(text.codePointAt(end))
+    }
+    return text.substring(start, end).takeIf { it.isNotEmpty() }
 }
 
 private val DifficultyFaces = listOf(

@@ -1,6 +1,12 @@
 package com.tepmex.extensivereadingtutor.storage
 
 import com.tepmex.extensivereadingtutor.domain.AiCallId
+import com.tepmex.extensivereadingtutor.domain.AssistanceEvent
+import com.tepmex.extensivereadingtutor.domain.AttemptFreeze
+import com.tepmex.extensivereadingtutor.domain.ContinuityNote
+import com.tepmex.extensivereadingtutor.domain.ExplainRecord
+import com.tepmex.extensivereadingtutor.domain.LearnerSelection
+import com.tepmex.extensivereadingtutor.domain.SelectionId
 import com.tepmex.extensivereadingtutor.domain.AiCallRecord
 import com.tepmex.extensivereadingtutor.domain.AnswerDraft
 import com.tepmex.extensivereadingtutor.domain.BlockId
@@ -74,6 +80,13 @@ class InMemoryTutorStore : TutorStore {
         val knowledge = mutableListOf<LearnerKnowledgeState>()
         val calls = mutableListOf<AiCallRecord>()
         val providers = mutableMapOf<String, ProviderConfig>()
+        val selections = mutableListOf<LearnerSelection>()
+        val freezes = mutableMapOf<SessionId, AttemptFreeze>()
+        val assistance = mutableListOf<AssistanceEvent>()
+        val explains = mutableListOf<ExplainRecord>()
+        val continuity = mutableMapOf<BookId, List<ContinuityNote>>()
+        val snapshots = mutableMapOf<Pair<SessionId, String>, String>()
+        val provenance = mutableMapOf<AiCallId, String>()
 
         fun deepCopy(): Mem = Mem().also { copy ->
             copy.sequence = sequence
@@ -96,6 +109,13 @@ class InMemoryTutorStore : TutorStore {
             copy.knowledge += knowledge
             copy.calls += calls
             copy.providers += providers
+            copy.selections += selections
+            copy.freezes += freezes
+            copy.assistance += assistance
+            copy.explains += explains
+            copy.continuity += continuity
+            copy.snapshots += snapshots
+            copy.provenance += provenance
         }
     }
 
@@ -318,6 +338,68 @@ class InMemoryTutorStore : TutorStore {
 
         override fun provider(id: String): ProviderConfig? = mem.providers[id]
 
+        override fun selections(sessionId: SessionId): List<LearnerSelection> =
+            mem.selections.filter { it.sessionId == sessionId }
+
+        override fun saveSelection(selection: LearnerSelection) {
+            mem.selections.removeAll { it.id == selection.id }
+            mem.selections += selection
+        }
+
+        override fun attemptFreeze(sessionId: SessionId): AttemptFreeze? = mem.freezes[sessionId]
+
+        override fun saveAttemptFreeze(freeze: AttemptFreeze) {
+            if (mem.freezes.containsKey(freeze.sessionId)) throw StoreConstraintException("freeze")
+            mem.freezes[freeze.sessionId] = freeze
+        }
+
+        override fun assistanceEvents(sessionId: SessionId): List<AssistanceEvent> =
+            mem.assistance.filter { it.sessionId == sessionId }
+
+        override fun insertAssistance(event: AssistanceEvent) {
+            mem.assistance += event
+        }
+
+        override fun explainRecords(sessionId: SessionId): List<ExplainRecord> =
+            mem.explains.filter { it.sessionId == sessionId }
+
+        override fun saveExplainRecord(record: ExplainRecord) {
+            mem.explains.removeAll { it.id == record.id }
+            mem.explains += record
+        }
+
+        override fun continuityNotes(bookId: BookId): List<ContinuityNote> = mem.continuity[bookId].orEmpty()
+
+        override fun saveContinuityNotes(bookId: BookId, notes: List<ContinuityNote>) {
+            mem.continuity[bookId] = notes
+        }
+
+        override fun inputSnapshot(sessionId: SessionId, operation: String): String? = mem.snapshots[sessionId to operation]
+
+        override fun saveInputSnapshot(sessionId: SessionId, operation: String, json: String) {
+            mem.snapshots.putIfAbsent(sessionId to operation, json)
+        }
+
+        override fun provenance(callId: AiCallId): String? = mem.provenance[callId]
+
+        override fun saveProvenance(callId: AiCallId, json: String) {
+            mem.provenance[callId] = json
+        }
+
+        override fun recentQuestionTypes(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String> {
+            val ordered = mem.sessions.values
+                .filter { it.learnerId == learnerId && it.id != excludeSession }
+                .sortedByDescending { it.createdAt }
+            val types = mutableListOf<String>()
+            for (row in ordered) {
+                for (question in questions(row.id)) {
+                    types += question.type.name
+                    if (types.size >= limit) return types
+                }
+            }
+            return types
+        }
+
         override fun recentQuestionPrompts(learnerId: LearnerId, limit: Int, excludeSession: SessionId?): List<String> {
             val ordered = mem.sessions.values
                 .filter { it.learnerId == learnerId && it.id != excludeSession }
@@ -350,6 +432,12 @@ class InMemoryTutorStore : TutorStore {
             mem.drafts.keys.removeAll { it.first in sessionIds }
             mem.questions.removeAll { it.sessionId in sessionIds }
             mem.calls.removeAll { it.sessionId in sessionIds }
+            mem.selections.removeAll { it.sessionId in sessionIds }
+            sessionIds.forEach { mem.freezes.remove(it) }
+            mem.assistance.removeAll { it.sessionId in sessionIds }
+            mem.explains.removeAll { it.sessionId in sessionIds }
+            mem.continuity.remove(bookId)
+            mem.snapshots.keys.removeAll { it.first in sessionIds }
             sessionIds.forEach { mem.sessions.remove(it) }
             mem.fragments.entries.removeAll { it.value.bookId == bookId }
             mem.completed.removeAll { it.bookId == bookId }

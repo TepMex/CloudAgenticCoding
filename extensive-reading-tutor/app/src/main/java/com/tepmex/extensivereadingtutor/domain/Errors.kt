@@ -14,6 +14,8 @@ sealed interface DomainError {
     data class IngestionFailed(val reason: String) : DomainError
     data class LlmFailed(val kind: LlmFailureKind, val detail: String) : DomainError
     data class InvalidModelOutput(val reason: String) : DomainError
+    data class BudgetExceeded(val reason: String) : DomainError
+    data class SelectionInvalid(val reason: String) : DomainError
 }
 
 sealed interface AppResult<out T> {
@@ -35,4 +37,6 @@ fun DomainError.explain(): String = when (this) {
     is DomainError.IngestionFailed -> reason
     is DomainError.LlmFailed -> detail
     is DomainError.InvalidModelOutput -> reason
+    is DomainError.BudgetExceeded -> reason
+    is DomainError.SelectionInvalid -> reason
 }

@@ -10,7 +10,11 @@ import com.tepmex.extensivereadingtutor.domain.DifficultyPreference
 import com.tepmex.extensivereadingtutor.domain.HintDepth
 import com.tepmex.extensivereadingtutor.domain.LearnerPreferences
 import com.tepmex.extensivereadingtutor.domain.LessonSession
+import com.tepmex.extensivereadingtutor.books.selectionBounds
+import com.tepmex.extensivereadingtutor.domain.HelpTiming
 import com.tepmex.extensivereadingtutor.domain.QuestionId
+import com.tepmex.extensivereadingtutor.domain.SelectionId
+import com.tepmex.extensivereadingtutor.domain.SelectionRequestType
 import com.tepmex.extensivereadingtutor.domain.SessionId
 import com.tepmex.extensivereadingtutor.domain.StudentSubmission
 import com.tepmex.extensivereadingtutor.domain.SubjectiveDifficulty
@@ -202,6 +206,91 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         _state.update { it.copy(lesson = it.lesson?.copy(comment = comment)) }
     }
 
+    fun setUnclear(text: String) {
+        _state.update { it.copy(lesson = it.lesson?.copy(unclear = text)) }
+    }
+
+    fun setWantsMore(value: Boolean) {
+        _state.update { it.copy(lesson = it.lesson?.copy(wantsMore = value)) }
+    }
+
+    fun selectRange(startUtf16: Int, endUtf16: Int) {
+        _state.update { it.copy(pendingStart = startUtf16, pendingEnd = endUtf16, error = null) }
+    }
+
+    fun setSelectionType(type: String) {
+        _state.update { it.copy(selectionType = type) }
+    }
+
+    fun setSelectionComment(comment: String) {
+        _state.update { it.copy(selectionComment = comment) }
+    }
+
+    fun clearPendingSelection() {
+        _state.update { it.copy(pendingStart = null, pendingEnd = null, selectionComment = "") }
+    }
+
+    fun saveSelection(now: Boolean) {
+        val lesson = _state.value.lesson ?: return
+        val start = _state.value.pendingStart ?: return
+        val end = _state.value.pendingEnd ?: return
+        val type = runCatching { SelectionRequestType.valueOf(_state.value.selectionType) }.getOrDefault(SelectionRequestType.GENERAL)
+        launch(if (now) "Объясняю выделение" else null) {
+            when (
+                val marked = graph.lessons.markUtf16(
+                    SessionId(lesson.sessionId),
+                    start,
+                    end,
+                    type,
+                    _state.value.selectionComment.ifBlank { null },
+                    if (now) HelpTiming.NOW else HelpTiming.WITH_REVIEW,
+                )
+            ) {
+                is AppResult.Err -> _state.update { it.copy(error = marked.error.explain()) }
+                is AppResult.Ok -> {
+                    clearPendingSelection()
+                    if (now) {
+                        when (val explained = graph.lessons.explainSelection(SessionId(lesson.sessionId), marked.value.id)) {
+                            is AppResult.Err -> _state.update { it.copy(error = explained.error.explain()) }
+                            is AppResult.Ok -> {
+                                if (explained.value.selectionRevision == marked.value.revision && explained.value.explanation != null) {
+                                    graph.lessons.revealExplanation(SessionId(lesson.sessionId), marked.value.id, marked.value.revision)
+                                }
+                            }
+                        }
+                    }
+                    graph.read { it.session(SessionId(lesson.sessionId)) }?.let { showLesson(it, keepDrafts = true) }
+                }
+            }
+        }
+    }
+
+    fun removeSelection(id: String) {
+        val lesson = _state.value.lesson ?: return
+        launch(null) {
+            when (val result = graph.lessons.deleteSelection(SessionId(lesson.sessionId), SelectionId(id))) {
+                is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
+                is AppResult.Ok -> showLesson(result.value, keepDrafts = true)
+            }
+        }
+    }
+
+    fun explainSaved(id: String) {
+        val lesson = _state.value.lesson ?: return
+        launch("Объясняю выделение") {
+            when (val explained = graph.lessons.explainSelection(SessionId(lesson.sessionId), SelectionId(id))) {
+                is AppResult.Err -> _state.update { it.copy(error = explained.error.explain()) }
+                is AppResult.Ok -> {
+                    val current = graph.lessons.selections(SessionId(lesson.sessionId)).firstOrNull { it.id.value == id }
+                    if (current != null && current.revision == explained.value.selectionRevision && explained.value.explanation != null) {
+                        graph.lessons.revealExplanation(SessionId(lesson.sessionId), current.id, current.revision)
+                    }
+                    graph.read { it.session(SessionId(lesson.sessionId)) }?.let { showLesson(it, keepDrafts = true) }
+                }
+            }
+        }
+    }
+
     fun submit() {
         draftJobs.values.forEach { it.cancel() }
         draftJobs.clear()
@@ -213,8 +302,8 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
                 sessionId = SessionId(sessionId),
                 answers = lesson.questions.map { SubmittedAnswer(QuestionId(it.id), lesson.drafts[it.id].orEmpty()) },
                 difficulty = lesson.difficulty,
-                wantsMoreExplanation = lesson.difficulty == SubjectiveDifficulty.TOO_HARD,
-                unclearNotes = null,
+                wantsMoreExplanation = lesson.wantsMore,
+                unclearNotes = lesson.unclear.ifBlank { null },
                 freeComment = lesson.comment.ifBlank { null },
                 hintRequestCount = 0,
                 submittedAt = Instant.now(),
@@ -326,9 +415,25 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
     private suspend fun showLesson(session: LessonSession, keepDrafts: Boolean) {
         val fragment = graph.lessons.fragment(session.fragmentId)
         val stored = graph.lessons.drafts(session.id).associate { it.questionId.value to it.text }
+        val explains = graph.lessons.explainRecords(session.id).filter { it.revealedAt != null }
+        val marks = graph.lessons.selections(session.id).filter { it.deletedAt == null }
         _state.update { current ->
             val previous = current.lesson?.takeIf { it.sessionId == session.id.value }
             val drafts = if (keepDrafts && previous != null) stored + previous.drafts else stored
+            val selectionUi = marks.map { mark ->
+                val bounds = fragment?.let { selectionBounds(it, mark.sourceAnchors) }
+                val shown = explains.firstOrNull { it.selectionId == mark.id && it.selectionRevision == mark.revision }
+                SelectionUi(
+                    id = mark.id.value,
+                    revision = mark.revision,
+                    quote = mark.quotedText,
+                    start = bounds?.first ?: 0,
+                    end = bounds?.second ?: 0,
+                    type = mark.requestType.name,
+                    comment = mark.comment.orEmpty(),
+                    explanation = shown?.explanation,
+                )
+            }
             current.copy(
                 lesson = LessonPanel(
                     sessionId = session.id.value,
@@ -346,9 +451,19 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
                     comment = session.submission?.freeComment ?: previous?.comment.orEmpty(),
                     submitted = session.submission != null,
                     reviews = session.review?.results.orEmpty().map {
-                        ReviewUi(it.questionId.value, it.verdict, it.explanation, it.errorNotes)
+                        ReviewUi(it.questionId.value, it.verdict, it.explanation, it.errorNotes, it.nuance, it.productionFeedback)
                     },
                     recommendations = session.review?.nextRecommendations.orEmpty(),
+                    selections = selectionUi,
+                    selectionReviews = session.review?.selectionReviews.orEmpty().map { review ->
+                        val quote = marks.firstOrNull { it.id == review.selectionId }?.quotedText
+                            ?: review.sourceQuotes.firstOrNull()
+                            ?: "выделение"
+                        SelectionReviewUi(quote, review.explanation, review.nuance, review.status.name)
+                    },
+                    wantsMore = session.submission?.wantsMoreExplanation ?: previous?.wantsMore ?: false,
+                    unclear = session.submission?.unclearNotes ?: previous?.unclear.orEmpty(),
+                    feedback = session.review?.feedbackResponse,
                 ),
             )
         }

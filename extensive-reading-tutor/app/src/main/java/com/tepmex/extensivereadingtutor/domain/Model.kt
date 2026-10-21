@@ -1,6 +1,7 @@
 package com.tepmex.extensivereadingtutor.domain
 
 import java.time.Instant
+import kotlinx.serialization.Serializable
 
 @JvmInline value class BookId(val value: String)
 @JvmInline value class BlockId(val value: String)
@@ -12,6 +13,7 @@ import java.time.Instant
 @JvmInline value class AiCallId(val value: String)
 @JvmInline value class LearnerId(val value: String)
 @JvmInline value class ProposalId(val value: String)
+@JvmInline value class SelectionId(val value: String)
 
 val LOCAL_LEARNER = LearnerId("local")
 
@@ -26,6 +28,7 @@ enum class SessionStatus {
     COMPLETED,
 }
 
+@Serializable
 enum class QuestionType {
     MAIN_IDEA,
     DETAIL_LOOKUP,
@@ -36,6 +39,7 @@ enum class QuestionType {
     ACTIVE_PRODUCTION,
 }
 
+@Serializable
 enum class SkillType {
     VOCABULARY_RECOGNITION,
     IDIOM_COMPREHENSION,
@@ -46,6 +50,7 @@ enum class SkillType {
     ACTIVE_PRODUCTION,
 }
 
+@Serializable
 enum class ObservationType {
     CORRECT_UNDERSTANDING,
     PARTIAL_UNDERSTANDING,
@@ -58,25 +63,57 @@ enum class ObservationType {
     HINT_DEPENDENT_SUCCESS,
 }
 
+@Serializable
 enum class Outcome { POSITIVE, WEAK, NEGATIVE }
 
+@Serializable
 enum class Confidence { LOW, MEDIUM, HIGH }
 
 enum class EvidenceStrength { LOW, MEDIUM, HIGH }
 
 enum class KnowledgeStatus { LEARNING, NEEDS_REVIEW, LIKELY_KNOWN, STABLE }
 
+@Serializable
 enum class DifficultyPreference { EASY, MATCHED, STRETCH }
 
+@Serializable
 enum class HintDepth { MINIMAL, MODERATE, DETAILED }
 
+@Serializable
 enum class SubjectiveDifficulty { TOO_EASY, SUITABLE, TOO_HARD }
 
-enum class AnswerVerdict { CORRECT, PARTIAL, INCORRECT, UNANSWERED }
+@Serializable
+enum class AnswerVerdict { CORRECT, PARTIAL, INCORRECT, UNANSWERED, NOT_ASSESSABLE }
 
 enum class ProviderKind { OPENAI_COMPATIBLE }
 
-enum class AiOperation { PREPARE_LESSON, EVALUATE_ANSWERS }
+enum class AiOperation { PREPARE_LESSON, EVALUATE_ANSWERS, EXPLAIN_SELECTION }
+
+@Serializable
+enum class EvidenceSource { ANSWER, UNCLEAR_NOTES, FREE_COMMENT, SELECTION_COMMENT }
+
+@Serializable
+enum class EvidenceMode { DEMONSTRATED, SELF_REPORTED, AMBIGUOUS }
+
+@Serializable
+enum class AssistanceLevel { NONE_RECORDED, SCAFFOLD, MEANING_GIVEN, ANSWER_GIVEN, UNKNOWN }
+
+@Serializable
+enum class QuestionPurpose { COMPREHENSION, CONTEXTUAL_LEARNING, REVISIT }
+
+@Serializable
+enum class SelectionRequestType { GENERAL, MEANING, GRAMMAR, REFERENCE, CUSTOM }
+
+enum class HelpTiming { WITH_REVIEW, NOW }
+
+@Serializable
+enum class SelectionReviewStatus { EXPLAINED, NEEDS_CONTEXT }
+
+enum class ConceptKind { LEXICAL, IDIOM, GRAMMAR, DIAGNOSTIC }
+
+enum class SenseScope { SURFACE, CONTEXTUAL_ONLY }
+
+enum class RequestedPhase { BEFORE_PREPARE, AFTER_PREPARE, AFTER_SUBMISSION }
 
 enum class CallStatus { SUCCEEDED, REJECTED_OUTPUT, FAILED }
 
@@ -178,6 +215,21 @@ data class SourceSpan(
     val endCodePoint: Int?,
 )
 
+data class QuestionRubric(
+    val expectedMeaning: String,
+    val requiredPoints: List<String>,
+    val acceptableAlternatives: List<String>,
+    val unsupportedInferences: List<String>,
+    val evidenceQuotes: List<String>,
+)
+
+data class HintPlan(
+    val localId: String,
+    val text: String,
+    val targetQuestionLocalIds: List<String>,
+    val assistanceLevel: AssistanceLevel,
+)
+
 data class LessonQuestion(
     val id: QuestionId,
     val sessionId: SessionId,
@@ -187,6 +239,10 @@ data class LessonQuestion(
     val targetExpression: String?,
     val sourceAnchors: List<SourceSpan>,
     val order: Int,
+    val purpose: QuestionPurpose = QuestionPurpose.COMPREHENSION,
+    val conceptRef: String? = null,
+    val rubric: QuestionRubric? = null,
+    val localId: String? = null,
 )
 
 data class PreparedLesson(
@@ -194,6 +250,7 @@ data class PreparedLesson(
     val hints: List<String>,
     val questions: List<LessonQuestion>,
     val strategyVersion: String,
+    val hintPlans: List<HintPlan> = emptyList(),
 )
 
 data class AnswerDraft(
@@ -223,6 +280,21 @@ data class QuestionReview(
     val errorNotes: String,
     val evidenceSufficient: Boolean,
     val examples: List<String>,
+    val demonstratedMeaning: String = "",
+    val nuance: String? = null,
+    val productionFeedback: String? = null,
+    val rubricIssue: String? = null,
+)
+
+data class SelectionReview(
+    val selectionId: SelectionId,
+    val selectionRevision: Int,
+    val status: SelectionReviewStatus,
+    val explanation: String,
+    val contextualMeaning: String? = null,
+    val nuance: String? = null,
+    val example: String? = null,
+    val sourceQuotes: List<String> = emptyList(),
 )
 
 data class LessonReview(
@@ -232,6 +304,8 @@ data class LessonReview(
     val nextRecommendations: List<String>,
     val aiCallId: AiCallId,
     val createdAt: Instant,
+    val selectionReviews: List<SelectionReview> = emptyList(),
+    val feedbackResponse: String? = null,
 )
 
 data class LessonSession(
@@ -256,6 +330,9 @@ data class Concept(
     val id: ConceptId,
     val language: String,
     val label: String,
+    val kind: ConceptKind = ConceptKind.LEXICAL,
+    val senseScope: SenseScope = SenseScope.CONTEXTUAL_ONLY,
+    val senseGloss: String? = null,
 )
 
 data class LearnerObservation(
@@ -278,6 +355,20 @@ data class LearnerObservation(
     val evaluationVersion: String,
     val createdAt: Instant,
     val sequence: Long,
+    val bookId: BookId? = null,
+    val diagnosticKey: String? = null,
+    val evidenceSource: EvidenceSource = EvidenceSource.ANSWER,
+    val evidenceMode: EvidenceMode = EvidenceMode.DEMONSTRATED,
+    val assistance: AssistanceLevel = AssistanceLevel.UNKNOWN,
+    val eligibleForIndependentSuccess: Boolean = false,
+    val schemaVersion: String = "",
+    val policyVersion: String = "",
+    val evidenceUnitId: String? = null,
+    val contextId: String? = null,
+    val selectionId: SelectionId? = null,
+    val selectionRevision: Int? = null,
+    val timeZone: String? = null,
+    val senseScope: SenseScope = SenseScope.CONTEXTUAL_ONLY,
 )
 
 data class ObservationRetraction(
@@ -313,6 +404,18 @@ data class LearnerKnowledgeState(
     val lastObservedAt: Instant?,
     val evidenceStrength: EvidenceStrength,
     val observationIds: List<ObservationId>,
+    val independentSuccessUnits: Int = 0,
+    val assistedSuccessUnits: Int = 0,
+    val errorUnits: Int = 0,
+    val distinctContexts: Int = 0,
+    val distinctStudyDays: Int = 0,
+    val lastIndependentSuccessAt: Instant? = null,
+    val lastErrorAt: Instant? = null,
+    val evidenceIds: List<String> = emptyList(),
+    val projectorVersion: String = "projector-v1",
+    val statusReason: String = "",
+    val stale: Boolean = false,
+    val senseScope: SenseScope = SenseScope.SURFACE,
 )
 
 data class LearnerPreferences(
@@ -324,6 +427,7 @@ data class LearnerPreferences(
     val hintDepth: HintDepth,
     val targetFragmentCodePoints: Int,
     val updatedAt: Instant,
+    val timeZone: String? = null,
 )
 
 fun defaultPreferences(now: Instant): LearnerPreferences = LearnerPreferences(
@@ -341,6 +445,8 @@ data class LlmCapabilities(
     val jsonObjectMode: Boolean = true,
     val reportsUsage: Boolean = true,
     val systemRole: Boolean = true,
+    val strictJsonSchema: Boolean = false,
+    val contextWindowTokens: Int? = null,
 )
 
 data class ProviderConfig(
