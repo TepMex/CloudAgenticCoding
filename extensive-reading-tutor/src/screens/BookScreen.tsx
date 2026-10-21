@@ -211,7 +211,7 @@ function NotesPane({
       )}
       {visible.map(item => (
         <div className="note-row" key={item.id}>
-          <span className="note-ico">{item.kind === "bookmark" ? <Bookmark size={18} /> : <MessageSquare size={18} />}</span>
+          <span className={item.kind === "bookmark" ? "note-ico mark" : "note-ico"}>{item.kind === "bookmark" ? <Bookmark size={18} /> : <MessageSquare size={18} />}</span>
           <span>
             <h3>{item.title}</h3>
             <p>{item.body}</p>

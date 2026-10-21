@@ -77,6 +77,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   useEffect(() => {
+    setWordId(null);
+    setLookup(null);
+  }, [state.route]);
+
+  useEffect(() => {
+    if (state.route.name !== "lesson") return;
+    if (state.attempts[state.route.bookId]) return;
+    dispatch({ type: "ensure-attempt", bookId: state.route.bookId });
+  }, [state.route, state.attempts]);
+
+  useEffect(() => {
     const onPop = () => {
       skipPush.current = true;
       dispatch({ type: "go", route: hashToRoute(location.hash) });

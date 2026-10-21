@@ -53,16 +53,16 @@ export function KnowledgeScreen() {
             </div>
             {wordRows.map(gloss => (
               <button key={gloss.id} type="button" className="know-row" onClick={() => openWord(gloss.id)}>
-                <span>
+                <span className="know-top">
                   <h3>{gloss.hanzi}</h3>
-                  <p>
-                    {gloss.gloss}. Последнее: {gloss.lastSeen}
-                  </p>
+                  <span className="know-meta">
+                    {gloss.kind !== "word" && <span className={`badge ${gloss.kind}`}>{kindLabel(gloss.kind)}</span>}
+                    <span className={`badge ${gloss.status}`}>{statusLabel(gloss.status)}</span>
+                  </span>
                 </span>
-                <span className="know-meta">
-                  {gloss.kind !== "word" && <span className={`badge ${gloss.kind}`}>{kindLabel(gloss.kind)}</span>}
-                  <span className={`badge ${gloss.status}`}>{statusLabel(gloss.status)}</span>
-                </span>
+                <p>
+                  {gloss.gloss}. Последнее: {gloss.lastSeen}
+                </p>
               </button>
             ))}
             {wordRows.length === 0 && <p className="muted">Ничего не нашлось.</p>}
@@ -73,11 +73,11 @@ export function KnowledgeScreen() {
             .filter(gloss => match(`${gloss.hanzi} ${gloss.gloss}`))
             .map(gloss => (
               <button key={gloss.id} type="button" className="know-row" onClick={() => openWord(gloss.id)}>
-                <span>
+                <span className="know-top">
                   <h3>{gloss.hanzi}</h3>
-                  <p>{gloss.gloss}</p>
+                  <span className={`badge ${gloss.status}`}>{statusLabel(gloss.status)}</span>
                 </span>
-                <span className={`badge ${gloss.status}`}>{statusLabel(gloss.status)}</span>
+                <p>{gloss.gloss}</p>
               </button>
             ))}
         {tab === "skills" &&
@@ -85,11 +85,11 @@ export function KnowledgeScreen() {
             .filter(skill => match(`${skill.title} ${skill.detail}`))
             .map(skill => (
               <button key={skill.id} type="button" className="know-row" onClick={() => cycleSkill(skill.id)}>
-                <span>
+                <span className="know-top">
                   <h3 style={{ fontFamily: "var(--ui)" }}>{skill.title}</h3>
-                  <p>{skill.detail}</p>
+                  <span className={`badge ${skill.status}`}>{statusLabel(skill.status)}</span>
                 </span>
-                <span className={`badge ${skill.status}`}>{statusLabel(skill.status)}</span>
+                <p>{skill.detail}</p>
               </button>
             ))}
         {tab === "skills" && <p className="help">Нажатие меняет статус: повторить → в процессе → знаю.</p>}

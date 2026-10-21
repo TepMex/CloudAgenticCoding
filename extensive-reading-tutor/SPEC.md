@@ -39,7 +39,7 @@ A local-first Russian-language tutor for extensive reading in Chinese. A learner
 
 ## UI / UX
 
-Match the attached phone mockup: white surfaces, iOS-like grouped cards, blue primary actions, green / amber / red for верно / частично / нужно внимание, a four-item tab bar (Книги, Учёба, Словарь, Профиль). Lesson and book screens replace the tab bar with a back button. No fake status-bar clock. Sample covers are original color plates with the title, not publisher artwork.
+Match the attached phone mockup: white surfaces, iOS-like grouped cards, blue primary actions, green / amber / red for верно / частично / нужно внимание, a four-item tab bar (Книги, Учёба, Словарь, Профиль). Lesson and book screens replace the tab bar with a back button. No fake status-bar clock. Sample covers are original color plates with the title, not publisher artwork. A tapped word opens a floating card: the sentence with that word marked, hanzi, pinyin, speak, status star, gloss, example, and «Смотреть подробнее». Settings label an empty provider «OpenAI-compatible»; `api.openai.com` reads as OpenAI. The chat URL is shown after the base URL is entered.
 
 ## Out of scope
 

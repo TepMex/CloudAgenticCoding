@@ -1,6 +1,7 @@
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Header, Sheet } from "../components.tsx";
-import { providerLabel } from "../lib/openai.ts";
+import { chatCompletionsUrl, providerLabel } from "../lib/openai.ts";
 import { endpointReady, defaultSettings } from "../lib/settings.ts";
 import { useApp } from "../state.tsx";
 import type { Settings } from "../lib/types.ts";
@@ -23,13 +24,24 @@ const CHOICE_LABEL: Record<ChoiceKey, string> = {
 
 export function SettingsScreen() {
   const { state, go, saveSettings, testConnection, resetData } = useApp();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => !endpointReady(state.settings));
   const [showKey, setShowKey] = useState(false);
   const [picker, setPicker] = useState<ChoiceKey | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const settings = state.settings;
   const patch = (partial: Partial<Settings>) => saveSettings({ ...settings, ...partial });
+  const connected = endpointReady(settings);
+  let endpoint = "";
+  if (settings.apiBaseUrl.trim()) {
+    try {
+      endpoint = chatCompletionsUrl(settings.apiBaseUrl);
+    } catch {
+      endpoint = "";
+    }
+  }
+  const provider = connected ? providerLabel(settings.apiBaseUrl) : "OpenAI-compatible";
+  const modelLine = connected ? settings.model || defaultSettings.model : `${settings.model || defaultSettings.model} · не подключено`;
 
   return (
     <div className="screen" data-screen="settings">
@@ -39,8 +51,8 @@ export function SettingsScreen() {
         <div className="settings-card">
           <button className="set-row" type="button" onClick={() => setOpen(value => !value)}>
             <span>
-              <b>{providerLabel(settings.apiBaseUrl)}</b>
-              <small>{settings.model || defaultSettings.model}</small>
+              <b>{provider}</b>
+              <small>{modelLine}</small>
             </span>
             <span className="set-value">{open ? "Свернуть" : "Изменить"}</span>
           </button>
@@ -57,7 +69,7 @@ export function SettingsScreen() {
               }}
             >
               <p className="help">
-                Любой OpenAI-compatible Chat Completions. Запрос уходит из браузера. Адрес можно указать как https://api.openai.com, с /v1 на конце или целиком до /chat/completions. Ключ хранится только в этом браузере.
+                Любой OpenAI-compatible Chat Completions: OpenAI, OpenRouter, Ollama или свой сервер. Запрос уходит из браузера. Адрес можно указать как https://api.openai.com, с /v1 на конце или целиком до /chat/completions — сегмент /v1 не дублируется. Ключ хранится только в этом браузере.
               </p>
               <label className="field">
                 <span>Базовый URL</span>
@@ -76,7 +88,7 @@ export function SettingsScreen() {
                   value={settings.apiKey}
                   type={showKey ? "text" : "password"}
                   autoComplete="off"
-                  placeholder="Для локального сервера можно оставить пустым"
+                  placeholder="Можно оставить пустым"
                   onChange={event => patch({ apiKey: event.target.value })}
                 />
               </label>
@@ -87,6 +99,7 @@ export function SettingsScreen() {
                 <span>Модель</span>
                 <input name="model" value={settings.model} placeholder="gpt-4o" onChange={event => patch({ model: event.target.value })} />
               </label>
+              {endpoint ? <p className="muted endpoint">Запрос: {endpoint}</p> : null}
               <button className="btn-primary" type="submit" disabled={!endpointReady(settings) || testing}>
                 {testing ? "Проверяю…" : "Проверить соединение"}
               </button>
@@ -100,7 +113,10 @@ export function SettingsScreen() {
           {(Object.keys(CHOICES) as ChoiceKey[]).map(key => (
             <button key={key} className="set-row" type="button" onClick={() => setPicker(key)}>
               <span>{CHOICE_LABEL[key]}</span>
-              <span className="set-value">{settings[key]}</span>
+              <span className="set-value">
+                {settings[key]}
+                <ChevronRight />
+              </span>
             </button>
           ))}
           <div className="set-row">

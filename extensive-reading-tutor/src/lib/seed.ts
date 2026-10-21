@@ -3,7 +3,7 @@ import { buildOfflineLesson } from "./lesson.ts";
 import { tokenize } from "./text.ts";
 import type { Book, Gloss, Lesson, Note, Question, Skill } from "./types.ts";
 
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 export const HERO_BOOK_ID = "book-tgcf";
 
 export const HERO_PASSAGE =
@@ -245,7 +245,7 @@ export const seedBooks: Book[] = [
       { id: "c13", title: "Глава 13", status: "unread", detail: "Ещё не открыта" },
     ],
     recent: [
-      { title: "Глава 12 · Фрагмент 3", when: "Сегодня · 5 новых слов", done: false },
+      { title: "Глава 12 · Фрагмент 3", when: "Сегодня · 5 новых слов", done: true },
       { title: "Глава 12 · Фрагмент 2", when: "Вчера · 6 новых слов", done: true },
     ],
   },
@@ -338,6 +338,14 @@ export const seedNotes: Note[] = [
     title: "Глава 12 · Фрагмент 3",
     body: "仿佛一座小小的图书馆",
     meta: "Сегодня",
+  },
+  {
+    id: "note-5",
+    bookId: HERO_BOOK_ID,
+    kind: "bookmark",
+    title: "Глава 12 · Фрагмент 2",
+    body: "我推开那扇熟悉的门",
+    meta: "Вчера",
   },
 ];
 

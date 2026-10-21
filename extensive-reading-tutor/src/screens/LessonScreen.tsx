@@ -1,6 +1,6 @@
 import { Info } from "lucide-react";
 import { useState } from "react";
-import { Header, kindLabel, statusLabel } from "../components.tsx";
+import { CheckDot, Header, kindLabel, statusLabel } from "../components.tsx";
 import { tally } from "../lib/grade.ts";
 import { isHan, passageOf, plural } from "../lib/text.ts";
 import { useApp } from "../state.tsx";
@@ -40,6 +40,7 @@ export function LessonScreen({ bookId }: { bookId: string }) {
   };
   const passage = passageOf(lesson.tokens);
   const glosses = app.state.glosses.filter(gloss => lesson.tokens.some(token => token.glossId === gloss.id));
+  const activeGlossId = app.word?.id;
 
   return (
     <div className="screen" data-screen="lesson">
@@ -75,6 +76,7 @@ export function LessonScreen({ bookId }: { bookId: string }) {
                 meta: "Сейчас",
               })
             }
+            activeGlossId={activeGlossId}
             onToken={(hanzi, glossId) => {
               if (glossId) app.openWord(glossId);
               else if (isHan(hanzi)) app.openLookup(hanzi, passage);
@@ -111,6 +113,7 @@ export function LessonScreen({ bookId }: { bookId: string }) {
             onWord={app.openWord}
           />
         )}
+        {phase === 4 && !attempt.review && <p className="muted">Разбор появится после отправки ответов.</p>}
       </div>
       <div className="dock">
         {phase === 1 && (
@@ -156,6 +159,7 @@ function PhaseText({
   onSaveNote,
   onBookmark,
   onToken,
+  activeGlossId,
 }: {
   lesson: Lesson;
   passage: string;
@@ -169,6 +173,7 @@ function PhaseText({
   onSaveNote: () => void;
   onBookmark: () => void;
   onToken: (hanzi: string, glossId?: string) => void;
+  activeGlossId?: string;
 }) {
   return (
     <>
@@ -200,7 +205,12 @@ function PhaseText({
           <p className="passage" lang="zh">
             {lesson.tokens.map((token, index) =>
               isHan(token.t) ? (
-                <button key={index} type="button" className={token.glossId ? "token gloss" : "token"} onClick={() => onToken(token.t, token.glossId)}>
+                <button
+                  key={index}
+                  type="button"
+                  className={token.glossId && token.glossId === activeGlossId ? "token on" : token.glossId ? "token gloss" : "token"}
+                  onClick={() => onToken(token.t, token.glossId)}
+                >
                   {token.t}
                 </button>
               ) : (
@@ -350,9 +360,7 @@ function PhaseCheck({
                 <span className="q-no">{index + 1}.</span>
                 {question.title}
               </h3>
-              <span className={raw ? "check" : "check off"} aria-label={raw ? "Заполнено" : "Пусто"}>
-                ✓
-              </span>
+              <CheckDot on={Boolean(raw)} />
             </div>
             <div className="answer-line">
               <p>{shown}</p>
@@ -367,12 +375,15 @@ function PhaseCheck({
       <div className="diff">
         {(
           [
-            ["easy", "Слишком легко"],
-            ["ok", "Подходит"],
-            ["hard", "Сложно"],
+            ["easy", "Слишком легко", "😌"],
+            ["ok", "Подходит", "🙂"],
+            ["hard", "Сложно", "😣"],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, face]) => (
           <button key={id} type="button" className={difficulty === id ? "on" : ""} onClick={() => onDifficulty(id)}>
+            <span className="face" aria-hidden>
+              {face}
+            </span>
             {label}
           </button>
         ))}
@@ -448,7 +459,7 @@ function PhaseReview({
               <p>{item.explanation}</p>
               {item.examples.length > 0 && (
                 <>
-                  <p className="section-label">Примеры</p>
+                  <p className="section-label">Примеры:</p>
                   <ul className="examples">
                     {item.examples.map(example => (
                       <li key={example}>{example}</li>
@@ -469,13 +480,13 @@ function PhaseReview({
       {tab === "words" &&
         glosses.map(gloss => (
           <button key={gloss.id} type="button" className="know-row" onClick={() => onWord(gloss.id)}>
-            <span>
+            <span className="know-top">
               <h3>{gloss.hanzi}</h3>
-              <p>{gloss.gloss}</p>
+              <span className={`badge ${gloss.kind === "word" ? gloss.status : gloss.kind}`}>
+                {gloss.kind === "word" ? statusLabel(gloss.status) : kindLabel(gloss.kind)}
+              </span>
             </span>
-            <span className={`badge ${gloss.kind === "word" ? gloss.status : gloss.kind}`}>
-              {gloss.kind === "word" ? statusLabel(gloss.status) : kindLabel(gloss.kind)}
-            </span>
+            <p>{gloss.gloss}</p>
           </button>
         ))}
     </>

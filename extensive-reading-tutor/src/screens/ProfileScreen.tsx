@@ -29,7 +29,11 @@ export function ProfileScreen() {
         <div className="stat4">
           <div>
             <b>{reading}</b>
-            <span>книги в работе</span>
+            <span>
+              книги
+              <br />
+              (самостоятельно)
+            </span>
           </div>
           <div>
             <b>{words}</b>
