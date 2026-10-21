@@ -1,0 +1,2 @@
+-keep class com.tepmex.myweek.data.** { *; }
+-keep class com.tepmex.myweek.domain.SprintJoinRow { *; }
