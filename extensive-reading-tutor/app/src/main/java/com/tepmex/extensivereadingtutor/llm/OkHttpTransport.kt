@@ -18,33 +18,55 @@ class OkHttpTransport : HttpTransport {
         body: String,
         timeoutMillis: Long,
     ): HttpResult = withContext(Dispatchers.IO) {
+        val wireRequest = mutableListOf<HttpHeader>()
         val client = OkHttpClient.Builder()
             .callTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
+            .addNetworkInterceptor { chain ->
+                chain.request().headers.forEach { (name, value) ->
+                    wireRequest += HttpHeader(name, value)
+                }
+                chain.proceed(chain.request())
+            }
             .build()
         val request = Request.Builder()
             .url(url)
             .post(body.toRequestBody(JSON))
             .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
             .build()
+        fun sentHeaders(): List<HttpHeader> =
+            if (wireRequest.isEmpty()) headers.map { (name, value) -> HttpHeader(name, value) } else wireRequest.toList()
+        val started = System.nanoTime()
         try {
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
+                val responseHeaders = response.headers.map { (name, value) -> HttpHeader(name, value) }
                 when (response.code) {
-                    in 200..299 -> HttpResult.Ok(response.code, text)
-                    401, 403 -> HttpResult.Fail(LlmFailureKind.UNAUTHORIZED, response.code, text)
-                    429 -> HttpResult.Fail(LlmFailureKind.RATE_LIMIT, response.code, text)
-                    in 500..599 -> HttpResult.Fail(LlmFailureKind.NETWORK, response.code, text)
-                    else -> HttpResult.Fail(LlmFailureKind.BAD_RESPONSE, response.code, text)
+                    in 200..299 -> HttpResult.Ok(response.code, text, sentHeaders(), responseHeaders)
+                    401, 403 -> HttpResult.Fail(LlmFailureKind.UNAUTHORIZED, response.code, text, sentHeaders(), responseHeaders)
+                    429 -> HttpResult.Fail(LlmFailureKind.RATE_LIMIT, response.code, text, sentHeaders(), responseHeaders)
+                    in 500..599 -> HttpResult.Fail(LlmFailureKind.NETWORK, response.code, text, sentHeaders(), responseHeaders)
+                    else -> HttpResult.Fail(LlmFailureKind.BAD_RESPONSE, response.code, text, sentHeaders(), responseHeaders)
                 }
             }
-        } catch (_: SocketTimeoutException) {
-            HttpResult.Fail(LlmFailureKind.TIMEOUT, null, null)
-        } catch (_: IOException) {
-            HttpResult.Fail(LlmFailureKind.NETWORK, null, null)
+        } catch (error: IOException) {
+            val elapsed = (System.nanoTime() - started) / 1_000_000L
+            val timedOut = error.isTimeout() || elapsed >= timeoutMillis - 50
+            val kind = if (timedOut) LlmFailureKind.TIMEOUT else LlmFailureKind.NETWORK
+            HttpResult.Fail(kind, null, null, sentHeaders(), emptyList())
         }
     }
 
     private companion object {
         val JSON = "application/json; charset=utf-8".toMediaType()
     }
+}
+
+private fun IOException.isTimeout(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is SocketTimeoutException) return true
+        if (current.message?.contains("timeout", ignoreCase = true) == true) return true
+        current = current.cause
+    }
+    return false
 }

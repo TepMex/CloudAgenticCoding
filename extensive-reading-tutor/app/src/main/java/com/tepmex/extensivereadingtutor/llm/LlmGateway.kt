@@ -16,9 +16,15 @@ import com.tepmex.extensivereadingtutor.domain.TokenUsage
 import com.tepmex.extensivereadingtutor.pedagogy.MemoryPacket
 import com.tepmex.extensivereadingtutor.pedagogy.PedagogicalStrategy
 import com.tepmex.extensivereadingtutor.pedagogy.Prompts
+import java.time.Instant
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 
 data class LlmMessage(val role: String, val content: String)
@@ -30,7 +36,18 @@ data class LlmRequest(
     val maxOutputTokens: Int,
     val jsonObjectMode: Boolean,
     val timeoutMillis: Long,
+    val extraBodyJson: String = "",
+    val purpose: String = "",
 )
+
+data class LlmCallSettings(
+    val timeoutMillis: Long = DEFAULT_TIMEOUT_SECONDS * 1000,
+    val extraBodyJson: String = "",
+)
+
+fun interface LlmCallPolicy {
+    suspend fun current(): LlmCallSettings
+}
 
 data class LlmResponse(
     val content: String,
@@ -157,6 +174,7 @@ fun interface ProviderLookup {
 class GatewayLessonAi(
     private val providers: ProviderLookup,
     private val retry: RetryingCalls,
+    private val policy: LlmCallPolicy = LlmCallPolicy { LlmCallSettings() },
     private val json: Json = lessonJson,
 ) : LessonAi {
     override suspend fun prepareLesson(input: PrepareLessonInput): AppResult<PreparedDraft> {
@@ -173,6 +191,7 @@ class GatewayLessonAi(
             Prompts.systemPrepare(input.strategy),
             user,
             temperature = 0.4,
+            purpose = "prepare",
         )
         if (response is AppResult.Err) return response
         val body = (response as AppResult.Ok).value
@@ -198,6 +217,7 @@ class GatewayLessonAi(
             Prompts.systemEvaluate(input.strategy),
             user,
             temperature = 0.2,
+            purpose = "evaluate",
         )
         if (response is AppResult.Err) return response
         val body = (response as AppResult.Ok).value
@@ -216,6 +236,7 @@ class GatewayLessonAi(
         system: String,
         user: String,
         temperature: Double,
+        purpose: String,
     ): AppResult<LlmResponse> {
         val resolved = providers.provider(providerConfigId)
         if (resolved is AppResult.Err) return resolved
@@ -225,6 +246,7 @@ class GatewayLessonAi(
         } else {
             listOf(LlmMessage("user", system + "\n\n" + user))
         }
+        val call = policy.current()
         return retry.generate(
             provider,
             LlmRequest(
@@ -233,7 +255,9 @@ class GatewayLessonAi(
                 temperature = temperature,
                 maxOutputTokens = 2000,
                 jsonObjectMode = provider.capabilities.jsonObjectMode,
-                timeoutMillis = 60_000,
+                timeoutMillis = call.timeoutMillis,
+                extraBodyJson = call.extraBodyJson,
+                purpose = purpose,
             ),
         )
     }
@@ -444,8 +468,20 @@ fun redact(text: String, secrets: List<String>): String {
 }
 
 sealed interface HttpResult {
-    data class Ok(val code: Int, val body: String) : HttpResult
-    data class Fail(val kind: LlmFailureKind, val code: Int?, val body: String?) : HttpResult
+    data class Ok(
+        val code: Int,
+        val body: String,
+        val requestHeaders: List<HttpHeader> = emptyList(),
+        val responseHeaders: List<HttpHeader> = emptyList(),
+    ) : HttpResult
+
+    data class Fail(
+        val kind: LlmFailureKind,
+        val code: Int?,
+        val body: String?,
+        val requestHeaders: List<HttpHeader> = emptyList(),
+        val responseHeaders: List<HttpHeader> = emptyList(),
+    ) : HttpResult
 }
 
 interface HttpTransport {
@@ -462,89 +498,109 @@ class OpenAiCompatibleProvider(
     private val baseUrl: String,
     private val apiKey: String,
     private val http: HttpTransport,
+    private val exchanges: LlmExchangeLog = NoopLlmExchangeLog,
 ) : LlmProvider {
     override suspend fun generate(request: LlmRequest): AppResult<LlmResponse> {
+        val started = Instant.now()
+        val startedNanos = System.nanoTime()
+        val url = if (baseUrl.isBlank()) "" else chatCompletionsUrl(baseUrl)
         if (apiKey.isBlank()) {
+            remember(request, url, started, startedNanos, false, null, LlmFailureKind.UNAUTHORIZED.name, emptyList(), emptyList(), "", "Нет ключа API.")
             return AppResult.Err(DomainError.LlmFailed(LlmFailureKind.UNAUTHORIZED, "Нет ключа API."))
         }
         if (baseUrl.isBlank()) {
+            remember(request, url, started, startedNanos, false, null, LlmFailureKind.BAD_RESPONSE.name, emptyList(), emptyList(), "", "Не указан адрес API.")
             return AppResult.Err(DomainError.LlmFailed(LlmFailureKind.BAD_RESPONSE, "Не указан адрес API."))
         }
-        val payload = buildString {
-            append("""{"model":""")
-            append(jsonString(request.model))
-            append(""","temperature":""")
-            append(request.temperature)
-            append(""","messages":[""")
-            request.messages.forEachIndexed { index, message ->
-                if (index > 0) append(',')
-                append("""{"role":""")
-                append(jsonString(message.role))
-                append(""","content":""")
-                append(jsonString(message.content))
-                append('}')
+        val payload = when (val built = chatPayload(request, capabilities.jsonObjectMode)) {
+            is AppResult.Err -> {
+                val message = (built.error as? DomainError.LlmFailed)?.detail ?: "Неверные дополнительные поля."
+                remember(request, url, started, startedNanos, false, null, "INVALID_EXTRA", emptyList(), emptyList(), request.extraBodyJson, message)
+                return built
             }
-            append(']')
-            if (request.jsonObjectMode && capabilities.jsonObjectMode) {
-                append(""","response_format":{"type":"json_object"}""")
-            }
-            append('}')
+            is AppResult.Ok -> built.value
         }
         val headers = linkedMapOf("Authorization" to "Bearer $apiKey")
-        return when (val result = http.postJson(chatCompletionsUrl(baseUrl), headers, payload, request.timeoutMillis)) {
-            is HttpResult.Fail -> AppResult.Err(
-                DomainError.LlmFailed(result.kind, redact(result.body ?: result.kind.name, listOf(apiKey))),
-            )
-            is HttpResult.Ok -> parseChatBody(result.body, apiKey, capabilities.reportsUsage)
+        return when (val result = http.postJson(url, headers, payload, request.timeoutMillis)) {
+            is HttpResult.Fail -> {
+                remember(
+                    request, url, started, startedNanos, true, result.code, result.kind.name,
+                    result.requestHeaders.ifEmpty { headers.toHeaders() }, result.responseHeaders, payload, result.body,
+                )
+                AppResult.Err(DomainError.LlmFailed(result.kind, redact(result.body ?: result.kind.name, listOf(apiKey))))
+            }
+            is HttpResult.Ok -> {
+                val parsed = parseChatBody(result.body, apiKey, capabilities.reportsUsage)
+                val failure = (parsed as? AppResult.Err)?.let { (it.error as? DomainError.LlmFailed)?.kind?.name }
+                remember(
+                    request, url, started, startedNanos, true, result.code, failure,
+                    result.requestHeaders.ifEmpty { headers.toHeaders() }, result.responseHeaders, payload, result.body,
+                )
+                parsed
+            }
+        }
+    }
+
+    private suspend fun remember(
+        request: LlmRequest,
+        url: String,
+        started: Instant,
+        startedNanos: Long,
+        sent: Boolean,
+        httpStatus: Int?,
+        failureKind: String?,
+        requestHeaders: List<HttpHeader>,
+        responseHeaders: List<HttpHeader>,
+        requestBody: String,
+        responseBody: String?,
+    ) {
+        val usage = tokenUsageOrNull(responseBody)
+        val secrets = listOf(apiKey)
+        val exchange = LlmExchange(
+            id = UUID.randomUUID().toString(),
+            purpose = request.purpose,
+            model = request.model,
+            url = url,
+            startedAtEpochMillis = started.toEpochMilli(),
+            finishedAtEpochMillis = Instant.now().toEpochMilli(),
+            durationMillis = ((System.nanoTime() - startedNanos) / 1_000_000L).coerceAtLeast(0),
+            sent = sent,
+            httpStatus = httpStatus,
+            failureKind = failureKind,
+            requestHeadersJson = headersJson(redactHeaders(requestHeaders, secrets)),
+            requestBody = loggedBody(requestBody, secrets),
+            responseHeadersJson = headersJson(redactHeaders(responseHeaders, secrets)),
+            responseBody = responseBody?.let { loggedBody(it, secrets) },
+            promptTokens = usage?.promptTokens,
+            completionTokens = usage?.completionTokens,
+            totalTokens = usage?.totalTokens,
+        )
+        withContext(Dispatchers.IO) {
+            try {
+                exchanges.append(exchange)
+            } catch (_: Exception) {
+            }
         }
     }
 }
+
+private fun Map<String, String>.toHeaders(): List<HttpHeader> = map { (name, value) -> HttpHeader(name, value) }
 
 private fun parseChatBody(body: String, apiKey: String, readUsage: Boolean): AppResult<LlmResponse> {
     return try {
-        val root = kotlinx.serialization.json.Json.parseToJsonElement(body) as kotlinx.serialization.json.JsonObject
-        val choice = (root["choices"] as? kotlinx.serialization.json.JsonArray)?.firstOrNull() as? kotlinx.serialization.json.JsonObject
-        val message = choice?.get("message") as? kotlinx.serialization.json.JsonObject
-        val content = (message?.get("content") as? kotlinx.serialization.json.JsonPrimitive)?.content
+        val root = Json.parseToJsonElement(body) as JsonObject
+        val choice = (root["choices"] as? kotlinx.serialization.json.JsonArray)?.firstOrNull() as? JsonObject
+        val message = choice?.get("message") as? JsonObject
+        val content = (message?.get("content") as? JsonPrimitive)?.content
         if (content.isNullOrBlank()) {
             return AppResult.Err(DomainError.LlmFailed(LlmFailureKind.BAD_RESPONSE, "Пустой ответ модели."))
         }
-        val usage = if (readUsage) root["usage"] as? kotlinx.serialization.json.JsonObject else null
-        val finish = (choice?.get("finish_reason") as? kotlinx.serialization.json.JsonPrimitive)?.content
-        AppResult.Ok(
-            LlmResponse(
-                content = content,
-                usage = usage?.let {
-                    TokenUsage(
-                        promptTokens = intField(it, "prompt_tokens"),
-                        completionTokens = intField(it, "completion_tokens"),
-                        totalTokens = intField(it, "total_tokens"),
-                    )
-                },
-                finishReason = finish,
-            ),
-        )
+        val usage = if (readUsage) tokenUsageOrNull(body) else null
+        val finish = (choice?.get("finish_reason") as? JsonPrimitive)?.content
+        AppResult.Ok(LlmResponse(content = content, usage = usage, finishReason = finish))
     } catch (error: Exception) {
         AppResult.Err(DomainError.LlmFailed(LlmFailureKind.BAD_RESPONSE, redact(error.message ?: "bad json", listOf(apiKey))))
     }
-}
-
-private fun intField(obj: kotlinx.serialization.json.JsonObject, name: String): Int? =
-    (obj[name] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull()
-
-private fun jsonString(value: String): String = buildString {
-    append('"')
-    value.forEach { ch ->
-        when (ch) {
-            '\\' -> append("\\\\")
-            '"' -> append("\\\"")
-            '\n' -> append("\\n")
-            '\r' -> append("\\r")
-            '\t' -> append("\\t")
-            else -> append(ch)
-        }
-    }
-    append('"')
 }
 
 fun questionIdOrNull(raw: String?): QuestionId? = raw?.takeIf { it.isNotBlank() }?.let(::QuestionId)

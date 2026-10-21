@@ -65,6 +65,9 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                         }
                         is Route.Lesson -> LessonScreen(state, model)
                         Route.Settings -> SettingsScreen(state, model)
+                        Route.AiLog -> AiJournalScreen(state, model)
+                        is Route.AiExchange -> AiExchangeScreen(state, model)
+                        is Route.AiRaw -> AiRawScreen(state, model)
                     }
                 }
                 if (showTabs) TutorTabs(state.tab, model::selectTab)

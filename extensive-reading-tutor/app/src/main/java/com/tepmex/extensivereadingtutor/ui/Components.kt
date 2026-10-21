@@ -175,13 +175,18 @@ fun SectionLabel(text: String) {
 }
 
 @Composable
-fun SurfaceCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun SurfaceCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(TutorCard)
             .border(1.dp, TutorLine, RoundedCornerShape(18.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(14.dp),
     ) { content() }
 }

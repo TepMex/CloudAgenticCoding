@@ -14,11 +14,16 @@ import java.time.LocalDate
 
 enum class Tab { BOOKS, STUDY, KNOWLEDGE, PROFILE }
 
+enum class RawSide { REQUEST, RESPONSE }
+
 sealed interface Route {
     data object Tabs : Route
     data class Book(val id: String) : Route
     data class Lesson(val bookId: String) : Route
     data object Settings : Route
+    data object AiLog : Route
+    data class AiExchange(val id: String) : Route
+    data class AiRaw(val id: String, val side: RawSide) : Route
 }
 
 data class QuestionUi(
@@ -61,6 +66,38 @@ data class WordSheetUi(
     val skill: SkillType?,
 )
 
+data class ExchangeRow(
+    val id: String,
+    val title: String,
+    val model: String,
+    val whenLabel: String,
+    val meta: String,
+    val tokens: String,
+    val ok: Boolean,
+)
+
+data class ExchangeView(
+    val id: String,
+    val title: String,
+    val model: String,
+    val url: String,
+    val whenLabel: String,
+    val duration: String,
+    val status: String,
+    val tokens: String,
+    val ok: Boolean,
+    val requestPreview: String,
+    val responsePreview: String,
+    val requestHeaders: String,
+    val requestBody: String,
+    val responseHeaders: String,
+    val responseBody: String,
+    val requestHeadersHighlighted: Boolean,
+    val requestBodyHighlighted: Boolean,
+    val responseHeadersHighlighted: Boolean,
+    val responseBodyHighlighted: Boolean,
+)
+
 data class TutorUiState(
     val tab: Tab = Tab.BOOKS,
     val route: Route = Route.Tabs,
@@ -74,8 +111,13 @@ data class TutorUiState(
     val baseUrl: String = "",
     val modelName: String = "",
     val apiKey: String = "",
+    val extraBodyJson: String = "",
+    val timeoutSeconds: String = "60",
+    val connectionDirty: Boolean = false,
     val keyStored: Boolean = false,
     val probe: String? = null,
+    val exchanges: List<ExchangeRow> = emptyList(),
+    val exchange: ExchangeView? = null,
     val lesson: LessonPanel? = null,
     val checkingAnswers: Boolean = false,
     val selectedWord: String? = null,

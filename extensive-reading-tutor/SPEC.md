@@ -22,6 +22,8 @@ Android tutor for one learner who reads a real book in a foreign language with a
 14. API keys are encrypted with a keystore key. They are not logged, not placed in lesson tables, and not part of a history export.
 15. Removing a book from the shelf and erasing its learning history are different operations.
 16. Domain logic is covered by JVM tests with a fake model. Room is the on-device store.
+17. Connection settings include an optional JSON object and a request timeout. The object is merged into each Chat Completions body for provider fields such as reasoning effort. It must be a JSON object and must not contain `model` or `messages`. The timeout is a whole number of seconds from 1 to 1800 and applies to lesson calls and the connection check. The default is 60. Invalid JSON or an out-of-range timeout is not saved. A call with invalid extra JSON is not sent.
+18. Every model attempt, including a retry and the connection check, is appended to a local journal of the newest 40 exchanges. A row shows the operation, time, duration, HTTP status, and token counts when the response includes `usage`. The learner can open the request or the response and read pretty-printed headers and the body. JSON is syntax-colored. The API key is replaced with `[redacted]` before the journal is written. The journal is a file, not a lesson-database table, and it is not a history export.
 
 ## Interfaces
 
@@ -33,7 +35,8 @@ Android tutor for one learner who reads a real book in a foreign language with a
 | Model | `LessonAi.prepareLesson`, `LessonAi.evaluateAnswers` |
 | HTTP | `LlmProvider.generate` via OpenAI-compatible `chat/completions` |
 | Database | Room `tutor.db`, schema version 1 |
-| Settings | DataStore `tutor_settings` for base URL and model name |
+| Settings | DataStore `tutor_settings` for base URL, model name, extra JSON, and timeout seconds |
+| Journal | `LlmExchangeLog` file `llm-exchanges.json`, newest 40 |
 | Secrets | `SecretStore`, Android Keystore AES-GCM on device |
 | Gradle | `./gradlew test assembleRelease` |
 
@@ -145,6 +148,7 @@ Book text and answers travel in the user message as data. The system message is 
 - **Preferences** — study language, explanation language, self-assessed level, difficulty, hint depth, target fragment size.
 - **Provider config** — id, display name, kind, base URL, capabilities. No secret.
 - **AI call** — lesson, operation, provider, model, prompt version, strategy version, token counts, raw JSON, time.
+- **Model exchange** — one HTTP attempt: purpose, model, URL, start, finish, duration, HTTP status, failure kind, whether it was sent, redacted request headers, request body, redacted response headers, response body, token counts. Stored in `llm-exchanges.json`, newest 40. Not in `tutor.db`.
 
 Deleting the shelf entry sets `removedAt` and deletes the local EPUB file. Blocks, fragments, lessons, and observations stay. Erasing history deletes those rows for that book, resets the cursor, and rebuilds knowledge. The file and the book row stay.
 
@@ -159,7 +163,8 @@ The launcher is the phone UI. A bottom bar switches Книги, Учёба, Сл
 5. **Учёба** resumes the current book and lists knowledge in `NEEDS_REVIEW`.
 6. **Словарь** is the knowledge projection: words, `GRAMMAR_COMPREHENSION` rows, and skill counts, with search.
 7. **Профиль** counts shelf and ledger figures. The activity grid uses completed-lesson days and observation days.
-8. **Настройки** edits the OpenAI-compatible base URL, the keystore key, and the model name, and saves `LearnerPreferences`: self-assessed level, explanation language, difficulty, hint depth, and target fragment size. Toggles that are not preferences are not shown.
+8. **Настройки** edits the OpenAI-compatible base URL, the keystore key, the model name, the timeout in seconds, and a text field of extra Chat Completions JSON. It also saves `LearnerPreferences`: self-assessed level, explanation language, difficulty, hint depth, and target fragment size. Toggles that are not preferences are not shown. Журнал запросов opens from this screen.
+9. **Журнал запросов** lists model attempts, newest first. A row shows the operation, time, duration, status, and token counts. The row opens one exchange. Запрос and Ответ each open a raw screen: HTTP headers and the body, both pretty-printed JSON when the text is JSON, with syntax coloring. The Authorization value is `[redacted]`. Очистить журнал deletes the file.
 
 ## Out of scope
 
@@ -176,3 +181,5 @@ Accounts, sync, shared study, voice, audio, a scheduler such as Anki, embeddings
 7. The second lesson's prepare payload includes the concept recorded by the first lesson and the full fragment. Changing the model id does not delete the first call.
 8. Changing the target size leaves the first fragment's hash unchanged.
 9. `./gradlew test assembleRelease` succeeds.
+10. A custom JSON object is merged into the chat body, including nested fields. An extra `messages` key does not call the network. The journal stores that attempt with `Authorization` redacted and keeps token counts from `usage`. A timeout typed in settings is the timeout passed to HTTP.
+11. Pretty-printed JSON uses separate colors for keys, strings, numbers, and `true` / `false` / `null`.

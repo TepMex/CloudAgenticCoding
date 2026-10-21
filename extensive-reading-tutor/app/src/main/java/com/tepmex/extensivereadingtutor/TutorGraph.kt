@@ -2,6 +2,7 @@ package com.tepmex.extensivereadingtutor
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.tepmex.extensivereadingtutor.books.BookFileStore
@@ -16,8 +17,14 @@ import com.tepmex.extensivereadingtutor.domain.ModelSource
 import com.tepmex.extensivereadingtutor.domain.ProviderConfig
 import com.tepmex.extensivereadingtutor.domain.ProviderKind
 import com.tepmex.extensivereadingtutor.domain.UuidIds
+import com.tepmex.extensivereadingtutor.llm.DEFAULT_TIMEOUT_SECONDS
+import com.tepmex.extensivereadingtutor.llm.FileLlmExchangeLog
+import com.tepmex.extensivereadingtutor.llm.LlmCallSettings
+import com.tepmex.extensivereadingtutor.llm.LlmExchangeLog
 import com.tepmex.extensivereadingtutor.llm.LlmMessage
 import com.tepmex.extensivereadingtutor.llm.LlmRequest
+import com.tepmex.extensivereadingtutor.llm.MAX_TIMEOUT_SECONDS
+import com.tepmex.extensivereadingtutor.llm.MIN_TIMEOUT_SECONDS
 import com.tepmex.extensivereadingtutor.learner.LearnerService
 import com.tepmex.extensivereadingtutor.lessons.LessonService
 import com.tepmex.extensivereadingtutor.llm.GatewayLessonAi
@@ -45,6 +52,7 @@ class TutorGraph(
     val learner: LearnerService,
     val secrets: SecretStore,
     val models: HoldingModel,
+    val exchanges: LlmExchangeLog,
     private val settings: SettingsStore,
     private val store: com.tepmex.extensivereadingtutor.storage.TutorStore,
 ) {
@@ -60,7 +68,7 @@ class TutorGraph(
             return AppResult.Err(DomainError.ModelNotConfigured)
         }
         val key = secrets.get(DEFAULT_PROVIDER).orEmpty()
-        val provider = OpenAiCompatibleProvider(LlmCapabilities(), current.baseUrl, key, OkHttpTransport())
+        val provider = OpenAiCompatibleProvider(LlmCapabilities(), current.baseUrl, key, OkHttpTransport(), exchanges)
         return when (
             val result = provider.generate(
                 LlmRequest(
@@ -69,7 +77,9 @@ class TutorGraph(
                     temperature = 0.0,
                     maxOutputTokens = 16,
                     jsonObjectMode = false,
-                    timeoutMillis = 20_000,
+                    timeoutMillis = current.timeoutSeconds.coerceIn(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) * 1000,
+                    extraBodyJson = current.extraBodyJson,
+                    purpose = "probe",
                 ),
             )
         ) {
@@ -78,8 +88,14 @@ class TutorGraph(
         }
     }
 
-    suspend fun saveSettings(baseUrl: String, model: String, apiKey: String?) {
-        settings.write(baseUrl.trim(), model.trim())
+    suspend fun saveSettings(
+        baseUrl: String,
+        model: String,
+        apiKey: String?,
+        extraBodyJson: String,
+        timeoutSeconds: Long,
+    ) {
+        settings.write(baseUrl.trim(), model.trim(), extraBodyJson.trim(), timeoutSeconds)
         val config = ProviderConfig(
             id = DEFAULT_PROVIDER,
             displayName = "OpenAI-compatible",
@@ -104,6 +120,7 @@ class TutorGraph(
             val settings = SettingsStore(context)
             val models = HoldingModel(ModelSnapshot(DEFAULT_PROVIDER, ProviderKind.OPENAI_COMPATIBLE.name, ""))
             val http = OkHttpTransport()
+            val exchanges = FileLlmExchangeLog(File(context.filesDir, "llm-exchanges.json"))
             val ai = GatewayLessonAi(
                 providers = { configId ->
                     val config = store.read { it.provider(configId) }
@@ -114,11 +131,18 @@ class TutorGraph(
                     } else {
                         val key = secrets.get(configId).orEmpty()
                         com.tepmex.extensivereadingtutor.domain.AppResult.Ok(
-                            OpenAiCompatibleProvider(config.capabilities, config.baseUrl, key, http),
+                            OpenAiCompatibleProvider(config.capabilities, config.baseUrl, key, http, exchanges),
                         )
                     }
                 },
                 retry = RetryingCalls(sleeper = { kotlinx.coroutines.delay(it) }),
+                policy = {
+                    val current = settings.read()
+                    LlmCallSettings(
+                        timeoutMillis = current.timeoutSeconds.coerceIn(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) * 1000,
+                        extraBodyJson = current.extraBodyJson,
+                    )
+                },
             )
             val learner = LearnerService(store, clock = clock, ids = ids)
             val files = DirectoryBookFiles(File(context.filesDir, "books"))
@@ -128,6 +152,7 @@ class TutorGraph(
                 learner = learner,
                 secrets = secrets,
                 models = models,
+                exchanges = exchanges,
                 settings = settings,
                 store = store,
             )
@@ -154,13 +179,17 @@ class SettingsStore(private val context: Context) {
         return Settings(
             baseUrl = prefs[BASE].orEmpty(),
             model = prefs[MODEL].orEmpty(),
+            extraBodyJson = prefs[EXTRA].orEmpty(),
+            timeoutSeconds = prefs[TIMEOUT] ?: DEFAULT_TIMEOUT_SECONDS,
         )
     }
 
-    suspend fun write(baseUrl: String, model: String) {
+    suspend fun write(baseUrl: String, model: String, extraBodyJson: String, timeoutSeconds: Long) {
         context.tutorSettings.edit {
             it[BASE] = baseUrl
             it[MODEL] = model
+            it[EXTRA] = extraBodyJson
+            it[TIMEOUT] = timeoutSeconds
         }
     }
 
@@ -169,7 +198,14 @@ class SettingsStore(private val context: Context) {
     private companion object {
         val BASE = stringPreferencesKey("base_url")
         val MODEL = stringPreferencesKey("model")
+        val EXTRA = stringPreferencesKey("extra_body")
+        val TIMEOUT = longPreferencesKey("timeout_seconds")
     }
 }
 
-data class Settings(val baseUrl: String, val model: String)
+data class Settings(
+    val baseUrl: String,
+    val model: String,
+    val extraBodyJson: String = "",
+    val timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS,
+)

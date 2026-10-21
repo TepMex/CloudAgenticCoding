@@ -36,6 +36,7 @@ Domain types do not import Android or HTTP. Room entities are not the domain typ
 9. The same proposal hash in one lesson is stored once.
 10. Knowledge rows are a function of non-retracted observations.
 11. Provider secrets are not columns in the lesson database.
+12. The exchange journal is written only after the API key is removed from headers and bodies. It is a file beside the provider, not a `TutorStore` table.
 
 ## State machine
 
