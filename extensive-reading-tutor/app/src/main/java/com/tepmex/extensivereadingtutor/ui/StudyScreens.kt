@@ -51,14 +51,14 @@ fun StudyScreen(state: TutorUiState, onOpenBook: (String) -> Unit, onContinue: (
         ScreenHeader(large = "Учёба")
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             if (current != null) {
-                val step = current.activeStatus?.let { lessonStep(it, current.activeSubmitted, false) }
+                val status = current.activeStatus?.let { statusLabel(it) }
                 SurfaceCard {
                     Text("Сейчас", color = TutorBlue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     Text(current.title, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TutorText)
                     Text(
                         buildString {
                             append(current.place)
-                            if (step != null) append(" · фаза ${stepNumber(step)} из 4")
+                            if (status != null) append(" · $status")
                         },
                         color = TutorMuted,
                         fontSize = 13.sp,

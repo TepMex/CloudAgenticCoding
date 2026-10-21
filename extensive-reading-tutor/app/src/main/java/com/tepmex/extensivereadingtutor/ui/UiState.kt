@@ -144,7 +144,6 @@ data class TutorUiState(
     val exchanges: List<ExchangeRow> = emptyList(),
     val exchange: ExchangeView? = null,
     val lesson: LessonPanel? = null,
-    val checkingAnswers: Boolean = false,
     val selectedWord: String? = null,
     val pendingStart: Int? = null,
     val pendingEnd: Int? = null,

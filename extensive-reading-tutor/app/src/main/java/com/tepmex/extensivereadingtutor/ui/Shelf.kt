@@ -20,7 +20,7 @@ import java.time.ZoneId
 
 enum class ChapterMark { DONE, CURRENT, AHEAD }
 
-enum class LessonStep { TEXT, QUESTIONS, CHECK, REVIEW }
+enum class LessonFeedSection { FRAGMENT, INTRODUCTION, QUESTIONS, REVIEW }
 
 data class ChapterRow(val title: String, val mark: ChapterMark)
 
@@ -119,22 +119,12 @@ fun placeLabel(blocks: List<BookBlock>, cursor: TextCursor): String {
     return current?.chapterTitle?.takeIf { it.isNotBlank() } ?: "Начало книги"
 }
 
-fun lessonStep(status: SessionStatus, submitted: Boolean, checking: Boolean): LessonStep = when (status) {
-    SessionStatus.CREATED, SessionStatus.PREPARING, SessionStatus.INTRO_READY -> LessonStep.TEXT
-    SessionStatus.QUESTIONS_READY -> if (checking) LessonStep.CHECK else LessonStep.QUESTIONS
-    SessionStatus.AWAITING_ANSWERS -> when {
-        submitted -> LessonStep.REVIEW
-        checking -> LessonStep.CHECK
-        else -> LessonStep.QUESTIONS
-    }
-    SessionStatus.EVALUATING, SessionStatus.REVIEW_READY, SessionStatus.COMPLETED -> LessonStep.REVIEW
-}
-
-fun stepNumber(step: LessonStep): Int = when (step) {
-    LessonStep.TEXT -> 1
-    LessonStep.QUESTIONS -> 2
-    LessonStep.CHECK -> 3
-    LessonStep.REVIEW -> 4
+fun visibleLessonSections(status: SessionStatus, submitted: Boolean): List<LessonFeedSection> {
+    val sections = mutableListOf(LessonFeedSection.FRAGMENT)
+    if (status.ordinal >= SessionStatus.INTRO_READY.ordinal) sections += LessonFeedSection.INTRODUCTION
+    if (status.ordinal >= SessionStatus.QUESTIONS_READY.ordinal) sections += LessonFeedSection.QUESTIONS
+    if (submitted || status.ordinal >= SessionStatus.EVALUATING.ordinal) sections += LessonFeedSection.REVIEW
+    return sections
 }
 
 fun loadShelf(db: StoreSession, zone: ZoneId = ZoneId.systemDefault()): ShelfLoad {
