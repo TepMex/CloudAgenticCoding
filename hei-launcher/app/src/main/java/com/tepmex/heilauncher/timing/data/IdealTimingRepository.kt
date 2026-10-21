@@ -1,5 +1,8 @@
 package com.tepmex.heilauncher.timing.data
 
+import com.tepmex.heilauncher.domain.FitnessHistory
+import com.tepmex.heilauncher.domain.FitnessWindows
+import com.tepmex.heilauncher.timing.domain.FitnessDayParser
 import com.tepmex.heilauncher.timing.domain.SleepRecordParser
 import com.tepmex.heilauncher.timing.mi.AuthException
 import com.tepmex.heilauncher.timing.mi.AuthToken
@@ -8,6 +11,12 @@ import com.tepmex.heilauncher.timing.mi.DeviceUntrustedException
 import com.tepmex.heilauncher.timing.mi.MiAuth
 import com.tepmex.heilauncher.timing.mi.MiConstants
 import com.tepmex.heilauncher.timing.mi.MiHealthClient
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 data class SyncResult(
     val wake: WakeSnapshot,
@@ -98,6 +107,48 @@ class IdealTimingRepository(
         )
         wakeStore.save(snap)
         return SyncResult(snap, "Wake synced")
+    }
+
+    /**
+     * Daily steps and sleep hours covering every year, month, and week window
+     * the averages table compares (through today, and the same windows ending yesterday).
+     */
+    suspend fun loadFitnessHistory(
+        today: LocalDate,
+        zone: ZoneId,
+    ): FitnessHistory = withContext(Dispatchers.IO) {
+        val token = currentToken() ?: throw AuthException("Not signed in")
+        if (!token.isAuthenticated) throw AuthException("Not signed in")
+        val uid = token.userId.toLongOrNull()
+            ?: throw AuthException("Invalid user id in token")
+        val client = MiHealthClient(token, auth)
+        val from = FitnessWindows.historyStart(today)
+        val steps = mutableListOf<JSONObject>()
+        val sleep = mutableListOf<JSONObject>()
+        for ((chunkStart, chunkEnd) in FitnessWindows.chunks(from, today)) {
+            val startSec = chunkStart.atStartOfDay(zone).toEpochSecond()
+            val endSec = chunkEnd.plusDays(1).atStartOfDay(zone).toEpochSecond() - 1
+            val limit = ChronoUnit.DAYS.between(chunkStart, chunkEnd).toInt() + 1
+            steps += client.fetchAggregatedItems(
+                uid,
+                MiConstants.DATA_KEY_STEPS,
+                startSec,
+                endSec,
+                limit,
+            )
+            sleep += client.fetchAggregatedItems(
+                uid,
+                MiConstants.DATA_KEY_SLEEP,
+                startSec,
+                endSec,
+                limit,
+            )
+        }
+        tokenStore.save(auth.token.takeIf { it.isAuthenticated } ?: token)
+        FitnessHistory(
+            steps = steps.mapNotNull { FitnessDayParser.steps(it, zone) },
+            sleepHours = sleep.mapNotNull { FitnessDayParser.sleepHours(it, zone) },
+        )
     }
 
     companion object {

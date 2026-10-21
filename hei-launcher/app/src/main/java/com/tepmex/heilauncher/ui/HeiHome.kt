@@ -46,9 +46,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,9 +101,14 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val PAGE_TIMING = 0
-private const val PAGE_FAVOURITES = 1
-private const val PAGE_APPS = 2
+private const val PAGE_FITNESS = 0
+private const val PAGE_TIMING = 1
+private const val PAGE_FAVOURITES = 2
+private const val PAGE_APPS = 3
+private const val PAGE_COUNT = 4
+
+/** Bumped when pager order changes so a restored index is not reused. */
+private const val PAGER_LAYOUT = 4
 
 private val Ink = Color.White
 private val Muted = Color(0xFF8A8A8A)
@@ -110,6 +117,7 @@ private val Dim = Color(0xFF4A4A4A)
 @Composable
 fun HeiHome(
     viewModel: HomeViewModel,
+    fitnessViewModel: FitnessViewModel,
     timingFactory: IdealTimingViewModelFactory,
     onOpenSystemSettings: () -> Unit,
     onOpenLauncherSettings: () -> Unit,
@@ -119,7 +127,8 @@ fun HeiHome(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(initialPage = PAGE_FAVOURITES, pageCount = { 3 })
+    val pagerState = rememberPagerState(initialPage = PAGE_FAVOURITES, pageCount = { PAGE_COUNT })
+    var pagerLayout by rememberSaveable { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -131,6 +140,13 @@ fun HeiHome(
         val controller = WindowCompat.getInsetsController(window, view)
         controller.isAppearanceLightStatusBars = timingPage
         controller.isAppearanceLightNavigationBars = timingPage
+    }
+
+    LaunchedEffect(pagerState) {
+        if (pagerLayout != PAGER_LAYOUT) {
+            pagerState.scrollToPage(PAGE_FAVOURITES)
+            pagerLayout = PAGER_LAYOUT
+        }
     }
 
     LaunchedEffect(viewModel) {
@@ -155,6 +171,10 @@ fun HeiHome(
         beyondViewportPageCount = 1,
     ) { page ->
         when (page) {
+            PAGE_FITNESS -> FitnessPagerPage(
+                viewModel = fitnessViewModel,
+                active = pagerState.currentPage == PAGE_FITNESS,
+            )
             PAGE_TIMING -> TimingPage(
                 factory = timingFactory,
                 active = pagerState.currentPage == PAGE_TIMING,
@@ -179,6 +199,18 @@ fun HeiHome(
             )
         }
     }
+}
+
+@Composable
+private fun FitnessPagerPage(
+    viewModel: FitnessViewModel,
+    active: Boolean,
+) {
+    val state by viewModel.ui.collectAsStateWithLifecycle()
+    LaunchedEffect(active) {
+        viewModel.setActive(active)
+    }
+    FitnessAveragesPage(state = state, modifier = Modifier.fillMaxSize())
 }
 
 @Composable
@@ -275,9 +307,11 @@ private fun FavouritesPage(
                     .fillMaxWidth()
                     .clickable(onClickLabel = openCalendar, role = Role.Button, onClick = onOpenCalendar),
             )
+            Spacer(Modifier.height(10.dp))
+            LifeSpanRow(state.now, Modifier.fillMaxWidth())
             if (state.prefs.showYearProgress) {
                 val year = DayYearProgress.year(state.now.toLocalDate())
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(4.dp))
                 ProgressRow(
                     percent = year.percent,
                     fraction = year.fraction,

@@ -35,4 +35,16 @@
     <string name="open_calendar">Открыть календарь</string>
     <string name="back">Назад</string>
     <string name="version">Версия %1$s</string>
+    <string name="life_span">Часов до 21.01.2063: %1$s</string>
+    <string name="fitness_sign_in">Войдите в Mi Fitness на экране часов.</string>
+    <string name="fitness_failed">Не удалось загрузить Mi Fitness.</string>
+    <string name="metric_steps">Шаги</string>
+    <string name="metric_sleep">Сон, часы</string>
+    <string name="period_year">год</string>
+    <string name="period_month">месяц</string>
+    <string name="period_week">неделя</string>
+    <string name="fitness_up">%1$s, среднее за %2$s %3$s, выросло</string>
+    <string name="fitness_down">%1$s, среднее за %2$s %3$s, упало</string>
+    <string name="fitness_flat">%1$s, среднее за %2$s %3$s</string>
+    <string name="fitness_empty">%1$s, среднее за %2$s, нет данных</string>
 </resources>

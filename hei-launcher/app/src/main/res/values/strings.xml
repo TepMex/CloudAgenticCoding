@@ -40,4 +40,17 @@
     <string name="back">Back</string>
     <string name="version">Version %1$s</string>
     <string name="xiaomi_sign_in">Xiaomi sign-in</string>
+    <string name="life_span">Hours until 21.01.2063: %1$s</string>
+    <string name="fitness_sign_in">Sign in with Mi Fitness on the day clock.</string>
+    <string name="fitness_failed">Couldn\'t load Mi Fitness.</string>
+    <string name="fitness_loading">…</string>
+    <string name="metric_steps">Steps</string>
+    <string name="metric_sleep">Sleep hours</string>
+    <string name="period_year">year</string>
+    <string name="period_month">month</string>
+    <string name="period_week">week</string>
+    <string name="fitness_up">%1$s, %2$s average %3$s, up from yesterday</string>
+    <string name="fitness_down">%1$s, %2$s average %3$s, down from yesterday</string>
+    <string name="fitness_flat">%1$s, %2$s average %3$s</string>
+    <string name="fitness_empty">%1$s, %2$s average, no data</string>
 </resources>

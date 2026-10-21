@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.tepmex.heilauncher.domain.LaunchableApp
 import com.tepmex.heilauncher.timing.ui.IdealTimingViewModelFactory
+import com.tepmex.heilauncher.ui.FitnessViewModel
 import com.tepmex.heilauncher.ui.GraphViewModelFactory
 import com.tepmex.heilauncher.ui.HeiHome
 import com.tepmex.heilauncher.ui.HeiTheme
@@ -22,6 +23,9 @@ import com.tepmex.heilauncher.ui.HomeViewModel
 
 class MainActivity : ComponentActivity() {
     private val viewModel: HomeViewModel by viewModels {
+        GraphViewModelFactory((application as HeiLauncherApp).graph)
+    }
+    private val fitnessViewModel: FitnessViewModel by viewModels {
         GraphViewModelFactory((application as HeiLauncherApp).graph)
     }
 
@@ -42,6 +46,7 @@ class MainActivity : ComponentActivity() {
             HeiTheme {
                 HeiHome(
                     viewModel = viewModel,
+                    fitnessViewModel = fitnessViewModel,
                     timingFactory = timingFactory,
                     onOpenSystemSettings = ::openSystemSettings,
                     onOpenLauncherSettings = ::openLauncherSettings,
