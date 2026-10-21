@@ -150,11 +150,20 @@ Deleting the shelf entry sets `removedAt` and deletes the local EPUB file. Block
 
 ## UI / UX
 
-The activity shipped here is a debug harness: import, settings, the lesson status, the original fragment, and the lesson actions. It is not the product UI. Layout and visual design are out of this iteration. The harness exists so the use cases can be driven on a device.
+The launcher is the phone UI. A bottom bar switches Книги, Учёба, Словарь, and Профиль. Book and lesson screens have a back control and hide the bar. There is no second web app.
+
+1. **Книги** lists EPUB still on the shelf. Filters are Читаю, Завершено, and Все. A book is finished when the cursor is past the last block. Progress is code points read over the book. The + button imports a DRM-free EPUB. The shelf is empty until that import.
+2. **Book** shows the cover, percent, Продолжить, chapter marks from block titles and the cursor, and recent lessons. Убрать с полки calls `removeFromLibrary` and does not erase history.
+3. **Lesson** has four visible steps on the existing state machine. Text is `CREATED`–`INTRO_READY` (Подготовить calls `prepareLesson`, К вопросам calls `revealQuestions`). Questions are `QUESTIONS_READY` or `AWAITING_ANSWERS` before a submission. Твои ответы is local until Отправить calls `submitAnswers` and then `evaluateAnswers`. Разбор is `REVIEW_READY` or a saved submission still waiting for a review. Дальше по книге calls `completeLesson`, which is still the only cursor move. Questions stay free text.
+4. **Word sheet** opens from a Han run in the fragment or a knowledge label. It shows that text, the sentence that contains it, and a knowledge row when the concept label matches. It is not a dictionary.
+5. **Учёба** resumes the current book and lists knowledge in `NEEDS_REVIEW`.
+6. **Словарь** is the knowledge projection: words, `GRAMMAR_COMPREHENSION` rows, and skill counts, with search.
+7. **Профиль** counts shelf and ledger figures. The activity grid uses completed-lesson days and observation days.
+8. **Настройки** edits the OpenAI-compatible base URL, the keystore key, and the model name, and saves `LearnerPreferences`: self-assessed level, explanation language, difficulty, hint depth, and target fragment size. Toggles that are not preferences are not shown.
 
 ## Out of scope
 
-Screen design, accounts, sync, shared study, voice, audio, a scheduler such as Anki, embeddings, multi-agent orchestration, official HSK or CEFR certificates, a book recommender, and a backend whose only job is to proxy the model. Contracts keep a learner id, a provider id, and a strategy version so those can be added later.
+Accounts, sync, shared study, voice, audio, a scheduler such as Anki, embeddings, multi-agent orchestration, official HSK or CEFR certificates, a book recommender, a separate notes store, and a backend whose only job is to proxy the model. Contracts keep a learner id, a provider id, and a strategy version so those can be added later.
 
 ## Acceptance criteria
 

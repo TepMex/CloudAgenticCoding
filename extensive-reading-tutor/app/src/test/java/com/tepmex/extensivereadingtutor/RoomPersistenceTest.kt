@@ -58,6 +58,7 @@ class RoomPersistenceTest {
         val duplicate = again.lessons.evaluateAnswers(session.id)
         assertTrue(duplicate is AppResult.Ok)
         assertEquals(1, store.read { it.observations(LOCAL_LEARNER) }.size)
+        assertEquals(book, store.read { it.books().single().id })
         second.close()
     }
 }

@@ -383,6 +383,9 @@ interface TutorDao {
     @Query("SELECT * FROM books WHERE contentHash = :hash")
     fun bookByHash(hash: String): BookEntity?
 
+    @Query("SELECT * FROM books ORDER BY importedAt DESC")
+    fun books(): List<BookEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertBlocks(entities: List<BlockEntity>)
 
@@ -650,6 +653,7 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
     override fun insertBook(book: Book) = guard { dao.insertBook(book.toEntity()) }
     override fun book(id: BookId): Book? = dao.book(id.value)?.toDomain()
     override fun bookByHash(hash: String): Book? = dao.bookByHash(hash)?.toDomain()
+    override fun books(): List<Book> = dao.books().map { it.toDomain() }
     override fun saveBook(book: Book) { dao.updateBook(book.toEntity()) }
 
     override fun insertBlocks(blocks: List<BookBlock>) = guard {

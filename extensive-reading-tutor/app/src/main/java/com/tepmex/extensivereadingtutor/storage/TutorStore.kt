@@ -51,6 +51,7 @@ interface StoreSession {
     fun insertBook(book: Book)
     fun book(id: BookId): Book?
     fun bookByHash(hash: String): Book?
+    fun books(): List<Book>
     fun saveBook(book: Book)
 
     fun insertBlocks(blocks: List<BookBlock>)

@@ -139,6 +139,8 @@ class InMemoryTutorStore : TutorStore {
 
         override fun bookByHash(hash: String): Book? = mem.books.values.firstOrNull { it.contentHash == hash }
 
+        override fun books(): List<Book> = mem.books.values.sortedByDescending { it.importedAt }
+
         override fun saveBook(book: Book) {
             if (mem.books[book.id] == null) throw StoreConstraintException("missing book")
             mem.books[book.id] = book
