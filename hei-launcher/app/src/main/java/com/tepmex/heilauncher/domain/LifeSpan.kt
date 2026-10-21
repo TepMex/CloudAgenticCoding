@@ -54,6 +54,8 @@ object LifeSpan {
 
     data class Grid(val columns: Int, val rows: Int)
 
+    data class Cell(val column: Int, val row: Int)
+
     /**
      * Pack [dayCount] pixels into a strip [widthPx] wide.
      * Column count follows the width so the hours label beside the bar can keep
@@ -63,5 +65,28 @@ object LifeSpan {
         val columns = widthPx.coerceAtLeast(1).coerceAtMost(dayCount)
         val rows = (dayCount + columns - 1) / columns
         return Grid(columns, rows)
+    }
+
+    /**
+     * Day [index] in [grid]. Days run down a column, then continue at the top
+     * of the next column to the right, so the filled run grows from the left.
+     * Column heights differ by at most one pixel: the leftmost columns that
+     * hold the remainder are one pixel taller, and every column is used.
+     */
+    fun cell(index: Int, grid: Grid): Cell {
+        val columns = grid.columns.coerceAtLeast(1)
+        val base = dayCount / columns
+        val extra = dayCount % columns
+        if (extra == 0) {
+            return Cell(column = index / base, row = index % base)
+        }
+        val tall = base + 1
+        val tallPixels = extra * tall
+        return if (index < tallPixels) {
+            Cell(column = index / tall, row = index % tall)
+        } else {
+            val rest = index - tallPixels
+            Cell(column = extra + rest / base, row = rest % base)
+        }
     }
 }
