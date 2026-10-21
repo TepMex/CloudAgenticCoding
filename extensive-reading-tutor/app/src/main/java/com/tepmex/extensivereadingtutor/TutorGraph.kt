@@ -8,12 +8,16 @@ import com.tepmex.extensivereadingtutor.books.BookFileStore
 import com.tepmex.extensivereadingtutor.books.BookService
 import com.tepmex.extensivereadingtutor.books.EpubExtractor
 import com.tepmex.extensivereadingtutor.domain.AppClock
+import com.tepmex.extensivereadingtutor.domain.AppResult
+import com.tepmex.extensivereadingtutor.domain.DomainError
 import com.tepmex.extensivereadingtutor.domain.LlmCapabilities
 import com.tepmex.extensivereadingtutor.domain.ModelSnapshot
 import com.tepmex.extensivereadingtutor.domain.ModelSource
 import com.tepmex.extensivereadingtutor.domain.ProviderConfig
 import com.tepmex.extensivereadingtutor.domain.ProviderKind
 import com.tepmex.extensivereadingtutor.domain.UuidIds
+import com.tepmex.extensivereadingtutor.llm.LlmMessage
+import com.tepmex.extensivereadingtutor.llm.LlmRequest
 import com.tepmex.extensivereadingtutor.learner.LearnerService
 import com.tepmex.extensivereadingtutor.lessons.LessonService
 import com.tepmex.extensivereadingtutor.llm.GatewayLessonAi
@@ -44,7 +48,35 @@ class TutorGraph(
     private val settings: SettingsStore,
     private val store: com.tepmex.extensivereadingtutor.storage.TutorStore,
 ) {
+    suspend fun <T> read(block: (com.tepmex.extensivereadingtutor.storage.StoreSession) -> T): T = store.read(block)
+
+    suspend fun hasApiKey(): Boolean = !secrets.get(DEFAULT_PROVIDER).isNullOrBlank()
+
     suspend fun loadSettings(): Settings = settings.read()
+
+    suspend fun probeModel(): AppResult<String> {
+        val current = settings.read()
+        if (current.baseUrl.isBlank() || current.model.isBlank()) {
+            return AppResult.Err(DomainError.ModelNotConfigured)
+        }
+        val key = secrets.get(DEFAULT_PROVIDER).orEmpty()
+        val provider = OpenAiCompatibleProvider(LlmCapabilities(), current.baseUrl, key, OkHttpTransport())
+        return when (
+            val result = provider.generate(
+                LlmRequest(
+                    model = current.model,
+                    messages = listOf(LlmMessage("user", "Reply with the single word ok.")),
+                    temperature = 0.0,
+                    maxOutputTokens = 16,
+                    jsonObjectMode = false,
+                    timeoutMillis = 20_000,
+                ),
+            )
+        ) {
+            is AppResult.Ok -> AppResult.Ok(result.value.content.trim())
+            is AppResult.Err -> result
+        }
+    }
 
     suspend fun saveSettings(baseUrl: String, model: String, apiKey: String?) {
         settings.write(baseUrl.trim(), model.trim())

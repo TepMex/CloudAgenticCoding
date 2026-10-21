@@ -1,0 +1,86 @@
+package com.tepmex.extensivereadingtutor.ui
+
+import com.tepmex.extensivereadingtutor.domain.AnswerVerdict
+import com.tepmex.extensivereadingtutor.domain.Concept
+import com.tepmex.extensivereadingtutor.domain.KnowledgeStatus
+import com.tepmex.extensivereadingtutor.domain.LearnerKnowledgeState
+import com.tepmex.extensivereadingtutor.domain.LearnerObservation
+import com.tepmex.extensivereadingtutor.domain.LearnerPreferences
+import com.tepmex.extensivereadingtutor.domain.QuestionType
+import com.tepmex.extensivereadingtutor.domain.SessionStatus
+import com.tepmex.extensivereadingtutor.domain.SkillType
+import com.tepmex.extensivereadingtutor.domain.SubjectiveDifficulty
+import java.time.LocalDate
+
+enum class Tab { BOOKS, STUDY, KNOWLEDGE, PROFILE }
+
+sealed interface Route {
+    data object Tabs : Route
+    data class Book(val id: String) : Route
+    data class Lesson(val bookId: String) : Route
+    data object Settings : Route
+}
+
+data class QuestionUi(
+    val id: String,
+    val type: QuestionType,
+    val prompt: String,
+    val expression: String?,
+)
+
+data class ReviewUi(
+    val questionId: String,
+    val verdict: AnswerVerdict,
+    val explanation: String,
+    val notes: String,
+)
+
+data class LessonPanel(
+    val sessionId: String,
+    val bookId: String,
+    val status: SessionStatus,
+    val chapter: String,
+    val original: String,
+    val introduction: String,
+    val hints: List<String>,
+    val questions: List<QuestionUi>,
+    val drafts: Map<String, String>,
+    val difficulty: SubjectiveDifficulty?,
+    val comment: String,
+    val submitted: Boolean,
+    val reviews: List<ReviewUi>,
+    val recommendations: List<String>,
+)
+
+data class WordSheetUi(
+    val expression: String,
+    val sentence: String,
+    val gloss: String,
+    val example: String?,
+    val status: KnowledgeStatus?,
+    val skill: SkillType?,
+)
+
+data class TutorUiState(
+    val tab: Tab = Tab.BOOKS,
+    val route: Route = Route.Tabs,
+    val shelf: List<ShelfBook> = emptyList(),
+    val knowledge: List<LearnerKnowledgeState> = emptyList(),
+    val concepts: List<Concept> = emptyList(),
+    val observations: List<LearnerObservation> = emptyList(),
+    val completedDays: List<LocalDate> = emptyList(),
+    val observationDays: List<LocalDate> = emptyList(),
+    val preferences: LearnerPreferences? = null,
+    val baseUrl: String = "",
+    val modelName: String = "",
+    val apiKey: String = "",
+    val keyStored: Boolean = false,
+    val probe: String? = null,
+    val lesson: LessonPanel? = null,
+    val checkingAnswers: Boolean = false,
+    val selectedWord: String? = null,
+    val word: WordSheetUi? = null,
+    val confirmRemove: Boolean = false,
+    val busy: String? = null,
+    val error: String? = null,
+)
