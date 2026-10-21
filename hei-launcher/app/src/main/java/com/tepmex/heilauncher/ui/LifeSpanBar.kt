@@ -90,9 +90,10 @@ private fun LifeSpanBar(today: LocalDate, modifier: Modifier = Modifier) {
                     index <= nearEnd -> Near
                     else -> Far
                 }
+                val cell = LifeSpan.cell(index, grid)
                 drawRect(
                     color = color,
-                    topLeft = Offset((index % columns) * cellW, (index / columns) * cellH),
+                    topLeft = Offset(cell.column * cellW, cell.row * cellH),
                     size = Size(cellW, cellH),
                 )
             }
