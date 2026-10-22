@@ -45,6 +45,7 @@ ANDROID_APPS=(
   hei-launcher
   corne-game
   inbox
+  my-week
 )
 
 # Repo-root files copied onto the site on every publish.
