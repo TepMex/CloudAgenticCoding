@@ -53,6 +53,8 @@ REVIEW_READY --complete--> COMPLETED
 
 `INTRO_READY` and `QUESTIONS_READY` are two views of one saved prepare result. `revealQuestions` does not call the model.
 
+The lesson screen does not swap these statuses for exclusive pages. It keeps one feed: the fragment stays first, and the introduction, the questions with their answer fields, and the review are appended under it as the machine advances. Scrolling up shows the earlier blocks. `revealQuestions` still gates the question block. There is no separate answer page and no step counter.
+
 ## Transactions
 
 | Step | Transaction | Network |

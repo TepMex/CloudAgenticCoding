@@ -10,11 +10,11 @@ import com.tepmex.extensivereadingtutor.domain.SessionStatus
 import com.tepmex.extensivereadingtutor.domain.TextCursor
 import com.tepmex.extensivereadingtutor.storage.InMemoryTutorStore
 import com.tepmex.extensivereadingtutor.ui.ChapterMark
-import com.tepmex.extensivereadingtutor.ui.LessonStep
+import com.tepmex.extensivereadingtutor.ui.LessonFeedSection
 import com.tepmex.extensivereadingtutor.ui.chapterRows
 import com.tepmex.extensivereadingtutor.ui.finished
-import com.tepmex.extensivereadingtutor.ui.lessonStep
 import com.tepmex.extensivereadingtutor.ui.loadShelf
+import com.tepmex.extensivereadingtutor.ui.visibleLessonSections
 import com.tepmex.extensivereadingtutor.ui.progressPercent
 import com.tepmex.extensivereadingtutor.ui.readCodePoints
 import java.time.Instant
@@ -44,12 +44,37 @@ class ShelfMathTest {
     }
 
     @Test
-    fun lessonStepsFollowTheStateMachine() {
-        assertEquals(LessonStep.TEXT, lessonStep(SessionStatus.INTRO_READY, submitted = false, checking = false))
-        assertEquals(LessonStep.QUESTIONS, lessonStep(SessionStatus.AWAITING_ANSWERS, submitted = false, checking = false))
-        assertEquals(LessonStep.CHECK, lessonStep(SessionStatus.AWAITING_ANSWERS, submitted = false, checking = true))
-        assertEquals(LessonStep.REVIEW, lessonStep(SessionStatus.AWAITING_ANSWERS, submitted = true, checking = true))
-        assertEquals(LessonStep.REVIEW, lessonStep(SessionStatus.REVIEW_READY, submitted = true, checking = false))
+    fun lessonFeedKeepsEarlierSections() {
+        assertEquals(
+            listOf(LessonFeedSection.FRAGMENT),
+            visibleLessonSections(SessionStatus.PREPARING, submitted = false),
+        )
+        assertEquals(
+            listOf(LessonFeedSection.FRAGMENT, LessonFeedSection.INTRODUCTION),
+            visibleLessonSections(SessionStatus.INTRO_READY, submitted = false),
+        )
+        assertEquals(
+            listOf(LessonFeedSection.FRAGMENT, LessonFeedSection.INTRODUCTION, LessonFeedSection.QUESTIONS),
+            visibleLessonSections(SessionStatus.AWAITING_ANSWERS, submitted = false),
+        )
+        assertEquals(
+            listOf(
+                LessonFeedSection.FRAGMENT,
+                LessonFeedSection.INTRODUCTION,
+                LessonFeedSection.QUESTIONS,
+                LessonFeedSection.REVIEW,
+            ),
+            visibleLessonSections(SessionStatus.AWAITING_ANSWERS, submitted = true),
+        )
+        assertEquals(
+            listOf(
+                LessonFeedSection.FRAGMENT,
+                LessonFeedSection.INTRODUCTION,
+                LessonFeedSection.QUESTIONS,
+                LessonFeedSection.REVIEW,
+            ),
+            visibleLessonSections(SessionStatus.REVIEW_READY, submitted = true),
+        )
     }
 
     @Test

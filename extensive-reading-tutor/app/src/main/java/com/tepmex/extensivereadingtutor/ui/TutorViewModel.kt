@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
+class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions {
     private val _state = MutableStateFlow(TutorUiState())
     val state: StateFlow<TutorUiState> = _state
     private val gate = Mutex()
@@ -162,22 +162,18 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         when (val result = graph.lessons.startOrResumeLesson(BookId(bookId))) {
             is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
             is AppResult.Ok -> {
-                _state.update { it.copy(route = Route.Lesson(bookId), checkingAnswers = false, word = null) }
+                _state.update { it.copy(route = Route.Lesson(bookId), word = null) }
                 showLesson(result.value, keepDrafts = false)
                 reload()
             }
         }
     }
 
-    fun prepare() = lessonAction("Готовлю занятие") { graph.lessons.prepareLesson(SessionId(it)) }
+    override fun prepare() = lessonAction("Готовлю занятие") { graph.lessons.prepareLesson(SessionId(it)) }
 
-    fun reveal() = lessonAction("Открываю вопросы") { graph.lessons.revealQuestions(SessionId(it)) }
+    override fun reveal() = lessonAction("Открываю вопросы") { graph.lessons.revealQuestions(SessionId(it)) }
 
-    fun showCheck() = _state.update { it.copy(checkingAnswers = true) }
-
-    fun hideCheck() = _state.update { it.copy(checkingAnswers = false) }
-
-    fun editDraft(questionId: String, text: String) {
+    override fun editDraft(questionId: String, text: String) {
         _state.update { state ->
             val lesson = state.lesson ?: return@update state
             state.copy(lesson = lesson.copy(drafts = lesson.drafts + (questionId to text)))
@@ -198,31 +194,31 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         }
     }
 
-    fun setDifficulty(difficulty: SubjectiveDifficulty) {
+    override fun setDifficulty(difficulty: SubjectiveDifficulty) {
         _state.update { it.copy(lesson = it.lesson?.copy(difficulty = difficulty)) }
     }
 
-    fun setComment(comment: String) {
+    override fun setComment(comment: String) {
         _state.update { it.copy(lesson = it.lesson?.copy(comment = comment)) }
     }
 
-    fun setUnclear(text: String) {
+    override fun setUnclear(text: String) {
         _state.update { it.copy(lesson = it.lesson?.copy(unclear = text)) }
     }
 
-    fun setWantsMore(value: Boolean) {
+    override fun setWantsMore(value: Boolean) {
         _state.update { it.copy(lesson = it.lesson?.copy(wantsMore = value)) }
     }
 
-    fun selectRange(startUtf16: Int, endUtf16: Int) {
+    override fun selectRange(startUtf16: Int, endUtf16: Int) {
         _state.update { it.copy(pendingStart = startUtf16, pendingEnd = endUtf16, error = null) }
     }
 
-    fun setSelectionType(type: String) {
+    override fun setSelectionType(type: String) {
         _state.update { it.copy(selectionType = type) }
     }
 
-    fun setSelectionComment(comment: String) {
+    override fun setSelectionComment(comment: String) {
         _state.update { it.copy(selectionComment = comment) }
     }
 
@@ -230,7 +226,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         _state.update { it.copy(pendingStart = null, pendingEnd = null, selectionComment = "") }
     }
 
-    fun saveSelection(now: Boolean) {
+    override fun saveSelection(now: Boolean) {
         val lesson = _state.value.lesson ?: return
         val start = _state.value.pendingStart ?: return
         val end = _state.value.pendingEnd ?: return
@@ -265,7 +261,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         }
     }
 
-    fun removeSelection(id: String) {
+    override fun removeSelection(id: String) {
         val lesson = _state.value.lesson ?: return
         launch(null) {
             when (val result = graph.lessons.deleteSelection(SessionId(lesson.sessionId), SelectionId(id))) {
@@ -275,7 +271,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         }
     }
 
-    fun explainSaved(id: String) {
+    override fun explainSaved(id: String) {
         val lesson = _state.value.lesson ?: return
         launch("Объясняю выделение") {
             when (val explained = graph.lessons.explainSelection(SessionId(lesson.sessionId), SelectionId(id))) {
@@ -291,7 +287,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         }
     }
 
-    fun submit() {
+    override fun submit() {
         draftJobs.values.forEach { it.cancel() }
         draftJobs.clear()
         lessonAction("Отправляю ответы") { sessionId ->
@@ -315,31 +311,30 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
         }
     }
 
-    fun evaluateAgain() = lessonAction("Повторяю разбор") { graph.lessons.evaluateAnswers(SessionId(it)) }
+    override fun evaluateAgain() = lessonAction("Повторяю разбор") { graph.lessons.evaluateAnswers(SessionId(it)) }
 
-    fun complete() = launch("Завершаю занятие") {
+    override fun complete() = launch("Завершаю занятие") {
         val lesson = _state.value.lesson ?: return@launch
         when (val result = graph.lessons.completeLesson(SessionId(lesson.sessionId))) {
             is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
             is AppResult.Ok -> {
                 reload()
-                _state.update { it.copy(route = Route.Book(lesson.bookId), lesson = null, checkingAnswers = false) }
+                _state.update { it.copy(route = Route.Book(lesson.bookId), lesson = null) }
             }
         }
     }
 
-    fun leaveLesson() {
+    override fun leaveLesson() {
         val bookId = _state.value.lesson?.bookId ?: ( _state.value.route as? Route.Lesson)?.bookId
         _state.update {
             it.copy(
                 route = if (bookId == null) Route.Tabs else Route.Book(bookId),
-                checkingAnswers = false,
                 word = null,
             )
         }
     }
 
-    fun openExpression(expression: String, sentence: String) {
+    override fun openExpression(expression: String, sentence: String) {
         val current = _state.value
         val card = wordCard(expression, sentence, current.concepts, current.knowledge, current.observations)
         _state.update {
@@ -379,7 +374,6 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel() {
                 graph.read { it.session(SessionId(sessionId)) }?.let { showLesson(it, keepDrafts = true) }
             }
             is AppResult.Ok -> {
-                _state.update { it.copy(checkingAnswers = false) }
                 showLesson(result.value, keepDrafts = true)
                 reload()
             }
