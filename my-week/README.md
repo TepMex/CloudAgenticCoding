@@ -7,7 +7,8 @@ The UI is Russian.
 ## Features
 
 - Planning only on Monday, until local midnight
-- Blocks with a name and a translucent color, tasks with an emoji and a description
+- Blocks with a name, a default emoji, and a translucent color. New tasks open with the block emoji
+- The emoji picker remembers ones you type and lists the most-used first
 - Checklist ticks for the whole week
 - Archive feed, oldest week on top, newest at the bottom
 - New week starts as a copy of the previous one, with ticks cleared

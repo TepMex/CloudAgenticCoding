@@ -14,6 +14,7 @@ private const val SPRINT_ROWS = """
         b.id AS blockId,
         b.title AS blockTitle,
         b.colorKey AS colorKey,
+        b.emoji AS blockEmoji,
         b.position AS blockPosition,
         t.id AS taskId,
         t.emoji AS emoji,
@@ -86,8 +87,14 @@ interface WeekDao {
     @Query("SELECT COALESCE(MAX(position), -1) FROM tasks WHERE blockId = :blockId")
     suspend fun maxTaskPosition(blockId: Long): Int
 
-    @Query("UPDATE blocks SET title = :title, colorKey = :colorKey WHERE id = :id")
-    suspend fun updateBlock(id: Long, title: String, colorKey: String)
+    @Query("UPDATE blocks SET title = :title, colorKey = :colorKey, emoji = :emoji WHERE id = :id")
+    suspend fun updateBlock(id: Long, title: String, colorKey: String, emoji: String)
+
+    @Query("SELECT emoji AS emoji, COUNT(*) AS uses FROM tasks GROUP BY emoji")
+    fun observeEmojiUsage(): Flow<List<EmojiUsage>>
+
+    @Query("SELECT emoji AS emoji, COUNT(*) AS uses FROM tasks GROUP BY emoji")
+    suspend fun emojiUsage(): List<EmojiUsage>
 
     @Query("UPDATE tasks SET emoji = :emoji, title = :title WHERE id = :id")
     suspend fun updateTask(id: Long, emoji: String, title: String)

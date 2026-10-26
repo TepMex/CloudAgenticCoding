@@ -33,6 +33,7 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
     val tab by viewModel.tab.collectAsStateWithLifecycle()
     val home by viewModel.home.collectAsStateWithLifecycle()
     val editor by viewModel.editor.collectAsStateWithLifecycle()
+    val emojiChoices by viewModel.emojiChoices.collectAsStateWithLifecycle()
     val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
     val context = LocalContext.current
     LaunchedEffect(viewModel) {
@@ -106,9 +107,13 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                     is Editor.BlockEditor -> BlockEditorDialog(
                         initialTitle = current.title,
                         initialColor = current.colorKey,
+                        initialEmoji = current.emoji,
+                        emojiChoices = emojiChoices,
                         canDelete = current.blockId != null,
                         onDismiss = viewModel::dismissEditor,
-                        onSave = { title, color -> viewModel.saveBlock(current.blockId, title, color) },
+                        onSave = { title, color, emoji ->
+                            viewModel.saveBlock(current.blockId, title, color, emoji)
+                        },
                         onDelete = {
                             val id = current.blockId
                             if (id != null) viewModel.deleteBlock(id)
@@ -117,6 +122,7 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                     is Editor.TaskEditor -> TaskEditorDialog(
                         initialEmoji = current.emoji,
                         initialTitle = current.title,
+                        emojiChoices = emojiChoices,
                         canDelete = current.taskId != null,
                         onDismiss = viewModel::dismissEditor,
                         onSave = { emoji, title ->

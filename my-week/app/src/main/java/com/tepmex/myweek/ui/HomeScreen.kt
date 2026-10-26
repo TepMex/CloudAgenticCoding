@@ -69,6 +69,7 @@ fun HomeScreen(
             when (line) {
                 is Line.Gap -> Spacer(Modifier.height(12.dp))
                 is Line.Header -> ChecklistHeader(
+                    emoji = line.block.emoji,
                     title = line.block.title,
                     colorKey = line.block.colorKey,
                     top = true,

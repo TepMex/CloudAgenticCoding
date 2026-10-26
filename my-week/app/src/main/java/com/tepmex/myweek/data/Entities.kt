@@ -32,6 +32,7 @@ data class BlockEntity(
     val sprintId: Long,
     val title: String,
     val colorKey: String,
+    val emoji: String,
     val position: Int,
 )
 
@@ -60,4 +61,9 @@ data class SprintHeaderEntity(
     val id: Long,
     val weekStartEpochDay: Long,
     val archived: Boolean,
+)
+
+data class EmojiUsage(
+    val emoji: String,
+    val uses: Int,
 )
