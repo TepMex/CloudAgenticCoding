@@ -73,6 +73,7 @@ private fun ArchivedSprint(sprint: Sprint) {
         sprint.blocks.forEachIndexed { index, block ->
             if (index > 0) Spacer(Modifier.height(12.dp))
             ChecklistHeader(
+                emoji = block.emoji,
                 title = block.title,
                 colorKey = block.colorKey,
                 top = true,

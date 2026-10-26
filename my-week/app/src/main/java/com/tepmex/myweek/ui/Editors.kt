@@ -45,22 +45,20 @@ import com.tepmex.myweek.R
 import com.tepmex.myweek.domain.Palette
 import com.tepmex.myweek.domain.TaskText
 
-private val emojiChoices = listOf(
-    "•", "📚", "📖", "✍️", "🎮", "🏃", "💪", "🏊", "🚶",
-    "🧹", "👨‍🍳", "🥗", "😴", "⏰", "💼", "🏠", "🎯", "🧠",
-)
-
 @Composable
 fun BlockEditorDialog(
     initialTitle: String,
     initialColor: String,
+    initialEmoji: String,
+    emojiChoices: List<String>,
     canDelete: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, String) -> Unit,
     onDelete: () -> Unit,
 ) {
     var title by rememberSaveable { mutableStateOf(initialTitle) }
     var color by rememberSaveable { mutableStateOf(Palette.sanitize(initialColor)) }
+    var emoji by rememberSaveable { mutableStateOf(initialEmoji) }
     var confirming by rememberSaveable { mutableStateOf(false) }
     val valid = TaskText.blockTitle(title) != null
     EditorDialog(onDismiss) {
@@ -84,7 +82,14 @@ fun BlockEditorDialog(
             NameField(
                 title = title,
                 onTitle = { title = it },
-                onDone = { if (valid) onSave(title, color) },
+                onDone = { if (valid) onSave(title, color, emoji) },
+            )
+            EmojiPicker(
+                emoji = emoji,
+                choices = emojiChoices,
+                onEmoji = { emoji = it },
+                label = stringResource(R.string.block_emoji),
+                help = stringResource(R.string.block_emoji_help),
             )
             Text(
                 text = stringResource(R.string.pick_color),
@@ -94,7 +99,7 @@ fun BlockEditorDialog(
             ColorRow(selected = color, onPick = { color = it })
             DialogActions(
                 onCancel = onDismiss,
-                onConfirm = { onSave(title, color) },
+                onConfirm = { onSave(title, color, emoji) },
                 confirmLabel = stringResource(R.string.save),
                 confirmEnabled = valid,
             )
@@ -111,6 +116,7 @@ fun BlockEditorDialog(
 fun TaskEditorDialog(
     initialEmoji: String,
     initialTitle: String,
+    emojiChoices: List<String>,
     canDelete: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
@@ -152,20 +158,11 @@ fun TaskEditorDialog(
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
-            Text(
-                text = stringResource(R.string.emoji),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-            )
-            EmojiRow(selected = emoji, onPick = { emoji = it })
-            OutlinedTextField(
-                value = emoji,
-                onValueChange = { emoji = it.take(16) },
-                label = { Text(stringResource(R.string.emoji)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                singleLine = true,
+            EmojiPicker(
+                emoji = emoji,
+                choices = emojiChoices,
+                onEmoji = { emoji = it },
+                label = stringResource(R.string.emoji),
             )
             DialogActions(
                 onCancel = onDismiss,
@@ -260,7 +257,40 @@ private fun ColorRow(selected: String, onPick: (String) -> Unit) {
 }
 
 @Composable
-private fun EmojiRow(selected: String, onPick: (String) -> Unit) {
+private fun EmojiPicker(
+    emoji: String,
+    choices: List<String>,
+    onEmoji: (String) -> Unit,
+    label: String,
+    help: String? = null,
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 16.dp, bottom = if (help == null) 8.dp else 4.dp),
+    )
+    if (help != null) {
+        Text(
+            text = help,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+    }
+    EmojiRow(choices = choices, selected = emoji, onPick = onEmoji)
+    OutlinedTextField(
+        value = emoji,
+        onValueChange = { onEmoji(it.take(TaskText.EMOJI_LIMIT)) },
+        label = { Text(label) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        singleLine = true,
+    )
+}
+
+@Composable
+private fun EmojiRow(choices: List<String>, selected: String, onPick: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,7 +298,7 @@ private fun EmojiRow(selected: String, onPick: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        emojiChoices.forEach { emoji ->
+        choices.forEach { emoji ->
             val picked = emoji == selected
             Text(
                 text = emoji,

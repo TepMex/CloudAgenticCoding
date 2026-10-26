@@ -61,6 +61,7 @@ internal fun pieceShape(top: Boolean, bottom: Boolean): Shape = when {
 
 @Composable
 internal fun ChecklistHeader(
+    emoji: String,
     title: String,
     colorKey: String,
     top: Boolean,
@@ -79,7 +80,7 @@ internal fun ChecklistHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = title,
+            text = "$emoji  $title",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
                 .weight(1f)

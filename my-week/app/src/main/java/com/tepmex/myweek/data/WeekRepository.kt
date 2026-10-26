@@ -5,6 +5,7 @@ import com.tepmex.myweek.domain.BlockDraft
 import com.tepmex.myweek.domain.Palette
 import com.tepmex.myweek.domain.Sprint
 import com.tepmex.myweek.domain.SprintHeader
+import com.tepmex.myweek.domain.TaskText
 import com.tepmex.myweek.domain.WeekRules
 import com.tepmex.myweek.domain.toSprints
 import java.time.LocalDate
@@ -26,6 +27,12 @@ class WeekRepository(
     fun observeArchived(): Flow<List<Sprint>> =
         dao.observeArchived().map { rows -> WeekRules.archiveFeed(rows.toSprints()) }
 
+    fun observeEmojiUsage(): Flow<Map<String, Int>> =
+        dao.observeEmojiUsage().map { rows -> rows.associate { it.emoji to it.uses } }
+
+    suspend fun emojiUsage(): Map<String, Int> =
+        dao.emojiUsage().associate { it.emoji to it.uses }
+
     suspend fun reconcile(today: LocalDate) = gate.withLock {
         db.withTransaction {
             val headers = dao.headers().map { row ->
@@ -45,7 +52,13 @@ class WeekRepository(
         }
     }
 
-    suspend fun addBlock(sprintId: Long, title: String, colorKey: String, today: LocalDate): Boolean =
+    suspend fun addBlock(
+        sprintId: Long,
+        title: String,
+        colorKey: String,
+        emoji: String,
+        today: LocalDate,
+    ): Boolean =
         gate.withLock {
             val sprint = dao.sprint(sprintId) ?: return@withLock false
             if (!allowsPlan(sprint, today)) return@withLock false
@@ -55,17 +68,24 @@ class WeekRepository(
                     sprintId = sprintId,
                     title = title,
                     colorKey = Palette.sanitize(colorKey),
+                    emoji = TaskText.emoji(emoji),
                     position = position,
                 ),
             )
             true
         }
 
-    suspend fun updateBlock(blockId: Long, title: String, colorKey: String, today: LocalDate): Boolean =
+    suspend fun updateBlock(
+        blockId: Long,
+        title: String,
+        colorKey: String,
+        emoji: String,
+        today: LocalDate,
+    ): Boolean =
         gate.withLock {
             val header = dao.headerForBlock(blockId) ?: return@withLock false
             if (!allowsPlan(header, today)) return@withLock false
-            dao.updateBlock(blockId, title, Palette.sanitize(colorKey))
+            dao.updateBlock(blockId, title, Palette.sanitize(colorKey), TaskText.emoji(emoji))
             true
         }
 
@@ -135,6 +155,7 @@ class WeekRepository(
                     sprintId = sprintId,
                     title = block.title,
                     colorKey = Palette.sanitize(block.colorKey),
+                    emoji = TaskText.emoji(block.emoji),
                     position = index,
                 ),
             )

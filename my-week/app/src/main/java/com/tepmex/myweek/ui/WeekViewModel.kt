@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.myweek.MyWeekApp
+import com.tepmex.myweek.data.EmojiMemory
 import com.tepmex.myweek.data.WeekRepository
 import com.tepmex.myweek.data.WeekSettings
 import com.tepmex.myweek.domain.DebugCalendar
+import com.tepmex.myweek.domain.EmojiChoices
 import com.tepmex.myweek.domain.Palette
 import com.tepmex.myweek.domain.Sprint
 import com.tepmex.myweek.domain.TaskText
@@ -44,6 +46,7 @@ sealed interface Editor {
         val blockId: Long?,
         val title: String,
         val colorKey: String,
+        val emoji: String,
     ) : Editor {
         override val identity: String = "block-${blockId ?: "new"}"
     }
@@ -87,6 +90,7 @@ data class SettingsUi(
 class WeekViewModel(
     private val repository: WeekRepository,
     private val settings: WeekSettings,
+    private val emojiMemory: EmojiMemory,
     versionName: String,
 ) : ViewModel() {
     private val clock = Channel<LocalDate>(Channel.CONFLATED)
@@ -95,6 +99,16 @@ class WeekViewModel(
     val tab = MutableStateFlow(Tab.Week)
     val editor = MutableStateFlow<Editor?>(null)
     val notices = MutableSharedFlow<Notice>(extraBufferCapacity = 4)
+    val emojiChoices: StateFlow<List<String>> = combine(
+        repository.observeEmojiUsage(),
+        emojiMemory.remembered,
+    ) { usage, remembered ->
+        EmojiChoices.order(usage, remembered)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        EmojiChoices.order(emptyMap(), emojiMemory.remembered.value),
+    )
 
     val home: StateFlow<HomeUi> = todayState
         .flatMapLatest { today ->
@@ -165,6 +179,18 @@ class WeekViewModel(
                 }
             }
         }
+        viewModelScope.launch(Dispatchers.IO) {
+            val seen = emojiMemory.generation()
+            val usage = try {
+                repository.emojiUsage()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "emoji usage failed", e)
+                emptyMap()
+            }
+            emojiMemory.rememberAll(usage.keys, seen)
+        }
         publishClock()
     }
 
@@ -223,6 +249,7 @@ class WeekViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 repository.clearAll()
+                emojiMemory.clear()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -237,18 +264,30 @@ class WeekViewModel(
         val ready = home.value as? HomeUi.Ready ?: return
         if (ready.phase != WeekPhase.Planning) return
         val color = Palette.next(ready.sprint?.blocks?.map { it.colorKey }.orEmpty())
-        editor.value = Editor.BlockEditor(blockId = null, title = "", colorKey = color)
+        editor.value = Editor.BlockEditor(
+            blockId = null,
+            title = "",
+            colorKey = color,
+            emoji = TaskText.DEFAULT_EMOJI,
+        )
     }
 
     fun openBlock(blockId: Long) {
         val ready = planningReady() ?: return
         val block = ready.sprint?.blocks?.firstOrNull { it.id == blockId } ?: return
-        editor.value = Editor.BlockEditor(block.id, block.title, block.colorKey)
+        editor.value = Editor.BlockEditor(
+            block.id,
+            block.title,
+            block.colorKey,
+            block.emoji.ifBlank { TaskText.DEFAULT_EMOJI },
+        )
     }
 
     fun openNewTask(blockId: Long) {
-        if (planningReady() == null) return
-        editor.value = Editor.TaskEditor(taskId = null, blockId = blockId, emoji = TaskText.DEFAULT_EMOJI, title = "")
+        val ready = planningReady() ?: return
+        val block = ready.sprint?.blocks?.firstOrNull { it.id == blockId } ?: return
+        val emoji = block.emoji.ifBlank { TaskText.DEFAULT_EMOJI }
+        editor.value = Editor.TaskEditor(taskId = null, blockId = blockId, emoji = emoji, title = "")
     }
 
     fun openTask(taskId: Long) {
@@ -259,19 +298,20 @@ class WeekViewModel(
         editor.value = Editor.TaskEditor(task.id, blockId, task.emoji, task.title)
     }
 
-    fun saveBlock(blockId: Long?, title: String, colorKey: String) {
+    fun saveBlock(blockId: Long?, title: String, colorKey: String, emoji: String) {
         val ready = planningReady() ?: return
         val sprint = ready.sprint ?: return
         val normalized = TaskText.blockTitle(title) ?: return
+        val normalizedEmoji = TaskText.emoji(emoji)
         val today = ready.today
         editor.value = null
         write {
             val ok = if (blockId == null) {
-                repository.addBlock(sprint.id, normalized, colorKey, today)
+                repository.addBlock(sprint.id, normalized, colorKey, normalizedEmoji, today)
             } else {
-                repository.updateBlock(blockId, normalized, colorKey, today)
+                repository.updateBlock(blockId, normalized, colorKey, normalizedEmoji, today)
             }
-            if (!ok) notices.tryEmit(Notice.PlanningClosed)
+            if (ok) emojiMemory.remember(normalizedEmoji) else notices.tryEmit(Notice.PlanningClosed)
         }
     }
 
@@ -295,7 +335,7 @@ class WeekViewModel(
             } else {
                 repository.updateTask(taskId, draft.emoji, draft.title, today)
             }
-            if (!ok) notices.tryEmit(Notice.PlanningClosed)
+            if (ok) emojiMemory.remember(draft.emoji) else notices.tryEmit(Notice.PlanningClosed)
         }
     }
 
@@ -357,7 +397,7 @@ class WeekViewModel(
         fun factory(app: MyWeekApp): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                WeekViewModel(app.repository, app.settings, app.versionName) as T
+                WeekViewModel(app.repository, app.settings, app.emojiMemory, app.versionName) as T
         }
     }
 }

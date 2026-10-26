@@ -56,6 +56,7 @@ object WeekRules {
                 BlockDraft(
                     title = block.title,
                     colorKey = Palette.sanitize(block.colorKey),
+                    emoji = TaskText.emoji(block.emoji),
                     tasks = block.tasks
                         .sortedBy { it.position }
                         .map { task -> TaskDraft(task.emoji, task.title) },

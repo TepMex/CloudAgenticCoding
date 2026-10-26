@@ -97,6 +97,7 @@ class WeekRulesTest {
                     id = 10,
                     title = "Чтение",
                     colorKey = "teal",
+                    emoji = "📚",
                     position = 1,
                     tasks = listOf(
                         Task(1, "📚", "Бродель", done = true, position = 0),
@@ -107,6 +108,7 @@ class WeekRulesTest {
                     id = 11,
                     title = "Дом",
                     colorKey = "nope",
+                    emoji = " ",
                     position = 0,
                     tasks = emptyList(),
                 ),
@@ -115,7 +117,9 @@ class WeekRulesTest {
         val drafts = WeekRules.carry(sprint)
         assertEquals(listOf("Дом", "Чтение"), drafts.map { it.title })
         assertEquals("blue", drafts[0].colorKey)
+        assertEquals(TaskText.DEFAULT_EMOJI, drafts[0].emoji)
         assertEquals("teal", drafts[1].colorKey)
+        assertEquals("📚", drafts[1].emoji)
         assertEquals(listOf("📚" to "Бродель", "📚" to "Ещё"), drafts[1].tasks.map { it.emoji to it.title })
         assertTrue(WeekRules.carry(null).isEmpty())
     }
@@ -153,6 +157,9 @@ class WeekRulesTest {
         assertEquals("Чтение", TaskText.blockTitle("  Чтение "))
         assertNull(TaskText.blockTitle("  "))
         assertEquals(80, TaskText.blockTitle("я".repeat(90))?.length)
+        assertEquals(TaskText.DEFAULT_EMOJI, TaskText.emoji("  "))
+        assertEquals("🦄", TaskText.emoji(" 🦄 "))
+        assertEquals(TaskText.EMOJI_LIMIT, TaskText.emoji("я".repeat(40)).length)
     }
 
     @Test
@@ -168,12 +175,13 @@ class WeekRulesTest {
         val monday = date("2026-10-19").toEpochDay()
         val next = date("2026-10-26").toEpochDay()
         val rows = listOf(
-            row(sprintId = 2, day = next, blockId = 8, blockTitle = "Дом", blockPosition = 0),
+            row(sprintId = 2, day = next, blockId = 8, blockTitle = "Дом", blockPosition = 0, blockEmoji = "🏠"),
             row(
                 sprintId = 1,
                 day = monday,
                 blockId = 4,
                 blockTitle = "Чтение",
+                blockEmoji = "📚",
                 blockPosition = 1,
                 taskId = 2,
                 title = "Вторая",
@@ -192,6 +200,7 @@ class WeekRulesTest {
                 day = monday,
                 blockId = 4,
                 blockTitle = "Чтение",
+                blockEmoji = "📚",
                 blockPosition = 1,
                 taskId = 1,
                 title = "Первая",
@@ -202,6 +211,9 @@ class WeekRulesTest {
         val sprints = rows.toSprints()
         assertEquals(listOf(1L, 2L), sprints.map { it.id })
         assertEquals(listOf("Пустой", "Чтение"), sprints[0].blocks.map { it.title })
+        assertEquals(TaskText.DEFAULT_EMOJI, sprints[0].blocks[0].emoji)
+        assertEquals("📚", sprints[0].blocks[1].emoji)
+        assertEquals("🏠", sprints[1].blocks[0].emoji)
         assertTrue(sprints[0].blocks[0].tasks.isEmpty())
         assertEquals(listOf("Первая", "Вторая"), sprints[0].blocks[1].tasks.map { it.title })
         assertTrue(sprints[0].blocks[1].tasks[0].done)
@@ -219,6 +231,7 @@ class WeekRulesTest {
         day: Long,
         blockId: Long? = null,
         blockTitle: String? = null,
+        blockEmoji: String? = null,
         blockPosition: Int? = null,
         taskId: Long? = null,
         title: String? = null,
@@ -231,6 +244,7 @@ class WeekRulesTest {
         blockId = blockId,
         blockTitle = blockTitle,
         colorKey = "blue",
+        blockEmoji = blockEmoji,
         blockPosition = blockPosition,
         taskId = taskId,
         emoji = "📚",

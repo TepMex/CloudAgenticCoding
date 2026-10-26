@@ -49,6 +49,8 @@
     <string name="notice_already_real">Уже используется дата устройства</string>
     <string name="version">Версия %1$s</string>
     <string name="pick_color">Цвет блока</string>
+    <string name="block_emoji">Базовый эмодзи</string>
+    <string name="block_emoji_help">Новые задачи в этом блоке открываются с ним</string>
     <string name="done_state">Выполнено</string>
     <string name="not_done_state">Не выполнено</string>
     <string name="color_blue">Синий</string>

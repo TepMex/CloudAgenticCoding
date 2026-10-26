@@ -13,6 +13,7 @@ data class Block(
     val id: Long,
     val title: String,
     val colorKey: String,
+    val emoji: String,
     val position: Int,
     val tasks: List<Task>,
 )
@@ -53,6 +54,7 @@ data class TaskDraft(
 data class BlockDraft(
     val title: String,
     val colorKey: String,
+    val emoji: String,
     val tasks: List<TaskDraft>,
 )
 
@@ -70,6 +72,7 @@ data class SprintJoinRow(
     val blockId: Long? = null,
     val blockTitle: String? = null,
     val colorKey: String? = null,
+    val blockEmoji: String? = null,
     val blockPosition: Int? = null,
     val taskId: Long? = null,
     val emoji: String? = null,

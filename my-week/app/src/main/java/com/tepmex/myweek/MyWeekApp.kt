@@ -2,6 +2,7 @@ package com.tepmex.myweek
 
 import android.app.Application
 import android.content.pm.PackageManager
+import com.tepmex.myweek.data.EmojiMemory
 import com.tepmex.myweek.data.WeekDatabase
 import com.tepmex.myweek.data.WeekRepository
 import com.tepmex.myweek.data.WeekSettings
@@ -11,6 +12,9 @@ class MyWeekApp : Application() {
         private set
 
     lateinit var settings: WeekSettings
+        private set
+
+    lateinit var emojiMemory: EmojiMemory
         private set
 
     val versionName: String by lazy {
@@ -23,6 +27,7 @@ class MyWeekApp : Application() {
     override fun onCreate() {
         super.onCreate()
         settings = WeekSettings(this)
+        emojiMemory = EmojiMemory(this)
         val database = WeekDatabase.create(this)
         repository = WeekRepository(database, database.weekDao())
     }

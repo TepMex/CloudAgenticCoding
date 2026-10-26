@@ -18,6 +18,7 @@ fun List<SprintJoinRow>.toSprints(): List<Sprint> {
                         id = block.blockId!!,
                         title = block.blockTitle.orEmpty(),
                         colorKey = Palette.sanitize(block.colorKey ?: ""),
+                        emoji = TaskText.emoji(block.blockEmoji.orEmpty()),
                         position = block.blockPosition ?: 0,
                         tasks = blockRows
                             .filter { it.taskId != null }
