@@ -31,6 +31,7 @@ A gear at the bottom of favourites opens the device Settings app. An ellipsis be
    - Day progress: dithered bar only. No “day in progress” caption. The truncated percent (`54%`) sits in small type to the right of the bar. Percent is truncated elapsed local seconds: `secondOfDay * 100 / 86400`. 13:02 is **54%**. The bar uses the exact fraction of the day.
    - Battery `66%` plus a coarse remaining-time estimate when discharging (`3h`, or `40m` under an hour). Charging shows percent only.
    - Weather `5°C переменная облачность` when a fix and a successful fetch exist. Open-Meteo, no API key. Hidden when there is nothing to show. No error text on the home screen.
+   - Internet, on the next line under battery and weather. One status from HTTPS probes of `ya.ru`, `google.com`, and `youtube.com`. All three reachable: **СВОБОДНЫЙ** / **FREE**. Only ya.ru: **БЕЛЫЙ СПИСОК** / **WHITELIST**. ya.ru and google.com, without youtube: **РОССИЙСКИЙ** / **RUSSIAN**. None: **НЕТ ИНТЕРНЕТА** / **NO INTERNET**. Every other mix: **ИНОСТРАННЫЙ** / **FOREIGN**. Any completed HTTP response counts as reachable, including redirects and error statuses; the redirect is not followed. Timeout, TLS failure, and connection failure count as unreachable. Each site is limited to 30 seconds, and the three probes run together. The row refreshes when favourites is the settled page and the activity is started, again when Home is pressed while favourites is already showing, and when the refresh icon on that row is tapped. It does not refresh on the clock tick. A probe already running ignores another tap; the previous status stays until the new one arrives. Before the first result the row shows an ellipsis.
 3. Pinned apps are text only. Never call `loadIcon` or decode drawables for the list.
 4. Each app row is the label only. Nothing is drawn beside the name: no time since last open, no counts, no badges.
 5. Pager order is fitness averages, day clock, favourites, all apps. The launcher opens on favourites. Swipe favourites left to the full launcher-activity list. Swipe favourites right to the day clock, and right again to fitness averages. From any other page, swipe back or Back returns to favourites. The Home intent returns to favourites and clears the query. A saved pager index from the older three-page order is discarded once, so an upgrade opens on favourites.
@@ -48,7 +49,7 @@ A gear at the bottom of favourites opens the device Settings app. An ellipsis be
     - Shortcuts: coarse location, request the Home role.
 13. Persist preferences and favourite order in `SharedPreferences` so the first frame does not wait on DataStore.
 14. Cache resolved labels in memory. Invalidate on package added / removed / changed. Do not reload labels on every resume.
-15. Poll clock and battery only while the home activity is started. Weather network at most every 30 minutes when a cached reading exists, and at most one failed attempt every 10 minutes.
+15. Poll clock and battery only while the home activity is started. Weather network at most every 30 minutes when a cached reading exists, and at most one failed attempt every 10 minutes. The internet probe is not part of that poll: it runs on entering favourites and from the refresh icon, with a 30 second cap per site.
 16. Favourites and the app list use a solid black window. No wallpaper, badges, folders, widgets, or icon packs. The day-clock page uses the ideal-timing parchment dial.
 17. On the all-apps page, a non-empty query that matches exactly one app opens that app after a 350 ms pause. More typing before the pause cancels the open. The keyboard Done action opens that single app immediately. The query is cleared after a successful open, so leaving the page and coming back does not open it again. A blank query never auto-opens, including when only one app is installed. The open runs only while the all-apps page is settled and the activity is still resumed.
 18. Sign release (and debug when the keystore is present) with the shared committed sideload keystore. Publish a GitHub Pages landing at `/hei-launcher/` with `hei-launcher.apk`.
@@ -84,6 +85,18 @@ The day is the aggregate item’s `time`. Steps are `value.steps`. Sleep hours a
 
 WMO `weather_code` 2 maps to **переменная облачность** / **partly cloudy**. Temperature is rounded half-up to whole degrees.
 
+### Internet
+
+`GET https://ya.ru/`, `GET https://google.com/`, and `GET https://youtube.com/`, in parallel. Call, connect, and read timeouts are 30 seconds. No retry and no redirect following. A response status of any kind means the site is up.
+
+| ya.ru | google.com | youtube.com | Status |
+|-------|------------|-------------|--------|
+| yes | yes | yes | СВОБОДНЫЙ / FREE |
+| yes | no | no | БЕЛЫЙ СПИСОК / WHITELIST |
+| yes | yes | no | РОССИЙСКИЙ / RUSSIAN |
+| no | no | no | НЕТ ИНТЕРНЕТА / NO INTERNET |
+| anything else | | | ИНОСТРАННЫЙ / FOREIGN |
+
 ### Battery estimate
 
 While discharging, `BATTERY_PROPERTY_CHARGE_COUNTER` (µAh) / `|BATTERY_PROPERTY_CURRENT_NOW|` (µA) = hours. Discard non-positive, unknown (`Long.MIN_VALUE`), or out-of-range results (under 3 minutes or over 200 hours).
@@ -95,6 +108,7 @@ While discharging, `BATTERY_PROPERTY_CHARGE_COUNTER` (µAh) / `|BATTERY_PROPERTY
 | `LauncherPrefs` | `SharedPreferences` `hei_launcher` | clock format, four visibility flags, name size, ordered favourite component names (`package/class` joined by newlines) |
 | `LaunchableApp` | memory cache | component, package, label |
 | Weather cache | same prefs file | rounded °C, WMO code, fetched-at epoch |
+| Internet status | memory, while the process lives | last probe result; not written to prefs |
 | Fitness averages | memory only, while the page is open | per-day steps and sleep hours, then year / month / week means |
 
 Uninstalled components are dropped from the favourite list the next time the package set loads non-empty.
@@ -102,7 +116,7 @@ Uninstalled components are dropped from the favourite list the next time the pac
 ## UI / UX
 
 - Black background, white text, no app icons.
-- Favourites: compact header (clock, date, life pixel bar with the hour count on the right, year and day bars with a small percent on the right, battery, weather), scrolling names with nothing beside them, gear and `...` pinned to the bottom above the navigation bar. The clock and the date are buttons: clock opens the default clock app, date opens the default calendar app.
+- Favourites: compact header (clock, date, life pixel bar with the hour count on the right, year and day bars with a small percent on the right, battery and weather on one line, internet status and a refresh icon on the next line), scrolling names with nothing beside them, gear and `...` pinned to the bottom above the navigation bar. The clock and the date are buttons: clock opens the default clock app, date opens the default calendar app. The refresh icon runs the internet probe again.
 - All apps: underlined search field (placeholder **Search apps** / **Поиск приложений**), scrolling names with nothing beside them, a rail of `#` `A`–`Z` `АБВ` `中文` that fits the viewport only while the query is empty. A query that leaves exactly one app opens it on its own.
 - Fitness averages: a centered 3×2 table on black. No header. Upward or downward triangle to the right of a number when that mean rose or fell against yesterday’s window.
 - Day clock: ideal-timing login, then the parchment 16-hour dial. Status-bar icons switch to dark on that page and back to light on the black pages, including fitness averages.
@@ -122,6 +136,6 @@ Uninstalled components are dropped from the favourite list the next time the pac
 ## Acceptance criteria
 
 1. `./gradlew test assembleRelease` succeeds. Release APK is signed with the shared sideload certificate (`android/verify-apk-sideload-cert.sh`).
-2. Unit tests cover year 75% and day 54% at 2026-10-05 13:02, English ordinal date, search rank, a unique search hit versus a blank query, the default clock and calendar intent order, alphabet jump (`#`, Latin, `АБВ`, `中文`) and script grouping, battery text, Open-Meteo parsing (`weather_code` 2 → переменная облачность), the life-span pixel counts and **317770** hours at 2026-10-21 13:02, fitness year/month/week means and yesterday-window triangles, steps and sleep JSON parsing, and the ideal-timing clock, sleep, sun, cue, and NFC cases.
+2. Unit tests cover year 75% and day 54% at 2026-10-05 13:02, English ordinal date, search rank, a unique search hit versus a blank query, the default clock and calendar intent order, alphabet jump (`#`, Latin, `АБВ`, `中文`) and script grouping, battery text, Open-Meteo parsing (`weather_code` 2 → переменная облачность), the life-span pixel counts and **317770** hours at 2026-10-21 13:02, fitness year/month/week means and yesterday-window triangles, steps and sleep JSON parsing, internet status for every ya.ru / google.com / youtube.com combination (including the Russian labels), a 30 second HTTPS probe cap, and the ideal-timing clock, sleep, sun, cue, and NFC cases.
 3. Favourites opens in the middle. Swipe left into the full list; swipe right into the day clock; swipe right again into fitness averages; Back from any of those returns to favourites. Search keeps only substring matches; a single match opens that app; gear opens device settings; ellipsis opens launcher settings. The favourites clock opens the clock app and the date opens the calendar app.
 4. The app list path does not load icons.

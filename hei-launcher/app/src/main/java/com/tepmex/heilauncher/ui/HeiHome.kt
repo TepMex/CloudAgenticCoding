@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -38,6 +39,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +81,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.heilauncher.R
+import com.tepmex.heilauncher.domain.InternetAccess
 import com.tepmex.heilauncher.domain.LaunchableApp
+import com.tepmex.heilauncher.domain.internetLabel
 import com.tepmex.heilauncher.domain.NameSize
 import com.tepmex.heilauncher.domain.formatBattery
 import com.tepmex.heilauncher.domain.formatClock
@@ -149,6 +153,10 @@ fun HeiHome(
         }
     }
 
+    LaunchedEffect(pagerState.settledPage) {
+        viewModel.setFavouritesVisible(pagerState.settledPage == PAGE_FAVOURITES)
+    }
+
     LaunchedEffect(viewModel) {
         viewModel.homeEvents.collect {
             pagerState.scrollToPage(PAGE_FAVOURITES)
@@ -187,6 +195,7 @@ fun HeiHome(
                 onOpenCalendar = onOpenCalendar,
                 onOpenSystemSettings = onOpenSystemSettings,
                 onOpenLauncherSettings = onOpenLauncherSettings,
+                onRefreshInternet = viewModel::refreshInternet,
             )
             PAGE_APPS -> AllAppsPage(
                 state = state,
@@ -280,6 +289,7 @@ private fun FavouritesPage(
     onOpenCalendar: () -> Unit,
     onOpenSystemSettings: () -> Unit,
     onOpenLauncherSettings: () -> Unit,
+    onRefreshInternet: () -> Unit,
 ) {
     val locale = locale()
     val openClock = stringResource(R.string.open_clock)
@@ -349,7 +359,15 @@ private fun FavouritesPage(
                         )
                     }
                 }
+                Spacer(Modifier.height(2.dp))
+            } else {
+                Spacer(Modifier.height(8.dp))
             }
+            InternetStatusRow(
+                access = state.internet,
+                refreshing = state.internetRefreshing,
+                onRefresh = onRefreshInternet,
+            )
         }
         Spacer(Modifier.height(12.dp))
         if (state.appsReady && state.favourites.isEmpty()) {
@@ -397,6 +415,49 @@ private fun FavouritesPage(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun InternetStatusRow(
+    access: InternetAccess?,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
+    val refreshLabel = stringResource(R.string.refresh_internet)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        when {
+            access != null -> Text(
+                text = internetLabel(access, locale()),
+                color = Ink,
+                fontSize = 16.sp,
+                maxLines = 1,
+            )
+            refreshing -> Text(
+                text = "…",
+                color = Muted,
+                fontSize = 16.sp,
+                maxLines = 1,
+            )
+        }
+        if (access != null || refreshing) {
+            Spacer(Modifier.width(4.dp))
+        }
+        Icon(
+            imageVector = Icons.Filled.Refresh,
+            contentDescription = null,
+            tint = if (refreshing) Muted else Ink,
+            modifier = Modifier
+                .size(40.dp)
+                .clickable(
+                    enabled = !refreshing,
+                    onClickLabel = refreshLabel,
+                    role = Role.Button,
+                    onClick = onRefresh,
+                )
+                .padding(11.dp)
+                .semantics { contentDescription = refreshLabel },
+        )
     }
 }
 

@@ -37,6 +37,7 @@
     <string name="cant_open">Can\'t open</string>
     <string name="open_clock">Open clock</string>
     <string name="open_calendar">Open calendar</string>
+    <string name="refresh_internet">Refresh internet</string>
     <string name="back">Back</string>
     <string name="version">Version %1$s</string>
     <string name="xiaomi_sign_in">Xiaomi sign-in</string>

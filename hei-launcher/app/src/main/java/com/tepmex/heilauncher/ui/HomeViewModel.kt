@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tepmex.heilauncher.AppGraph
 import com.tepmex.heilauncher.data.LauncherPrefs
 import com.tepmex.heilauncher.domain.BatteryStatus
+import com.tepmex.heilauncher.domain.InternetAccess
 import com.tepmex.heilauncher.domain.LaunchableApp
 import com.tepmex.heilauncher.domain.Weather
 import com.tepmex.heilauncher.domain.filterApps
@@ -19,8 +20,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -37,6 +40,8 @@ data class HomeUiState(
     val query: String,
     val battery: BatteryStatus?,
     val weather: Weather?,
+    val internet: InternetAccess?,
+    val internetRefreshing: Boolean,
     val appsReady: Boolean,
 )
 
@@ -45,6 +50,9 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private val prefs = MutableStateFlow(graph.prefs.read())
     private val battery = MutableStateFlow<BatteryStatus?>(null)
     private val weather = MutableStateFlow<Weather?>(null)
+    private val internet = MutableStateFlow<InternetAccess?>(null)
+    private val internetRefreshing = MutableStateFlow(false)
+    private val favouritesVisible = MutableStateFlow(false)
     private val query = MutableStateFlow("")
     private val ready = MutableStateFlow(false)
     private val now = MutableStateFlow(LocalDateTime.now())
@@ -52,6 +60,8 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private val active = MutableStateFlow(false)
     private val homePulse = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val reloadMutex = Mutex()
+    private var internetJob: Job? = null
+    private var internetToken = 0
 
     val homeEvents = homePulse.asSharedFlow()
 
@@ -61,20 +71,25 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
         combine(apps, prefs, query) { loaded, pref, q ->
             Core(loaded, pref, q)
         },
-        combine(battery, weather, now, is24Hour, ready) { batt, wx, moment, hour24, isReady ->
-            Sensors(batt, wx, moment, hour24, isReady)
+        combine(battery, weather, internet, internetRefreshing) { batt, wx, net, refreshing ->
+            Sensors(batt, wx, net, refreshing)
         },
-    ) { core, sensors ->
+        combine(now, is24Hour, ready) { moment, hour24, isReady ->
+            Clock(moment, hour24, isReady)
+        },
+    ) { core, sensors, clock ->
         HomeUiState(
-            now = sensors.now,
-            systemIs24Hour = sensors.is24Hour,
+            now = clock.now,
+            systemIs24Hour = clock.is24Hour,
             prefs = core.prefs,
             favourites = resolveFavourites(core.prefs.favouriteIds, core.apps),
             listedApps = filterApps(core.apps, core.query),
             query = core.query,
             battery = if (core.prefs.showBattery) sensors.battery else null,
             weather = if (core.prefs.showWeather) sensors.weather else null,
-            appsReady = sensors.ready,
+            internet = sensors.internet,
+            internetRefreshing = sensors.refreshing,
+            appsReady = clock.ready,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState())
 
@@ -93,10 +108,35 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
                 }
             }
         }
+        viewModelScope.launch {
+            combine(active, favouritesVisible) { started, shown -> started && shown }
+                .distinctUntilChanged()
+                .collect { shown ->
+                    if (shown) refreshInternet() else stopInternet()
+                }
+        }
     }
 
     fun setActive(value: Boolean) {
         active.value = value
+    }
+
+    fun setFavouritesVisible(visible: Boolean) {
+        favouritesVisible.value = visible
+    }
+
+    fun refreshInternet() {
+        val token = ++internetToken
+        internetJob?.cancel()
+        internetJob = viewModelScope.launch {
+            internetRefreshing.value = true
+            try {
+                val access = withContext(Dispatchers.IO) { graph.internet.check() }
+                if (token == internetToken) internet.value = access
+            } finally {
+                if (token == internetToken) internetRefreshing.value = false
+            }
+        }
     }
 
     fun setQuery(value: String) {
@@ -106,6 +146,7 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     fun onHomePressed() {
         query.value = ""
         homePulse.tryEmit(Unit)
+        if (active.value && favouritesVisible.value) refreshInternet()
     }
 
     /** @return true when the app is pinned after the toggle */
@@ -170,8 +211,17 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
             query = "",
             battery = null,
             weather = null,
+            internet = null,
+            internetRefreshing = false,
             appsReady = false,
         )
+    }
+
+    private fun stopInternet() {
+        internetToken++
+        internetJob?.cancel()
+        internetJob = null
+        internetRefreshing.value = false
     }
 
     private data class Core(
@@ -183,6 +233,11 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private data class Sensors(
         val battery: BatteryStatus?,
         val weather: Weather?,
+        val internet: InternetAccess?,
+        val refreshing: Boolean,
+    )
+
+    private data class Clock(
         val now: LocalDateTime,
         val is24Hour: Boolean,
         val ready: Boolean,
