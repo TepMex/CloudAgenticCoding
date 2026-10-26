@@ -33,6 +33,7 @@
     <string name="cant_open">Не удалось открыть</string>
     <string name="open_clock">Открыть часы</string>
     <string name="open_calendar">Открыть календарь</string>
+    <string name="refresh_internet">Обновить интернет</string>
     <string name="back">Назад</string>
     <string name="version">Версия %1$s</string>
     <string name="life_span">Часов до 21.01.2063: %1$s</string>

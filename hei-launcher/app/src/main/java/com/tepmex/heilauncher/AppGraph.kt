@@ -3,6 +3,7 @@ package com.tepmex.heilauncher
 import android.content.Context
 import com.tepmex.heilauncher.data.BatteryReader
 import com.tepmex.heilauncher.data.InstalledApps
+import com.tepmex.heilauncher.data.InternetProbe
 import com.tepmex.heilauncher.data.PrefsStore
 import com.tepmex.heilauncher.data.WeatherRepository
 import com.tepmex.heilauncher.timing.data.AuthTokenStore
@@ -19,6 +20,7 @@ class AppGraph(context: Context) {
     val apps = InstalledApps(appContext)
     val battery = BatteryReader(appContext)
     val weather = WeatherRepository(appContext)
+    val internet = InternetProbe()
     val timingRepository = IdealTimingRepository(
         tokenStore = AuthTokenStore(appContext),
         wakeStore = WakeSnapshotStore(appContext),
