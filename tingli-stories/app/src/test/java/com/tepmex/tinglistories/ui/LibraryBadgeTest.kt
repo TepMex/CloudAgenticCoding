@@ -51,6 +51,7 @@ class LibraryBadgeTest {
             }
         }
 
+        compose.onNodeWithContentDescription("Экспорт JSON").assertIsDisplayed()
         compose.onNodeWithText("换工作").assertIsDisplayed()
         compose.onNodeWithText("满分").assertIsDisplayed()
         compose.onNodeWithText("零分").assertIsDisplayed()

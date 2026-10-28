@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,7 +21,11 @@ import com.tepmex.tinglistories.domain.storyStats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
+fun StatsScreen(
+    state: TingliUiState,
+    onBack: () -> Unit,
+    onExport: () -> Unit = {},
+) {
     val library = state.library
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
@@ -28,6 +33,11 @@ fun StatsScreen(state: TingliUiState, onBack: () -> Unit) {
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                }
+            },
+            actions = {
+                IconButton(onClick = onExport, enabled = !state.busy) {
+                    Icon(Icons.Filled.FileDownload, contentDescription = "Экспорт JSON")
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
