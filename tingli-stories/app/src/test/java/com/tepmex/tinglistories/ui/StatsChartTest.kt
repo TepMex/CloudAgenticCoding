@@ -45,6 +45,7 @@ class StatsChartTest {
             }
         }
 
+        compose.onNodeWithContentDescription("Экспорт JSON").assertIsDisplayed()
         compose.onNodeWithTag(StatsChartTag).assertIsDisplayed()
         compose.onNodeWithContentDescription("02 50 зелёный", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("04 0 серый", substring = true).assertIsDisplayed()

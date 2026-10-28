@@ -24,6 +24,7 @@ Android listening practice for a learner of Chinese. The user imports a zip of s
 12. After a grade, **Следующая история** opens the next story in catalog order. On the last story the control returns to the library.
 13. **Статистика** shows only a bar chart. There is no story list, no totals, and no sliding mean. Each bar is a story that has an indicator, in catalog order. The height is `(score / max) × 100 / listenCount`: the percent of correct answers divided by how many times Play was pressed before the grade. Score is clamped to `0..max`. The indicator is absent when the story has no grade, the grade max is 0, or the listen count is 0, and that story has no bar. The mean is the unweighted average of the indicators on the chart. A bar is green when its indicator is greater than or equal to that mean, and gray when it is strictly below — the same split as a library circle. Green is the secondary color of a bright circle. Gray is the quieter text color of a circle below the mean. Axis labels are the catalog positions of the included stories.
 14. Sign release and debug (when the keystore is present) with the shared sideload keystore. GitHub Pages landing at `/tingli-stories/` serves `tingli-stories.apk`.
+15. **Экспорт JSON** on the library and on **Статистика** opens a save dialog (`ACTION_CREATE_DOCUMENT`, suggested name `tingli-stories.json`). The file is one JSON document, version 1, with every story: catalog number, id, title, text, listen count, and each question’s prompt, reference, and the learner’s answer. A graded story also stores score, max, summary, and per-question correct/comment. An unfinished story includes the current unsaved draft when that story is the open draft; otherwise it includes the saved answers. Titles, texts, and references are written even while the screens still hide them. `statistics` repeats the chart: `mean` is the unweighted average of the indicators, and `bars` lists catalog, id, indicator, and `green` for the same stories, in the same order, with the same green/gray split. Stories without an indicator stay in `stories` and are absent from `bars`. `mean` is null when there are no bars. The API token is not in the file.
 
 ## Interfaces
 
@@ -38,6 +39,7 @@ Android listening practice for a learner of Chinese. The user imports a zip of s
 | Permission | `INTERNET` |
 | Gradle | `./gradlew test assembleRelease` |
 | Pages | `https://<host>/<repo>/tingli-stories/tingli-stories.apk` |
+| Export | `ACTION_CREATE_DOCUMENT` `application/json`, suggested name `tingli-stories.json` |
 
 Grade JSON:
 
@@ -55,11 +57,45 @@ Grade JSON:
 - **Listen** — one press of an enabled Play control before the story is graded. Story audio and question audio share one counter per story. Presses after a grade, including **Прослушать ещё раз**, do not count. A reset sets the counter to zero.
 - **Content key** — story text plus each prompt and reference. A reimport with the same id and a different key keeps the listen count and drops the grade.
 
-The API token lives in DataStore and is not copied into `library.json`.
+The API token lives in DataStore and is not copied into `library.json` or the export file.
+
+Export JSON (pretty-printed, UTF-8):
+
+```json
+{
+  "version": 1,
+  "level": "HSK 4",
+  "kind": "listening",
+  "stories": [
+    {
+      "catalog": 1,
+      "id": 1,
+      "title": "换工作",
+      "text": "…",
+      "listenCount": 3,
+      "completed": true,
+      "score": 2,
+      "max": 4,
+      "summary": "Кратко по-русски.",
+      "indicator": 16.666666666666668,
+      "green": false,
+      "questions": [
+        {"index": 1, "question": "…", "reference": "…", "answer": "…", "correct": true, "comment": "Смысл совпал."}
+      ]
+    }
+  ],
+  "statistics": {
+    "mean": 22.22222222222222,
+    "bars": [{"catalog": 1, "id": 1, "indicator": 16.666666666666668, "green": false}]
+  }
+}
+```
+
+`score`, `max`, `summary`, `indicator`, `green`, `correct`, and `comment` are JSON `null` when that story or question has no grade. `indicator` is the same value as a chart bar: `(score / max) × 100 / listenCount`.
 
 ## UI / UX
 
-Paper background, cinnabar controls, large Chinese titles once a story is graded. Before that, lists show the catalog number only. On the library, a circle replaces the listen phrase and the passed line: the disk fills with the share of correct answers, and the listen count sits in the circle after a grade. Zero stays blank, and a story with no grade is an empty circle. When a graded story’s indicator is strictly below the current mean of that indicator, the circle is muted and its spoken label says it is below the mean. Statistics is a bar chart of that indicator and nothing else on the screen. A bar at or above the mean is green, and a bar below the mean is gray, using the same colors as the library circles. Stories that are not completed are omitted. Once a story is graded, the answer screen places **Прослушать ещё раз** beside the story text. That replay does not count. Resetting an answer returns the listen count to zero. The listening screen shows a playback position while audio plays: current time, duration, a slider, and ±10 second jumps. Settings is three fields and a save action. Import of a second pack asks before replacing the current one.
+Paper background, cinnabar controls, large Chinese titles once a story is graded. Before that, lists show the catalog number only. On the library, a circle replaces the listen phrase and the passed line: the disk fills with the share of correct answers, and the listen count sits in the circle after a grade. Zero stays blank, and a story with no grade is an empty circle. When a graded story’s indicator is strictly below the current mean of that indicator, the circle is muted and its spoken label says it is below the mean. Statistics is a bar chart of that indicator and nothing else on the screen. A bar at or above the mean is green, and a bar below the mean is gray, using the same colors as the library circles. Stories that are not completed are omitted. Once a story is graded, the answer screen places **Прослушать ещё раз** beside the story text. That replay does not count. Resetting an answer returns the listen count to zero. The listening screen shows a playback position while audio plays: current time, duration, a slider, and ±10 second jumps. Settings is three fields and a save action. Import of a second pack asks before replacing the current one. **Экспорт JSON** sits in the library toolbar and in the statistics toolbar. It asks where to save one file that holds the texts, the questions, the answers, and the chart.
 
 ## Out of scope
 
@@ -87,3 +123,4 @@ Paper background, cinnabar controls, large Chinese titles once a story is graded
 12. A library mark before a grade has no count and no fill, including when the listen count is already positive. A grade of 2 out of 4 with 31 listens is count 31 and fill one half. A graded story with zero listens has no count. A score of zero keeps a positive listen count and an empty fill.
 13. For listen counts 3, 2, 10, 4 with grades 2/4, 4/4, none, and 0/4, the bars are catalog numbers 1, 2, and 4. Their indicators are 50/3, 50, and 0. The mean is 22,2. Bar 2 is green. Bars 1 and 4 are gray. The unanswered 10 listens are excluded. A grade with max 0 adds no bar. A graded story with zero listens adds no bar. A score above max counts as 100 percent, so 8 of 4 with 2 listens is 50. On that same library the muted circles are stories 1 and 4. Story 2 stays bright, and the unanswered story stays bright.
 14. Two graded stories with the same indicator are both bright on the library and both green on the chart. A single scored story is bright and its bar is green. A perfect grade with zero listens is left out of the mean and stays bright. Indicators 100, 0, and 50 mute only the story at 0, because 50 equals the mean; on the chart only that story’s bar is gray.
+15. For listen counts 3, 2, 10, 4 with grades 2/4, 4/4, none, and 0/4, the export lists all four texts. The unfinished story’s answer is the open draft. Its indicator and `green` are null, and it is absent from `statistics.bars`. The bars are catalogs 1, 2, and 4, with indicators 50/3, 50, and 0. The mean formats as 22,2. Bar 2 is green; bars 1 and 4 are not. A graded story keeps its saved answer when a draft for that same id is also present. An empty library exports no stories, a null mean, and no bars.

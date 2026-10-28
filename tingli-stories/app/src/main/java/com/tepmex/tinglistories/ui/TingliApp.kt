@@ -34,6 +34,10 @@ fun TingliApp(viewModel: TingliViewModel) {
     val importZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importFromUri(uri)
     }
+    val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.saveExport(uri)
+    }
+    val onExport = { exportJson.launch("tingli-stories.json") }
     LaunchedEffect(state.message) {
         val text = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(text)
@@ -86,6 +90,7 @@ fun TingliApp(viewModel: TingliViewModel) {
                             onSample = viewModel::importSample,
                             onStats = viewModel::openStats,
                             onSettings = viewModel::openSettings,
+                            onExport = onExport,
                         )
                         is Screen.Listen -> StoryPage(state, screen.storyId, missing = { viewModel.back() }) { story ->
                             ListenScreen(
@@ -112,7 +117,7 @@ fun TingliApp(viewModel: TingliViewModel) {
                                 onSeek = viewModel::seekPlayback,
                             )
                         }
-                        Screen.Stats -> StatsScreen(state = state, onBack = viewModel::back)
+                        Screen.Stats -> StatsScreen(state = state, onBack = viewModel::back, onExport = onExport)
                         Screen.Settings -> SettingsScreen(
                             settings = state.settings,
                             showToken = state.showToken,

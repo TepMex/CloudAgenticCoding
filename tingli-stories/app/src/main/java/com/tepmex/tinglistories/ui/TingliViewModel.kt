@@ -16,6 +16,7 @@ import com.tepmex.tinglistories.domain.alignedAnswers
 import com.tepmex.tinglistories.domain.clampSeek
 import com.tepmex.tinglistories.domain.evaluationSystemPrompt
 import com.tepmex.tinglistories.domain.evaluationUserPrompt
+import com.tepmex.tinglistories.domain.exportDocument
 import com.tepmex.tinglistories.domain.importMessage
 import com.tepmex.tinglistories.domain.nextStoryId
 import com.tepmex.tinglistories.domain.parseEvaluation
@@ -382,6 +383,24 @@ class TingliViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissMessage() {
         _state.update { it.copy(message = null) }
+    }
+
+    fun saveExport(uri: Uri) {
+        val snapshot = _state.value
+        val json = exportDocument(snapshot.library, snapshot.draftStoryId, snapshot.draftAnswers)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val stream = getApplication<Application>().contentResolver.openOutputStream(uri)
+                        ?: throw IllegalStateException("Не удалось сохранить файл")
+                    stream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
+                _state.update { it.copy(message = "Экспорт сохранён") }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.update { it.copy(message = e.message ?: "Не удалось сохранить экспорт") }
+            }
+        }
     }
 
     override fun onCleared() {

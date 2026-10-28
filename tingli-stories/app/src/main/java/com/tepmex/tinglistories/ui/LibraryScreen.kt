@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
@@ -61,6 +62,7 @@ fun LibraryScreen(
     onSample: () -> Unit,
     onStats: () -> Unit,
     onSettings: () -> Unit,
+    onExport: () -> Unit = {},
 ) {
     val library = state.library
     Column(Modifier.fillMaxSize()) {
@@ -75,6 +77,9 @@ fun LibraryScreen(
                 }
                 IconButton(onClick = onSample, enabled = !state.busy) {
                     Icon(Icons.Filled.School, contentDescription = "Пример HSK 4")
+                }
+                IconButton(onClick = onExport, enabled = !state.busy) {
+                    Icon(Icons.Filled.FileDownload, contentDescription = "Экспорт JSON")
                 }
                 IconButton(onClick = onStats) {
                     Icon(Icons.Filled.BarChart, contentDescription = "Статистика")
