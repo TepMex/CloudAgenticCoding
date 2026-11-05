@@ -18,8 +18,7 @@ enum class RawSide { REQUEST, RESPONSE }
 
 sealed interface Route {
     data object Tabs : Route
-    data class Book(val id: String) : Route
-    data class Lesson(val bookId: String) : Route
+    data class Reader(val bookId: String) : Route
     data object Settings : Route
     data object AiLog : Route
     data class AiExchange(val id: String) : Route
@@ -59,6 +58,29 @@ data class SelectionReviewUi(
     val nuance: String?,
     val status: String,
 )
+
+data class ReaderPageUi(
+    val place: String,
+    val text: String,
+    val chapter: String,
+    val lesson: LessonPanel?,
+)
+
+data class ReaderUi(
+    val bookId: String,
+    val title: String,
+    val pages: List<ReaderPageUi>,
+    val index: Int,
+    val showPinyin: Boolean,
+    val analyzing: Boolean = false,
+)
+
+fun LessonPanel?.acceptsIteration(): Boolean {
+    if (this == null) return true
+    if (status == SessionStatus.CREATED || status == SessionStatus.PREPARING || status == SessionStatus.INTRO_READY) return true
+    if (!submitted && (status == SessionStatus.QUESTIONS_READY || status == SessionStatus.AWAITING_ANSWERS)) return true
+    return submitted && reviews.isEmpty()
+}
 
 data class LessonPanel(
     val sessionId: String,
@@ -150,7 +172,8 @@ data class TutorUiState(
     val selectionType: String = "GENERAL",
     val selectionComment: String = "",
     val word: WordSheetUi? = null,
-    val confirmRemove: Boolean = false,
+    val confirmRemoveId: String? = null,
+    val reader: ReaderUi? = null,
     val busy: String? = null,
     val error: String? = null,
 )

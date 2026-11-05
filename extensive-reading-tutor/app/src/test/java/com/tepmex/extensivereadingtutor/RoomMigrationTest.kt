@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.tepmex.extensivereadingtutor.storage.room.MIGRATION_1_2
+import com.tepmex.extensivereadingtutor.storage.room.MIGRATION_2_3
 import com.tepmex.extensivereadingtutor.storage.room.TutorDatabase
 import java.io.File
 import kotlinx.serialization.json.Json
@@ -49,7 +50,7 @@ class RoomMigrationTest {
         raw.close()
 
         val migrated = Room.databaseBuilder(context, TutorDatabase::class.java, file.name)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         val session = migrated.openHelper.readableDatabase.query("SELECT status FROM lesson_sessions WHERE id = 's1'")
@@ -61,5 +62,36 @@ class RoomMigrationTest {
         val table = migrated.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pedagogy_documents'")
         assertTrue(table.moveToFirst())
         migrated.close()
+    }
+
+    @Test
+    fun twoFragmentsOfOneBookCanBothKeepAnOpenLesson() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val file = context.getDatabasePath("two-open-lessons.db")
+        if (file.exists()) file.delete()
+        val database = Room.databaseBuilder(context, TutorDatabase::class.java, file.name)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addCallback(object : androidx.room.RoomDatabase.Callback() {
+                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_fragment ON lesson_sessions(fragmentId) WHERE status != 'COMPLETED'")
+                }
+            })
+            .allowMainThreadQueries()
+            .build()
+        val sql = database.openHelper.writableDatabase
+        sql.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_book ON lesson_sessions(bookId) WHERE status != 'COMPLETED'")
+        MIGRATION_2_3.migrate(sql)
+        sql.execSQL(
+            "INSERT INTO lesson_sessions (id, bookId, fragmentId, learnerId, strategyVersion, createdAt, status, updatedAt, hintsJson) " +
+                "VALUES ('s1', 'b1', 'f1', 'local', 'strategy-v2', 0, 'CREATED', 0, '[]')",
+        )
+        sql.execSQL(
+            "INSERT INTO lesson_sessions (id, bookId, fragmentId, learnerId, strategyVersion, createdAt, status, updatedAt, hintsJson) " +
+                "VALUES ('s2', 'b1', 'f2', 'local', 'strategy-v2', 0, 'CREATED', 0, '[]')",
+        )
+        val rows = sql.query("SELECT COUNT(*) FROM lesson_sessions WHERE bookId = 'b1' AND status != 'COMPLETED'")
+        assertTrue(rows.moveToFirst())
+        assertEquals(2, rows.getInt(0))
+        database.close()
     }
 }

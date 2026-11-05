@@ -2,6 +2,7 @@ package com.tepmex.extensivereadingtutor.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun LibraryScreen(state: TutorUiState, onOpen: (String) -> Unit, onImport: () -> Unit) {
+fun LibraryScreen(
+    state: TutorUiState,
+    onOpen: (String) -> Unit,
+    onImport: () -> Unit,
+    onAskRemove: (String) -> Unit,
+    onCancelRemove: () -> Unit,
+    onRemove: (String) -> Unit,
+) {
     var filter by rememberSaveable { mutableStateOf("reading") }
     val reading = state.shelf.count { !it.done }
     val done = state.shelf.count { it.done }
@@ -80,7 +88,7 @@ fun LibraryScreen(state: TutorUiState, onOpen: (String) -> Unit, onImport: () ->
                         .padding(bottom = 10.dp)
                         .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
                         .background(TutorCard)
-                        .clickable { onOpen(book.id) }
+                        .combinedClickable(onClick = { onOpen(book.id) }, onLongClick = { onAskRemove(book.id) })
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -101,9 +109,17 @@ fun LibraryScreen(state: TutorUiState, onOpen: (String) -> Unit, onImport: () ->
                         Text(book.author, color = TutorMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(6.dp))
                         ProgressBar(book.percent)
-                        Spacer(Modifier.height(6.dp))
-                        Text("Последнее занятие", color = TutorSecondary, fontSize = 13.sp)
-                        Text(book.lastSession, color = TutorText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        if (state.confirmRemoveId == book.id) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Убрать «${book.title}» с полки? Занятия останутся.", color = TutorText, fontSize = 13.sp)
+                            Spacer(Modifier.height(8.dp))
+                            PrimaryButton("Убрать") { onRemove(book.id) }
+                            Text(
+                                "Отмена",
+                                color = TutorBlue,
+                                modifier = Modifier.padding(top = 8.dp).clickable(onClick = onCancelRemove),
+                            )
+                        }
                     }
                 }
             }

@@ -3,6 +3,7 @@ package com.tepmex.extensivereadingtutor
 import com.tepmex.extensivereadingtutor.books.BookFileStore
 import com.tepmex.extensivereadingtutor.books.BookService
 import com.tepmex.extensivereadingtutor.books.EpubExtractor
+import com.tepmex.extensivereadingtutor.books.placeKey
 import com.tepmex.extensivereadingtutor.domain.AnswerVerdict
 import com.tepmex.extensivereadingtutor.domain.AppClock
 import com.tepmex.extensivereadingtutor.domain.AppResult
@@ -178,6 +179,22 @@ class TutorScenariosTest {
         val duplicate = reopened.lessons.evaluateAnswers(session.id).unwrap()
         assertEquals(reviewed.review!!.aiCallId, duplicate.review!!.aiCallId)
         assertEquals(1, store.read { it.observations(LOCAL_LEARNER) }.size)
+    }
+
+    @Test
+    fun aLaterPageKeepsItsOwnLessonAndDoesNotMoveTheCursor() = runBlocking {
+        val harness = Harness()
+        val book = harness.import()
+        val spread = harness.lessons.readerSpread(book).unwrap()
+        assertTrue(spread.pages.size >= 2)
+        val cursor = harness.lessons.getReadingProgress(book)!!.cursor
+        val first = harness.lessons.openPageLesson(book, spread.pages[0].placeKey()).unwrap()
+        val second = harness.lessons.openPageLesson(book, spread.pages[1].placeKey()).unwrap()
+        assertNotEquals(first.id, second.id)
+        assertEquals(cursor, harness.lessons.getReadingProgress(book)!!.cursor)
+        assertEquals(first.id, harness.lessons.openPageLesson(book, spread.pages[0].placeKey()).unwrap().id)
+        assertEquals(spread.pages[0].text, harness.store.read { it.fragment(first.fragmentId) }!!.originalText)
+        assertEquals(spread.pages[1].text, harness.store.read { it.fragment(second.fragmentId) }!!.originalText)
     }
 
     @Test

@@ -1,7 +1,12 @@
 package com.tepmex.extensivereadingtutor.lessons
 
 import com.tepmex.extensivereadingtutor.books.FragmentSelector
+import com.tepmex.extensivereadingtutor.books.ReaderPage
+import com.tepmex.extensivereadingtutor.books.layoutReaderPages
 import com.tepmex.extensivereadingtutor.books.locateInFragment
+import com.tepmex.extensivereadingtutor.books.parsePlace
+import com.tepmex.extensivereadingtutor.books.placeKey
+import com.tepmex.extensivereadingtutor.books.startsAt
 import com.tepmex.extensivereadingtutor.books.locateQuote
 import com.tepmex.extensivereadingtutor.books.mapSelection
 import com.tepmex.extensivereadingtutor.books.nfc
@@ -45,7 +50,9 @@ import com.tepmex.extensivereadingtutor.domain.ProposalId
 import com.tepmex.extensivereadingtutor.domain.ProposalStatus
 import com.tepmex.extensivereadingtutor.domain.QuestionId
 import com.tepmex.extensivereadingtutor.domain.QuestionReview
+import com.tepmex.extensivereadingtutor.domain.FragmentId
 import com.tepmex.extensivereadingtutor.domain.ReadingProgress
+import com.tepmex.extensivereadingtutor.domain.TextCursor
 import com.tepmex.extensivereadingtutor.domain.RequestedPhase
 import com.tepmex.extensivereadingtutor.domain.SelectionId
 import com.tepmex.extensivereadingtutor.domain.SelectionRequestType
@@ -1086,8 +1093,16 @@ class LessonService(
         val fragment = db.fragment(session.fragmentId)!!
         val blocks = db.blocks(session.bookId)
         val progress = db.progress(session.bookId)!!
-        val cursor = FragmentSelector.advance(blocks, fragment)
+        val atCursor = fragment.startsAt(blocks, progress.cursor)
+        val cursor = if (atCursor) FragmentSelector.advance(blocks, fragment) else progress.cursor
         val completedIds = progress.completedFragmentIds + fragment.id
+        val replacement = if (progress.activeSessionId == session.id) {
+            db.allSessions().firstOrNull {
+                it.bookId == session.bookId && it.id != session.id && it.status != SessionStatus.COMPLETED
+            }?.id
+        } else {
+            progress.activeSessionId
+        }
         db.saveSessionHead(session.head((next as AppResult.Ok).value, updatedAt = now, completedAt = now))
         db.addCompletedRange(
             CompletedRange(
@@ -1101,7 +1116,7 @@ class LessonService(
         db.saveProgress(
             progress.copy(
                 cursor = cursor,
-                activeSessionId = null,
+                activeSessionId = replacement,
                 completedFragmentIds = completedIds,
                 updatedAt = now,
             ),
@@ -1121,6 +1136,94 @@ class LessonService(
     suspend fun getActiveLesson(bookId: BookId): LessonSession? = store.read { it.activeSession(bookId) }
 
     suspend fun getReadingProgress(bookId: BookId): ReadingProgress? = store.read { it.progress(bookId) }
+
+    suspend fun readerSpread(bookId: BookId): AppResult<ReaderSpread> = store.read { db -> spreadIn(db, bookId) }
+
+    /**
+     * The lesson for one reader page. Creates it when the page has none, without moving the study cursor.
+     * A fragment keeps the lesson it already has, including a completed one.
+     */
+    suspend fun openPageLesson(bookId: BookId, place: String): AppResult<LessonSession> {
+        val opened = try {
+            store.transaction { db -> openPageIn(db, bookId, place) }
+        } catch (error: StoreConstraintException) {
+            val start = parsePlace(place) ?: return AppResult.Err(DomainError.LessonNotReady("Фрагмент не найден."))
+            val existing = store.read { db ->
+                val blocks = db.blocks(bookId)
+                val fragment = db.fragments(bookId).firstOrNull { it.startsAt(blocks, start) } ?: return@read null
+                db.allSessions().firstOrNull { it.fragmentId == fragment.id }
+            }
+            if (existing != null) return AppResult.Ok(existing)
+            return AppResult.Err(DomainError.LessonNotReady(error.message ?: "Фрагмент уже открыт."))
+        }
+        return opened
+    }
+
+    private fun spreadIn(db: StoreSession, bookId: BookId): AppResult<ReaderSpread> {
+        val book = db.book(bookId) ?: return AppResult.Err(DomainError.BookNotFound(bookId.value))
+        if (book.removedAt != null) return AppResult.Err(DomainError.BookRemoved(bookId.value))
+        val blocks = db.blocks(bookId)
+        val prefs = db.preferences(LOCAL_LEARNER) ?: defaultPreferences(clock.now())
+        val target = FragmentSelector.targetFor(prefs.targetFragmentCodePoints, multiplier(prefs.preferredDifficulty))
+        val pages = layoutReaderPages(blocks, db.fragments(bookId), target, FragmentSelector.hardMax(target))
+        val cursor = db.progress(bookId)?.cursor ?: TextCursor(blocks.firstOrNull()?.orderInBook ?: 0, 0)
+        return AppResult.Ok(
+            ReaderSpread(
+                title = book.title.ifBlank { "Книга" },
+                pages = pages,
+                sessions = db.allSessions().filter { it.bookId == bookId },
+                cursor = cursor,
+            ),
+        )
+    }
+
+    private fun openPageIn(db: StoreSession, bookId: BookId, place: String): AppResult<LessonSession> {
+        val spread = spreadIn(db, bookId)
+        if (spread is AppResult.Err) return spread
+        val page = (spread as AppResult.Ok).value.pages.firstOrNull { it.placeKey() == place }
+            ?: return AppResult.Err(DomainError.LessonNotReady("Этого фрагмента нет."))
+        val blocks = db.blocks(bookId)
+        val stored = page.fragmentId?.let { db.fragment(it) }
+            ?: db.fragments(bookId).firstOrNull { it.startsAt(blocks, page.start) }
+        if (stored != null) {
+            db.allSessions().firstOrNull { it.fragmentId == stored.id }?.let { return AppResult.Ok(it) }
+        }
+        val now = clock.now()
+        db.ensureLearner(LOCAL_LEARNER, now)
+        if (db.preferences(LOCAL_LEARNER) == null) db.savePreferences(defaultPreferences(now))
+        val fragment = stored ?: run {
+            val prefs = db.preferences(LOCAL_LEARNER)!!
+            val target = FragmentSelector.targetFor(prefs.targetFragmentCodePoints, multiplier(prefs.preferredDifficulty))
+            val slices = FragmentSelector.select(blocks, page.start, target, FragmentSelector.hardMax(target))
+            if (slices.isEmpty()) return AppResult.Err(DomainError.NothingLeftToRead)
+            val made = FragmentSelector.materialize(bookId, FragmentId(ids.newId("fragment")), slices)
+            db.insertFragment(made)
+            made
+        }
+        val session = LessonSession(
+            id = SessionId(ids.newId("lesson")),
+            bookId = bookId,
+            fragmentId = fragment.id,
+            learnerId = LOCAL_LEARNER,
+            status = SessionStatus.CREATED,
+            strategyVersion = strategy.version,
+            prepareCallId = null,
+            evaluateCallId = null,
+            createdAt = now,
+            updatedAt = now,
+            completedAt = null,
+            observationsAppliedAt = null,
+            prepared = null,
+            submission = null,
+            review = null,
+        )
+        db.insertSession(session)
+        val progress = db.progress(bookId) ?: ReadingProgress(bookId, page.start, null, emptyList(), now)
+        if (progress.activeSessionId == null) {
+            db.saveProgress(progress.copy(activeSessionId = session.id, updatedAt = now))
+        }
+        return AppResult.Ok(db.session(session.id)!!)
+    }
 
     suspend fun drafts(sessionId: SessionId): List<AnswerDraft> = store.read { it.drafts(sessionId) }
 
@@ -1365,6 +1468,13 @@ private sealed interface PrepareGate {
     data class Finished(val result: AppResult<LessonSession>) : PrepareGate
     data class Run(val work: PrepareWork) : PrepareGate
 }
+
+data class ReaderSpread(
+    val title: String,
+    val pages: List<ReaderPage>,
+    val sessions: List<LessonSession>,
+    val cursor: TextCursor,
+)
 
 private sealed interface EvalGate {
     data class Finished(val result: AppResult<LessonSession>) : EvalGate

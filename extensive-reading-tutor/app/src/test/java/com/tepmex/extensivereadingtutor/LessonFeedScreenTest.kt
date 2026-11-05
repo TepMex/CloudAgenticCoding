@@ -16,11 +16,11 @@ import com.tepmex.extensivereadingtutor.domain.SessionStatus
 import com.tepmex.extensivereadingtutor.domain.SubjectiveDifficulty
 import com.tepmex.extensivereadingtutor.ui.LessonActions
 import com.tepmex.extensivereadingtutor.ui.LessonPanel
-import com.tepmex.extensivereadingtutor.ui.LessonScreen
 import com.tepmex.extensivereadingtutor.ui.QuestionUi
+import com.tepmex.extensivereadingtutor.ui.ReaderPage
+import com.tepmex.extensivereadingtutor.ui.ReaderPageUi
 import com.tepmex.extensivereadingtutor.ui.ReviewUi
 import com.tepmex.extensivereadingtutor.ui.TutorTheme
-import com.tepmex.extensivereadingtutor.ui.TutorUiState
 import java.io.File
 import org.junit.Rule
 import org.junit.Test
@@ -40,7 +40,7 @@ class LessonFeedScreenTest {
     fun questionsStayUnderTheFragment() {
         compose.setContent {
             TutorTheme {
-                LessonScreen(TutorUiState(lesson = answeringLesson()), object : LessonActions {})
+                ReaderPage(pageOf(answeringLesson()), showPinyin = false, analyzing = false, onPulling = {}, onRequest = {}, actions = object : LessonActions {})
             }
         }
         compose.onNodeWithText("雷打不动，他每天来。").assertIsDisplayed()
@@ -48,7 +48,7 @@ class LessonFeedScreenTest {
         compose.onNodeWithText("Что значит 雷打不动?").assertIsDisplayed()
         compose.onNodeWithText("неизменно").assertIsDisplayed()
         compose.onNodeWithText("Отправить ответы").assertIsDisplayed()
-        absent("К ответам")
+        absent("Подготовить занятие")
         absent("Разбор")
         compose.onNodeWithText("雷打不动，他每天来。").performScrollTo()
         save("lesson-feed-questions.png")
@@ -58,15 +58,15 @@ class LessonFeedScreenTest {
     fun reviewAppendsBelowAndTheFragmentScrollsBack() {
         compose.setContent {
             TutorTheme {
-                LessonScreen(TutorUiState(lesson = reviewedLesson()), object : LessonActions {})
+                ReaderPage(pageOf(reviewedLesson()), showPinyin = false, analyzing = false, onPulling = {}, onRequest = {}, actions = object : LessonActions {})
             }
         }
         present("雷打不动，他每天来。")
-        present("Введение")
-        present("Вопросы")
+        present("Здесь устойчивое выражение.")
+        present("Что значит 雷打不动?")
         compose.onNodeWithText("Разбор").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Верно по смыслу.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Дальше по книге").assertIsDisplayed()
+        absent("Дальше по книге")
         absent("1/4")
         save("lesson-feed-review.png")
         compose.onNodeWithText("雷打不动，他每天来。").performScrollTo().assertIsDisplayed()
@@ -102,6 +102,8 @@ class LessonFeedScreenTest {
         submitted = true,
         reviews = listOf(ReviewUi("q1", AnswerVerdict.CORRECT, "Верно по смыслу.", "")),
     )
+
+    private fun pageOf(lesson: LessonPanel) = ReaderPageUi("0:0", lesson.original, lesson.chapter, lesson)
 
     private fun panel(status: SessionStatus, submitted: Boolean, reviews: List<ReviewUi>) = LessonPanel(
         sessionId = "s",

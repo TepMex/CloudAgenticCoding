@@ -39,31 +39,35 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                 Box(Modifier.weight(1f)) {
                     when (val route = state.route) {
                         Route.Tabs -> when (state.tab) {
-                            Tab.BOOKS -> LibraryScreen(state, model::openBook, onImport)
-                            Tab.STUDY -> StudyScreen(state, model::openBook, model::openLesson) { model.openExpression(it, "") }
+                            Tab.BOOKS -> LibraryScreen(
+                                state,
+                                model::openBook,
+                                onImport,
+                                model::askRemove,
+                                model::cancelRemove,
+                                model::removeBook,
+                            )
+                            Tab.STUDY -> StudyScreen(state, model::openBook) { model.openExpression(it, "") }
                             Tab.KNOWLEDGE -> KnowledgeScreen(state) { model.openExpression(it, "") }
                             Tab.PROFILE -> ProfileScreen(state, model::openSettings)
                         }
-                        is Route.Book -> {
-                            val book = state.shelf.firstOrNull { it.id == route.id }
-                            if (book == null) {
+                        is Route.Reader -> {
+                            val reader = state.reader?.takeIf { it.bookId == route.bookId }
+                            if (reader == null) {
                                 Column(Modifier.padding(16.dp)) {
-                                    ScreenHeader(title = "Книга", onBack = model::backToShelf)
-                                    Text("Этой книги нет на полке.", color = TutorMuted)
+                                    ScreenHeader(title = "Книга", onBack = model::leaveLesson)
+                                    Text("Книга ещё не открыта.", color = TutorMuted)
                                 }
                             } else {
-                                BookScreen(
-                                    book = book,
-                                    confirmRemove = state.confirmRemove,
-                                    onBack = model::backToShelf,
-                                    onContinue = { model.openLesson(book.id) },
-                                    onAskRemove = model::askRemove,
-                                    onCancelRemove = model::cancelRemove,
-                                    onRemove = { model.removeBook(book.id) },
+                                ReaderScreen(
+                                    reader = reader,
+                                    onBack = model::leaveLesson,
+                                    onSettle = model::settlePage,
+                                    onRequest = model::requestIteration,
+                                    actions = model,
                                 )
                             }
                         }
-                        is Route.Lesson -> LessonScreen(state, model)
                         Route.Settings -> SettingsScreen(state, model)
                         Route.AiLog -> AiJournalScreen(state, model)
                         is Route.AiExchange -> AiExchangeScreen(state, model)
@@ -102,7 +106,7 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White)
+                            .background(TutorCard)
                             .padding(horizontal = 18.dp, vertical = 14.dp),
                     )
                 }
@@ -116,7 +120,7 @@ private fun TutorTabs(selected: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(TutorCard)
             .navigationBarsPadding()
             .height(58.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -163,7 +167,7 @@ private fun WordSheet(word: WordSheetUi, onClose: () -> Unit) {
                 .padding(12.dp)
                 .navigationBarsPadding()
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color.White)
+                .background(TutorCard)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
                 .padding(18.dp),
         ) {

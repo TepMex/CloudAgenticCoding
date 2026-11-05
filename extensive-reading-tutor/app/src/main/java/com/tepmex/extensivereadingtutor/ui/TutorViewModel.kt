@@ -4,8 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.extensivereadingtutor.TutorGraph
+import com.tepmex.extensivereadingtutor.books.pageIndexFor
+import com.tepmex.extensivereadingtutor.books.placeKey
 import com.tepmex.extensivereadingtutor.domain.AppResult
 import com.tepmex.extensivereadingtutor.domain.BookId
+import com.tepmex.extensivereadingtutor.domain.SessionStatus
+import com.tepmex.extensivereadingtutor.lessons.ReaderSpread
 import com.tepmex.extensivereadingtutor.domain.DifficultyPreference
 import com.tepmex.extensivereadingtutor.domain.HintDepth
 import com.tepmex.extensivereadingtutor.domain.LearnerPreferences
@@ -45,12 +49,10 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     fun selectTab(tab: Tab) {
-        _state.update { it.copy(tab = tab, route = Route.Tabs, word = null, confirmRemove = false) }
+        _state.update { it.copy(tab = tab, route = Route.Tabs, word = null, confirmRemoveId = null) }
     }
 
-    fun openBook(id: String) {
-        _state.update { it.copy(route = Route.Book(id), word = null, confirmRemove = false, error = null) }
-    }
+    fun openBook(id: String) = launch(null) { openReader(id) }
 
     fun backToShelf() = selectTab(_state.value.tab)
 
@@ -153,19 +155,53 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
             is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
             is AppResult.Ok -> {
                 reload()
-                _state.update { it.copy(route = Route.Book(result.value.id.value), tab = Tab.BOOKS) }
+                _state.update { it.copy(tab = Tab.BOOKS) }
+                openReader(result.value.id.value)
             }
         }
     }
 
-    fun openLesson(bookId: String) = launch("Открываю занятие") {
-        when (val result = graph.lessons.startOrResumeLesson(BookId(bookId))) {
-            is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
-            is AppResult.Ok -> {
-                _state.update { it.copy(route = Route.Lesson(bookId), word = null) }
-                showLesson(result.value, keepDrafts = false)
-                reload()
+    fun openLesson(bookId: String) = openBook(bookId)
+
+    fun settlePage(index: Int) {
+        val reader = _state.value.reader ?: return
+        if (index == reader.index || index !in reader.pages.indices) return
+        val leaving = reader.pages[reader.index]
+        val place = reader.pages[index].place
+        _state.update { state ->
+            val current = state.reader ?: return@update state
+            state.copy(
+                reader = current.copy(index = index),
+                lesson = current.pages[index].lesson,
+            )
+        }
+        viewModelScope.launch {
+            graph.saveReaderPlace(reader.bookId, place)
+            if (leaving.lesson?.status == SessionStatus.REVIEW_READY) {
+                gate.withLock {
+                    graph.lessons.completeLesson(SessionId(leaving.lesson.sessionId))
+                    refreshReader(reader.bookId, index)
+                }
             }
+        }
+    }
+
+    fun togglePinyin() {
+        val reader = _state.value.reader ?: return
+        val show = !reader.showPinyin
+        _state.update { it.copy(reader = it.reader?.copy(showPinyin = show)) }
+        viewModelScope.launch { graph.saveShowPinyin(show) }
+    }
+
+    fun requestIteration() = launch(null) {
+        val reader = _state.value.reader ?: return@launch
+        val page = reader.pages.getOrNull(reader.index) ?: return@launch
+        if (reader.analyzing || !page.lesson.acceptsIteration()) return@launch
+        _state.update { it.copy(reader = it.reader?.copy(analyzing = true), error = null) }
+        try {
+            advancePage(reader.bookId, page)
+        } finally {
+            _state.update { it.copy(reader = it.reader?.copy(analyzing = false)) }
         }
     }
 
@@ -174,10 +210,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     override fun reveal() = lessonAction("Открываю вопросы") { graph.lessons.revealQuestions(SessionId(it)) }
 
     override fun editDraft(questionId: String, text: String) {
-        _state.update { state ->
-            val lesson = state.lesson ?: return@update state
-            state.copy(lesson = lesson.copy(drafts = lesson.drafts + (questionId to text)))
-        }
+        updateLesson { it.copy(drafts = it.drafts + (questionId to text)) }
         draftJobs[questionId]?.cancel()
         draftJobs[questionId] = viewModelScope.launch {
             delay(350)
@@ -195,19 +228,19 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     override fun setDifficulty(difficulty: SubjectiveDifficulty) {
-        _state.update { it.copy(lesson = it.lesson?.copy(difficulty = difficulty)) }
+        updateLesson { it.copy(difficulty = difficulty) }
     }
 
     override fun setComment(comment: String) {
-        _state.update { it.copy(lesson = it.lesson?.copy(comment = comment)) }
+        updateLesson { it.copy(comment = comment) }
     }
 
     override fun setUnclear(text: String) {
-        _state.update { it.copy(lesson = it.lesson?.copy(unclear = text)) }
+        updateLesson { it.copy(unclear = text) }
     }
 
     override fun setWantsMore(value: Boolean) {
-        _state.update { it.copy(lesson = it.lesson?.copy(wantsMore = value)) }
+        updateLesson { it.copy(wantsMore = value) }
     }
 
     override fun selectRange(startUtf16: Int, endUtf16: Int) {
@@ -288,6 +321,10 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     override fun submit() {
+        if (_state.value.reader != null) {
+            requestIteration()
+            return
+        }
         draftJobs.values.forEach { it.cancel() }
         draftJobs.clear()
         lessonAction("Отправляю ответы") { sessionId ->
@@ -313,25 +350,10 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
 
     override fun evaluateAgain() = lessonAction("Повторяю разбор") { graph.lessons.evaluateAnswers(SessionId(it)) }
 
-    override fun complete() = launch("Завершаю занятие") {
-        val lesson = _state.value.lesson ?: return@launch
-        when (val result = graph.lessons.completeLesson(SessionId(lesson.sessionId))) {
-            is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
-            is AppResult.Ok -> {
-                reload()
-                _state.update { it.copy(route = Route.Book(lesson.bookId), lesson = null) }
-            }
-        }
-    }
+    override fun complete() = requestIteration()
 
     override fun leaveLesson() {
-        val bookId = _state.value.lesson?.bookId ?: ( _state.value.route as? Route.Lesson)?.bookId
-        _state.update {
-            it.copy(
-                route = if (bookId == null) Route.Tabs else Route.Book(bookId),
-                word = null,
-            )
-        }
+        _state.update { it.copy(route = Route.Tabs, word = null) }
     }
 
     override fun openExpression(expression: String, sentence: String) {
@@ -345,16 +367,16 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
         }
     }
 
-    fun askRemove() = _state.update { it.copy(confirmRemove = true) }
+    fun askRemove(id: String) = _state.update { it.copy(confirmRemoveId = id) }
 
-    fun cancelRemove() = _state.update { it.copy(confirmRemove = false) }
+    fun cancelRemove() = _state.update { it.copy(confirmRemoveId = null) }
 
     fun removeBook(id: String) = launch("Убираю с полки") {
         when (val result = graph.books.removeFromLibrary(BookId(id))) {
-            is AppResult.Err -> _state.update { it.copy(error = result.error.explain(), confirmRemove = false) }
+            is AppResult.Err -> _state.update { it.copy(error = result.error.explain(), confirmRemoveId = null) }
             is AppResult.Ok -> {
                 reload()
-                _state.update { it.copy(route = Route.Tabs, tab = Tab.BOOKS, confirmRemove = false) }
+                _state.update { it.copy(route = Route.Tabs, tab = Tab.BOOKS, confirmRemoveId = null, reader = null) }
             }
         }
     }
@@ -407,60 +429,199 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     private suspend fun showLesson(session: LessonSession, keepDrafts: Boolean) {
+        val previous = if (keepDrafts) _state.value.lesson?.takeIf { it.sessionId == session.id.value } else null
+        val panel = panelFor(session, previous)
+        _state.update { current ->
+            current.copy(lesson = panel, reader = current.reader?.withLesson(panel))
+        }
+    }
+
+    private suspend fun panelFor(session: LessonSession, previous: LessonPanel?): LessonPanel {
         val fragment = graph.lessons.fragment(session.fragmentId)
         val stored = graph.lessons.drafts(session.id).associate { it.questionId.value to it.text }
         val explains = graph.lessons.explainRecords(session.id).filter { it.revealedAt != null }
         val marks = graph.lessons.selections(session.id).filter { it.deletedAt == null }
-        _state.update { current ->
-            val previous = current.lesson?.takeIf { it.sessionId == session.id.value }
-            val drafts = if (keepDrafts && previous != null) stored + previous.drafts else stored
-            val selectionUi = marks.map { mark ->
-                val bounds = fragment?.let { selectionBounds(it, mark.sourceAnchors) }
-                val shown = explains.firstOrNull { it.selectionId == mark.id && it.selectionRevision == mark.revision }
-                SelectionUi(
-                    id = mark.id.value,
-                    revision = mark.revision,
-                    quote = mark.quotedText,
-                    start = bounds?.first ?: 0,
-                    end = bounds?.second ?: 0,
-                    type = mark.requestType.name,
-                    comment = mark.comment.orEmpty(),
-                    explanation = shown?.explanation,
-                )
-            }
-            current.copy(
-                lesson = LessonPanel(
-                    sessionId = session.id.value,
-                    bookId = session.bookId.value,
-                    status = session.status,
-                    chapter = fragment?.chapterTitle?.takeIf { it.isNotBlank() } ?: "Фрагмент",
-                    original = fragment?.originalText.orEmpty(),
-                    introduction = session.prepared?.introduction.orEmpty(),
-                    hints = session.prepared?.hints.orEmpty(),
-                    questions = session.prepared?.questions.orEmpty().sortedBy { it.order }.map {
-                        QuestionUi(it.id.value, it.type, it.prompt, it.targetExpression)
-                    },
-                    drafts = drafts,
-                    difficulty = session.submission?.difficulty ?: previous?.difficulty,
-                    comment = session.submission?.freeComment ?: previous?.comment.orEmpty(),
-                    submitted = session.submission != null,
-                    reviews = session.review?.results.orEmpty().map {
-                        ReviewUi(it.questionId.value, it.verdict, it.explanation, it.errorNotes, it.nuance, it.productionFeedback)
-                    },
-                    recommendations = session.review?.nextRecommendations.orEmpty(),
-                    selections = selectionUi,
-                    selectionReviews = session.review?.selectionReviews.orEmpty().map { review ->
-                        val quote = marks.firstOrNull { it.id == review.selectionId }?.quotedText
-                            ?: review.sourceQuotes.firstOrNull()
-                            ?: "выделение"
-                        SelectionReviewUi(quote, review.explanation, review.nuance, review.status.name)
-                    },
-                    wantsMore = session.submission?.wantsMoreExplanation ?: previous?.wantsMore ?: false,
-                    unclear = session.submission?.unclearNotes ?: previous?.unclear.orEmpty(),
-                    feedback = session.review?.feedbackResponse,
-                ),
+        val prior = previous?.takeIf { it.sessionId == session.id.value }
+        val drafts = if (prior != null) stored + prior.drafts else stored
+        val selectionUi = marks.map { mark ->
+            val bounds = fragment?.let { selectionBounds(it, mark.sourceAnchors) }
+            val shown = explains.firstOrNull { it.selectionId == mark.id && it.selectionRevision == mark.revision }
+            SelectionUi(
+                id = mark.id.value,
+                revision = mark.revision,
+                quote = mark.quotedText,
+                start = bounds?.first ?: 0,
+                end = bounds?.second ?: 0,
+                type = mark.requestType.name,
+                comment = mark.comment.orEmpty(),
+                explanation = shown?.explanation,
             )
         }
+        return LessonPanel(
+            sessionId = session.id.value,
+            bookId = session.bookId.value,
+            status = session.status,
+            chapter = fragment?.chapterTitle?.takeIf { it.isNotBlank() } ?: "Фрагмент",
+            original = fragment?.originalText.orEmpty(),
+            introduction = session.prepared?.introduction.orEmpty(),
+            hints = session.prepared?.hints.orEmpty(),
+            questions = session.prepared?.questions.orEmpty().sortedBy { it.order }.map {
+                QuestionUi(it.id.value, it.type, it.prompt, it.targetExpression)
+            },
+            drafts = drafts,
+            difficulty = session.submission?.difficulty ?: prior?.difficulty,
+            comment = session.submission?.freeComment ?: prior?.comment.orEmpty(),
+            submitted = session.submission != null,
+            reviews = session.review?.results.orEmpty().map {
+                ReviewUi(it.questionId.value, it.verdict, it.explanation, it.errorNotes, it.nuance, it.productionFeedback)
+            },
+            recommendations = session.review?.nextRecommendations.orEmpty(),
+            selections = selectionUi,
+            selectionReviews = session.review?.selectionReviews.orEmpty().map { review ->
+                val quote = marks.firstOrNull { it.id == review.selectionId }?.quotedText
+                    ?: review.sourceQuotes.firstOrNull()
+                    ?: "выделение"
+                SelectionReviewUi(quote, review.explanation, review.nuance, review.status.name)
+            },
+            wantsMore = session.submission?.wantsMoreExplanation ?: prior?.wantsMore ?: false,
+            unclear = session.submission?.unclearNotes ?: prior?.unclear.orEmpty(),
+            feedback = session.review?.feedbackResponse,
+        )
+    }
+
+    private fun ReaderUi.withLesson(updated: LessonPanel) = copy(
+        pages = pages.map { if (it.lesson?.sessionId == updated.sessionId) it.copy(lesson = updated) else it },
+    )
+
+    private fun updateLesson(transform: (LessonPanel) -> LessonPanel) {
+        _state.update { state ->
+            val lesson = state.lesson ?: state.reader?.pages?.getOrNull(state.reader.index)?.lesson ?: return@update state
+            val updated = transform(lesson)
+            state.copy(lesson = updated, reader = state.reader?.withLesson(updated))
+        }
+    }
+
+    private suspend fun openReader(bookId: String) {
+        when (val spread = graph.lessons.readerSpread(BookId(bookId))) {
+            is AppResult.Err -> _state.update { it.copy(error = spread.error.explain()) }
+            is AppResult.Ok -> {
+                val index = pageIndexFor(spread.value.pages, graph.readerPlace(bookId), spread.value.cursor)
+                val reader = assembleReader(bookId, spread.value, index, graph.showPinyin(), null)
+                reader.pages.getOrNull(reader.index)?.let { graph.saveReaderPlace(bookId, it.place) }
+                _state.update {
+                    it.copy(
+                        route = Route.Reader(bookId),
+                        reader = reader,
+                        lesson = reader.pages.getOrNull(reader.index)?.lesson,
+                        word = null,
+                        error = null,
+                        confirmRemoveId = null,
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshReader(bookId: String, index: Int) {
+        val spread = graph.lessons.readerSpread(BookId(bookId))
+        if (spread is AppResult.Ok) {
+            val show = _state.value.reader?.showPinyin ?: graph.showPinyin()
+            val reader = assembleReader(bookId, spread.value, index, show, _state.value.reader)
+            _state.update {
+                it.copy(reader = reader, lesson = reader.pages.getOrNull(reader.index)?.lesson)
+            }
+        }
+        reload()
+    }
+
+    private suspend fun assembleReader(
+        bookId: String,
+        spread: ReaderSpread,
+        index: Int,
+        showPinyin: Boolean,
+        previous: ReaderUi?,
+    ): ReaderUi {
+        val pages = spread.pages.map { page ->
+            val session = page.fragmentId?.let { id -> spread.sessions.firstOrNull { it.fragmentId == id } }
+            val prior = previous?.pages?.firstOrNull { it.place == page.placeKey() }?.lesson
+            ReaderPageUi(
+                place = page.placeKey(),
+                text = page.text,
+                chapter = page.chapter.orEmpty(),
+                lesson = session?.let { panelFor(it, prior) },
+            )
+        }
+        val safe = if (pages.isEmpty()) 0 else index.coerceIn(0, pages.lastIndex)
+        return ReaderUi(bookId, spread.title, pages, safe, showPinyin, analyzing = false)
+    }
+
+    private suspend fun advancePage(bookId: String, page: ReaderPageUi) {
+        val opened = page.lesson?.sessionId?.let { id -> graph.read { it.session(SessionId(id)) } }
+            ?: when (val created = graph.lessons.openPageLesson(BookId(bookId), page.place)) {
+                is AppResult.Err -> {
+                    _state.update { it.copy(error = created.error.explain()) }
+                    null
+                }
+                is AppResult.Ok -> created.value
+            }
+        var session = opened ?: return
+        if (session.prepared == null && session.status != SessionStatus.COMPLETED) {
+            session = when (val prepared = graph.lessons.prepareLesson(session.id)) {
+                is AppResult.Err -> {
+                    _state.update { it.copy(error = prepared.error.explain()) }
+                    refreshReader(bookId, _state.value.reader?.index ?: 0)
+                    return
+                }
+                is AppResult.Ok -> prepared.value
+            }
+        }
+        if (session.status == SessionStatus.INTRO_READY) {
+            session = when (val revealed = graph.lessons.revealQuestions(session.id)) {
+                is AppResult.Err -> {
+                    _state.update { it.copy(error = revealed.error.explain()) }
+                    refreshReader(bookId, _state.value.reader?.index ?: 0)
+                    return
+                }
+                is AppResult.Ok -> revealed.value
+            }
+        }
+        val showingQuestions = page.lesson?.status == SessionStatus.QUESTIONS_READY ||
+            page.lesson?.status == SessionStatus.AWAITING_ANSWERS
+        val needsReview = session.submission == null && showingQuestions
+        if (needsReview || (session.submission != null && session.review == null)) {
+            if (session.submission == null) {
+                draftJobs.values.forEach { it.cancel() }
+                draftJobs.clear()
+                val lesson = _state.value.reader?.pages?.firstOrNull { it.place == page.place }?.lesson ?: page.lesson
+                if (lesson == null) {
+                    refreshReader(bookId, _state.value.reader?.index ?: 0)
+                    return
+                }
+                val submission = StudentSubmission(
+                    sessionId = session.id,
+                    answers = lesson.questions.map { SubmittedAnswer(QuestionId(it.id), lesson.drafts[it.id].orEmpty()) },
+                    difficulty = lesson.difficulty,
+                    wantsMoreExplanation = lesson.wantsMore,
+                    unclearNotes = lesson.unclear.ifBlank { null },
+                    freeComment = lesson.comment.ifBlank { null },
+                    hintRequestCount = 0,
+                    submittedAt = Instant.now(),
+                )
+                when (val submitted = graph.lessons.submitAnswers(session.id, submission)) {
+                    is AppResult.Err -> {
+                        _state.update { it.copy(error = submitted.error.explain()) }
+                        refreshReader(bookId, _state.value.reader?.index ?: 0)
+                        return
+                    }
+                    is AppResult.Ok -> Unit
+                }
+            }
+            when (val reviewed = graph.lessons.evaluateAnswers(session.id)) {
+                is AppResult.Err -> _state.update { it.copy(error = reviewed.error.explain()) }
+                is AppResult.Ok -> Unit
+            }
+        }
+        refreshReader(bookId, _state.value.reader?.index ?: 0)
     }
 
     private fun launch(label: String?, block: suspend () -> Unit) {

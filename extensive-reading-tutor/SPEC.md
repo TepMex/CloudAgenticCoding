@@ -34,8 +34,8 @@ Android tutor for one learner who reads a real book in a foreign language with a
 | Lesson API | `LessonService` methods below |
 | Model | `LessonAi.prepareLesson`, `LessonAi.evaluateAnswers`, and `LessonAi.explainSelection` when the learner asks to explain a selection now |
 | HTTP | `LlmProvider.generate` via OpenAI-compatible `chat/completions` |
-| Database | Room `tutor.db`, schema version 2. Migration 1→2 adds `pedagogy_documents` and does not drop lesson rows. |
-| Settings | DataStore `tutor_settings` for base URL, model name, extra JSON, and timeout seconds |
+| Database | Room `tutor.db`, schema version 3. Migration 1→2 adds `pedagogy_documents` and does not drop lesson rows. Migration 2→3 drops the partial index that allowed only one non-completed lesson per book. One non-completed lesson per fragment remains. |
+| Settings | DataStore `tutor_settings` for base URL, model name, extra JSON, timeout seconds, `show_pinyin`, and `reader_stop_<bookId>` |
 | Journal | `LlmExchangeLog` file `llm-exchanges.json`, newest 40 |
 | Secrets | `SecretStore`, Android Keystore AES-GCM on device |
 | Gradle | `./gradlew test assembleRelease` |
@@ -44,8 +44,13 @@ Android tutor for one learner who reads a real book in a foreign language with a
 
 `startOrResumeLesson(bookId)`  
 Precondition: the book exists and is on the shelf.  
-Result: the non-completed lesson for that book, or a new `CREATED` lesson on the next fragment.  
+Result: a non-completed lesson for that book, or a new `CREATED` lesson on the next fragment at the study cursor. If several fragments already have non-completed lessons, one of those lessons is returned and no new lesson is created.  
 Errors: unknown book, book removed, no unread text left.
+
+`openPageLesson(bookId, place)`  
+Precondition: the book is on the shelf and `place` is `blockOrder:codePoint` of a reader page.  
+Result: the lesson already stored for that page, or a new `CREATED` lesson on that page's fragment. The study cursor does not move. A fragment keeps at most one non-completed lesson.  
+Errors: unknown book, book removed, place is not a page, no text left at that place.
 
 `prepareLesson(sessionId)`  
 Precondition: lesson is `CREATED` or `PREPARING`, and a model name is set. If the lesson already has a prepared lesson, the saved one is returned and the model is not called.  
@@ -71,7 +76,7 @@ Errors: nothing submitted, transport failure, truncated JSON, review JSON that d
 
 `completeLesson(sessionId)`  
 Precondition: `REVIEW_READY`, review saved, observation pass finished.  
-Result: `COMPLETED`. The cursor moves to the end of the fragment. This is the only event that advances reading progress.
+Result: `COMPLETED`. The study cursor moves to the end of the fragment only when that fragment starts at the cursor. A lesson on a later or earlier page still completes, and the cursor stays. This is the only event that advances the study cursor. The reader bookmark is separate and moves when the learner swipes.
 
 `getActiveLesson(bookId)`  
 Result: the non-completed lesson, or null.
@@ -163,12 +168,12 @@ Deleting the shelf entry sets `removedAt` and deletes the local EPUB file. Block
 
 ## UI / UX
 
-The launcher is the phone UI. A bottom bar switches Книги, Учёба, Словарь, and Профиль. Book and lesson screens have a back control and hide the bar. There is no second web app.
+The launcher is the phone UI. A bottom bar switches Книги, Учёба, Словарь, and Профиль. The reader has a back control and hides the bar. Colors follow the system light and dark theme. There is no second web app.
 
-1. **Книги** lists EPUB still on the shelf. Filters are Читаю, Завершено, and Все. A book is finished when the cursor is past the last block. Progress is code points read over the book. The + button imports a DRM-free EPUB. The shelf is empty until that import.
-2. **Book** shows the cover, percent, Продолжить, chapter marks from block titles and the cursor, and recent lessons. Убрать с полки calls `removeFromLibrary` and does not erase history.
-3. **Lesson** is one downward feed on the existing state machine. Earlier blocks stay on screen; the learner scrolls up to reread them, including the original fragment. The fragment is the first block from `CREATED` onward. The learner can drag any range, including across blocks, and mark «Не понимаю». The default timing is «Разобрать вместе с ответами». «Объяснить сейчас» is a separate action. Подготовить calls `prepareLesson` and appends the introduction and hints under the fragment. К вопросам calls `revealQuestions` and appends each question with its free-text answer, the unclear-notes field, and «Нужно подробнее». Отправить calls `submitAnswers` and `evaluateAnswers`. After submit the answers stay visible and locked, and the review appends below: a verdict and explanation for every answer, a nuance only when one was returned, production feedback separately, and one review per frozen selection. A new mark after submit does not change that freeze. Дальше по книге calls `completeLesson`, which is still the only cursor move. There is no step counter and no screen that replaces the fragment.
-4. **Word sheet** still opens from a tap on a Han run or a knowledge label. Dragging a range is the way to mark a difficulty. The sheet is not a dictionary.
+1. **Книги** lists EPUB still on the shelf. Filters are Читаю, Завершено, and Все. A book is finished when the cursor is past the last block. Progress is code points read over the book. The + button imports a DRM-free EPUB. The shelf is empty until that import. A tap opens the reader. A long press asks to remove the book from the shelf.
+2. Choosing a book opens the reader on the page where the learner stopped (`reader_stop_<bookId>`, or the study cursor when no stop is saved). The reading map, chapter list, and session statistics are not shown. Убрать с полки calls `removeFromLibrary` and does not erase history.
+3. **Reader** shows one fragment as one page of the original text, the way a reading app shows a page. A horizontal swipe moves to the previous or next fragment and saves that page. Swiping does not by itself call the model. Analysis is loaded only by a pull past the end of the page that is held and then released: the first such gesture calls `prepareLesson` and then `revealQuestions`, and the introduction, hints, and questions appear under the fragment on the same page. The same gesture, or «Отправить ответы», calls `submitAnswers` and `evaluateAnswers`, and the review appears under the same text. Loaded analysis stays on that page and is shown again when the learner swipes back. A page can be passed without analysis. Volume up and volume down each toggle ruby pinyin above hanzi. There is no step counter and no screen that replaces the fragment. Leaving a page whose review is ready calls `completeLesson`.
+4. **Word sheet** opens from a tap on a hanzi run in the plain text, a ruby character, or a knowledge label. The sheet is not a dictionary.
 5. **Учёба** resumes the current book and lists knowledge in `NEEDS_REVIEW`.
 6. **Словарь** is the knowledge projection: words, `GRAMMAR_COMPREHENSION` rows, and skill counts, with search.
 7. **Профиль** counts shelf and ledger figures. The activity grid uses completed-lesson days and observation days.
