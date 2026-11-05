@@ -20,6 +20,58 @@ object AndroidKeyCodes {
     const val NUMPAD_ENTER = 160
 }
 
+/** ACTION_DOWN / ACTION_UP, те же числа, что у Android KeyEvent. */
+const val HARDWARE_DOWN = 0
+const val HARDWARE_UP = 1
+
+data class HardwareStep(
+    val pending: Map<Int, TrainerAction>,
+    val deliver: TrainerAction?,
+    val shiftDown: Boolean,
+    val altDown: Boolean,
+    val consumed: Boolean,
+)
+
+/**
+ * Символ запоминаем на DOWN и отдаём на UP.
+ * У части Bluetooth-клавиатур на UP unicode уже 0: если смотреть только UP,
+ * нажатие пропадает, хотя буква на DOWN была.
+ * Повтор зажатой клавиши в сессию не идёт.
+ */
+fun stepHardware(
+    phase: Int,
+    keyCode: Int,
+    unicodeChar: Int,
+    shiftDown: Boolean,
+    altDown: Boolean,
+    repeatCount: Int,
+    pending: Map<Int, TrainerAction>,
+): HardwareStep {
+    if (phase != HARDWARE_DOWN && phase != HARDWARE_UP) {
+        return HardwareStep(
+            pending = pending - keyCode,
+            deliver = null,
+            shiftDown = shiftDown,
+            altDown = altDown,
+            consumed = keyCode in pending,
+        )
+    }
+    if (phase == HARDWARE_DOWN) {
+        if (repeatCount > 0) {
+            return HardwareStep(pending, null, shiftDown, altDown, consumed = keyCode in pending)
+        }
+        val mapped = mapHardwareKey(keyCode, unicodeChar, altDown)
+            ?: return HardwareStep(pending, null, shiftDown, altDown, consumed = false)
+        return HardwareStep(pending + (keyCode to mapped), null, shiftDown, altDown, consumed = true)
+    }
+    pending[keyCode]?.let { saved ->
+        return HardwareStep(pending - keyCode, saved, shiftDown, altDown, consumed = true)
+    }
+    val mapped = mapHardwareKey(keyCode, unicodeChar, altDown)
+        ?: return HardwareStep(pending, null, shiftDown, altDown, consumed = false)
+    return HardwareStep(pending, mapped, shiftDown, altDown, consumed = true)
+}
+
 fun mapHardwareKey(keyCode: Int, unicodeChar: Int, altPressed: Boolean = false): TrainerAction? {
     when (keyCode) {
         AndroidKeyCodes.SPACE -> return TrainerAction.Character(' ')

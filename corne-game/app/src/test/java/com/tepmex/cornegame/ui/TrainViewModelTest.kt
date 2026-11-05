@@ -3,6 +3,7 @@ package com.tepmex.cornegame.ui
 import com.tepmex.cornegame.data.FileSessionHistory
 import com.tepmex.cornegame.data.FileSettingsStore
 import com.tepmex.cornegame.domain.Language
+import com.tepmex.cornegame.domain.Latch
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.actionsToType
 import java.io.File
@@ -59,6 +60,30 @@ class TrainViewModelTest {
         assertNotEquals(firstTarget, viewModel.state.value.session.target)
         assertTrue(history.load().isEmpty())
         assertEquals(other, settings.load().language)
+    }
+
+    @Test
+    fun shortTapLatchesAndATypedCharacterWhileHeldDoesNot() {
+        val dir = tempDir()
+        val viewModel = TrainViewModel(
+            FileSessionHistory(File(dir, "sessions.json")),
+            FileSettingsStore(File(dir, "settings.json")),
+            clock = { 1_000L },
+            random = Random(1),
+        )
+        viewModel.onKeyContact(TrainerAction.Lower, true)
+        viewModel.onKeyContact(TrainerAction.Lower, false)
+        assertEquals(Latch.LOWER, viewModel.state.value.session.latch)
+        assertFalse(viewModel.state.value.board.screenLower)
+
+        viewModel.restart()
+        viewModel.onKeyContact(TrainerAction.Lower, true)
+        val next = viewModel.state.value.session.nextChar
+        check(next != null)
+        viewModel.onTrainerAction(TrainerAction.Character(next))
+        viewModel.onKeyContact(TrainerAction.Lower, false)
+        assertEquals(Latch.NONE, viewModel.state.value.session.latch)
+        assertEquals(1, viewModel.state.value.session.index)
     }
 
     @Test

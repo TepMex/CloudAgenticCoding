@@ -35,6 +35,7 @@ fun CorneApp(viewModel: TrainViewModel) {
                     onLanguage = viewModel::setLanguage,
                     onOpenProgress = viewModel::openProgress,
                     onOpenSettings = viewModel::openSettings,
+                    onContact = viewModel::onKeyContact,
                 )
                 AppScreen.Results -> ResultsScreen(
                     state = state,

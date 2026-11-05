@@ -84,7 +84,42 @@ private data class Slot(
     val holdLegend: String? = null,
     val holdOutput: Char? = null,
     val role: Role = Role.TEXT,
+    val hid: Int = 0,
+    val forcedShift: Boolean = false,
 )
+
+/**
+ * Живое состояние клавиатуры, отдельно от защёлки упражнения.
+ * Shift и Alt приходят с физической клавиатуры и с зажатого пальца на экране.
+ * L1/L2 Android с прошивки не видит: их даёт палец на нарисованной клавише.
+ * [language] — раскладка подключённой клавиатуры; null значит «как у текста упражнения».
+ */
+data class BoardLive(
+    val language: Language? = null,
+    val hardwareShift: Boolean = false,
+    val hardwareAlt: Boolean = false,
+    val screenShift: Boolean = false,
+    val screenAlt: Boolean = false,
+    val screenLower: Boolean = false,
+    val screenUpper: Boolean = false,
+) {
+    val shiftHeld: Boolean get() = hardwareShift || screenShift
+    val altHeld: Boolean get() = hardwareAlt || screenAlt
+}
+
+/** Символы, которые KeyCharacterMap реально отдаёт для кодов клавиш. */
+data class LegendTable(
+    val plain: Map<Int, Char> = emptyMap(),
+    val shifted: Map<Int, Char> = emptyMap(),
+) {
+    fun isBlank(): Boolean = plain.isEmpty() && shifted.isEmpty()
+
+    fun char(code: Int, shift: Boolean): Char? {
+        val found = if (shift) shifted[code] else plain[code]
+        if (found == null || found == ' ' || found.isISOControl()) return null
+        return found
+    }
+}
 
 data class KeyFace(
     val id: Int,
@@ -186,8 +221,60 @@ private fun literal(token: String): Slot {
     return Slot(legend = token, output = token.first(), role = Role.TEXT)
 }
 
+private data class Hid(val code: Int, val forcedShift: Boolean = false)
+
+private fun h(code: Int, shift: Boolean = false) = Hid(code, shift)
+
+private fun z() = Hid(0)
+
+// Коды Android KeyEvent. Буквы и знаки, которые ОС превращает в символ.
+// 0 — подпись (Esc, стрелки, L1), её раскладка не меняет.
+private val baseHids: List<Hid> = listOf(
+    z(), h(45), h(51), h(33), h(46), h(48),
+    z(), h(29), h(47), h(32), h(34), h(35),
+    z(), h(54), h(52), h(31), h(50), h(30),
+    z(), z(), z(), z(), z(), z(),
+    h(53), h(49), h(37), h(43), h(44), z(),
+    h(36), h(38), h(39), h(40), h(74), h(75),
+    h(42), h(41), h(55), h(56), h(76), z(),
+    z(), z(), z(), z(), z(), z(),
+)
+
+private val lowerHids: List<Hid> = listOf(
+    z(), h(68), h(16, true), h(7, true), h(155), h(154),
+    z(), z(), h(71), h(72), h(70, true), h(69),
+    z(), z(), h(71, true), h(72, true), h(55, true), h(56, true),
+    z(), z(), z(), z(), z(), z(),
+    h(14), h(15), h(16), h(7), z(), z(),
+    h(11), h(12), h(13), h(158), h(69, true), h(73),
+    h(8), h(9), h(10), h(161), h(76), z(),
+    z(), z(), z(), z(), z(), z(),
+)
+
+private val upperHids: List<Hid> = listOf(
+    h(155), h(154), h(144), h(151), h(152), h(153),
+    h(157), h(156), h(158), h(148), h(149), h(150),
+    z(), z(), h(161), h(145), h(146), h(147),
+    z(), z(), z(), z(), z(), z(),
+    z(), z(), z(), z(), z(), z(),
+    z(), z(), z(), z(), z(), h(74),
+    z(), z(), z(), z(), z(), z(),
+    z(), z(), z(), z(), z(), z(),
+)
+
+private fun attach(slots: List<Slot>, hids: List<Hid>): List<Slot> {
+    require(slots.size == hids.size) { "${slots.size} слотов и ${hids.size} кодов" }
+    return slots.zip(hids) { slot, hid ->
+        slot.copy(hid = hid.code, forcedShift = hid.forcedShift)
+    }
+}
+
+/** Коды, которые надо спросить у раскладки ОС, чтобы легенда совпала с клавишей. */
+fun trackedLegendCodes(): Set<Int> =
+    (baseHids + lowerHids + upperHids).map { it.code }.filter { it != 0 }.toSet()
+
 // Сначала четыре ряда левой половинки, затем четыре ряда правой. Ряд больших — четвёртый.
-private val enBase = grid(
+private val enBase = attach(grid(
     """
     esc q w e r t
     tab a s d f g
@@ -198,9 +285,9 @@ private val enBase = grid(
     n m , . / sft
     sp l2 gui up down ctl
     """,
-)
+), baseHids)
 
-private val enShift = grid(
+private val enShift = attach(grid(
     """
     esc Q W E R T
     tab A S D F G
@@ -211,9 +298,9 @@ private val enShift = grid(
     N M < > ? sft
     sp l2 gui up down ctl
     """,
-)
+), baseHids)
 
-private val enLower = grid(
+private val enLower = attach(grid(
     """
     esc ` ( ) * /
     tab xx [ ] + -
@@ -224,9 +311,9 @@ private val enLower = grid(
     1 2 3 = / sft
     ent l2 gui pgu pgd ctl
     """,
-)
+), lowerHids)
 
-private val ruBase = grid(
+private val ruBase = attach(grid(
     """
     esc й ц у к е
     tab ф ы в а п
@@ -237,9 +324,9 @@ private val ruBase = grid(
     т ь б ю . sft
     sp l2 gui up down ctl
     """,
-)
+), baseHids)
 
-private val ruShift = grid(
+private val ruShift = attach(grid(
     """
     esc Й Ц У К Е
     tab Ф Ы В А П
@@ -250,9 +337,9 @@ private val ruShift = grid(
     Т Ь Б Ю , sft
     sp l2 gui up down ctl
     """,
-)
+), baseHids)
 
-private val ruLower = grid(
+private val ruLower = attach(grid(
     """
     esc ё ( ) * /
     tab xx х ъ + -
@@ -263,9 +350,9 @@ private val ruLower = grid(
     1 2 3 = . sft
     ent l2 gui pgu pgd ctl
     """,
-)
+), lowerHids)
 
-private val enUpper = grid(
+private val enUpper = attach(grid(
     """
     * / 0 7 8 9
     + - . 4 5 6
@@ -276,9 +363,9 @@ private val enUpper = grid(
     f1 f2 f3 f12 men sft
     ent l2 caps pgu pgd ctl
     """,
-)
+), upperHids)
 
-private val ruUpper = grid(
+private val ruUpper = attach(grid(
     """
     * / 0 7 8 9
     + - . 4 5 6
@@ -289,7 +376,7 @@ private val ruUpper = grid(
     f1 f2 f3 f12 men sft
     ent l2 caps pgu pgd ctl
     """,
-)
+), upperHids)
 
 private fun slots(language: Language, latch: Latch): List<Slot> = when (latch) {
     Latch.NONE -> if (language == Language.EN) enBase else ruBase
@@ -392,10 +479,19 @@ fun actionsToType(target: String, start: Language): List<TrainerAction> {
     return actions
 }
 
-fun keyboardModel(session: TypingSession): KeyboardModel {
-    val language = session.typingLanguage
-    val marks = coach(session)
-    val faces = slots(language, session.latch).mapIndexed { id, slot ->
+fun keyboardModel(
+    session: TypingSession,
+    live: BoardLive = BoardLive(),
+    legends: LegendTable = LegendTable(),
+): KeyboardModel {
+    val language = live.language ?: session.typingLanguage
+    val shown = shownLayer(session, live)
+    val marks = coach(session, live, shown)
+    val userShift = live.shiftHeld && (shown == Latch.LOWER || shown == Latch.UPPER)
+    val faces = slots(language, shown).mapIndexed { id, raw ->
+        val slot = raw
+            .withUserShift(language, shown, id, userShift)
+            .withDeviceLegend(legends, live.shiftHeld || shown == Latch.SHIFT)
         KeyFace(
             id = id,
             column = id % KEY_COLS,
@@ -414,7 +510,84 @@ fun keyboardModel(session: TypingSession): KeyboardModel {
         val start = 24 + row * KEY_COLS
         faces.subList(start, start + KEY_COLS)
     }
-    return KeyboardModel(left, right, caption(session, marks))
+    return KeyboardModel(left, right, caption(session, live, shown, marks))
+}
+
+private fun shownLayer(session: TypingSession, live: BoardLive): Latch = when {
+    live.screenUpper -> Latch.UPPER
+    live.screenLower -> Latch.LOWER
+    session.latch == Latch.LOWER || session.latch == Latch.UPPER -> session.latch
+    live.shiftHeld || session.latch == Latch.SHIFT -> Latch.SHIFT
+    else -> Latch.NONE
+}
+
+private fun modifierReady(session: TypingSession, live: BoardLive, needed: Latch): Boolean = when (needed) {
+    Latch.NONE -> true
+    Latch.SHIFT -> live.shiftHeld || session.latch == Latch.SHIFT
+    Latch.LOWER -> live.screenLower || session.latch == Latch.LOWER
+    Latch.UPPER -> live.screenUpper || session.latch == Latch.UPPER
+}
+
+private fun Slot.withUserShift(language: Language, shown: Latch, id: Int, active: Boolean): Slot {
+    if (!active) return this
+    val shifted = userShiftedSymbol(language, shown, id) ?: return this
+    return copy(legend = shifted.toString(), output = shifted, role = Role.TEXT)
+}
+
+private fun userShiftedSymbol(language: Language, shown: Latch, id: Int): Char? {
+    if (shown == Latch.UPPER && id == 35) {
+        return if (language == Language.EN) ':' else 'Ж'
+    }
+    if (shown != Latch.LOWER) return null
+    // Уже сдвинутые коды прошивки и цифровой блок от дополнительного Shift не меняются.
+    if (id in setOf(2, 3, 4, 5, 10, 14, 15, 16, 17, 33, 34, 39)) return null
+    return if (language == Language.EN) {
+        when (id) {
+            1 -> '~'
+            8 -> '{'
+            9 -> '}'
+            11 -> '_'
+            24 -> '&'
+            25 -> '*'
+            26 -> '('
+            27 -> ')'
+            30 -> '$'
+            31 -> '%'
+            32 -> '^'
+            35 -> '|'
+            36 -> '!'
+            37 -> '@'
+            38 -> '#'
+            40 -> '?'
+            else -> null
+        }
+    } else {
+        when (id) {
+            1 -> 'Ё'
+            8 -> 'Х'
+            9 -> 'Ъ'
+            11 -> '_'
+            24 -> '?'
+            25 -> '*'
+            26 -> '('
+            27 -> ')'
+            30 -> ';'
+            31 -> '%'
+            32 -> ':'
+            35 -> '/'
+            36 -> '!'
+            37 -> '"'
+            38 -> '№'
+            40 -> ','
+            else -> null
+        }
+    }
+}
+
+private fun Slot.withDeviceLegend(table: LegendTable, shift: Boolean): Slot {
+    if (hid == 0 || table.isBlank()) return this
+    val produced = table.char(hid, forcedShift || shift) ?: return this
+    return copy(legend = produced.toString(), output = produced, role = Role.TEXT)
 }
 
 private data class Coach(
@@ -423,16 +596,16 @@ private data class Coach(
     val hold: Boolean,
 )
 
-private fun coach(session: TypingSession): Coach {
+private fun coach(session: TypingSession, live: BoardLive, shown: Latch): Coach {
     if (session.completed) return Coach(emptySet(), emptySet(), hold = false)
     val next = session.nextChar ?: return Coach(emptySet(), emptySet(), hold = false)
     if (next == LANGUAGE_SWITCH) {
-        val keys = if (session.altArmed) SHIFT_KEY_IDS else setOf(ALT_KEY)
+        val keys = if (session.altArmed || live.altHeld) SHIFT_KEY_IDS else setOf(ALT_KEY)
         return Coach(keys, emptySet(), hold = false)
     }
     val stroke = strokeFor(next, session.typingLanguage)
         ?: return Coach(emptySet(), emptySet(), hold = false)
-    if (session.latch != stroke.latch) {
+    if (!modifierReady(session, live, stroke.latch)) {
         val modifiers = when (stroke.latch) {
             Latch.SHIFT -> SHIFT_KEY_IDS
             Latch.LOWER -> setOf(LOWER_KEY)
@@ -442,18 +615,19 @@ private fun coach(session: TypingSession): Coach {
         val hint = if (stroke.latch == Latch.NONE) emptySet() else stroke.keyIds
         return Coach(modifiers, hint, hold = false)
     }
-    return Coach(stroke.keyIds, emptySet(), hold = stroke.hold)
+    return Coach(stroke.keyIds, emptySet(), hold = stroke.hold && shown == stroke.latch)
 }
 
-private fun caption(session: TypingSession, marks: Coach): String {
+private fun caption(session: TypingSession, live: BoardLive, shown: Latch, marks: Coach): String {
     if (session.completed) return "Готово"
-    val language = session.typingLanguage.name
+    val keys = live.language ?: session.typingLanguage
     val next = session.nextChar
     if (next == LANGUAGE_SWITCH) {
-        return if (session.altArmed) "$language · язык: теперь Shift" else "$language · язык: Alt, затем Shift"
+        val armed = session.altArmed || live.altHeld
+        val label = keys.name
+        return if (armed) "$label · язык: теперь Shift" else "$label · язык: Alt, затем Shift"
     }
     val stroke = next?.let { strokeFor(it, session.typingLanguage) }
-    val shown = session.latch
     val layer = when (shown) {
         Latch.NONE -> "строчные"
         Latch.SHIFT -> "прописные"
@@ -461,14 +635,19 @@ private fun caption(session: TypingSession, marks: Coach): String {
         Latch.UPPER -> "функции"
     }
     val needed = when {
-        stroke == null || shown == stroke.latch -> ""
+        stroke == null || modifierReady(session, live, stroke.latch) -> ""
         stroke.latch == Latch.SHIFT -> " · нужен Shift"
         stroke.latch == Latch.LOWER -> " · нужен L1"
         stroke.latch == Latch.UPPER -> " · нужен L2"
         else -> ""
     }
     val hold = if (marks.hold) " · удержать" else ""
-    return "$language · $layer$needed$hold"
+    val otherText = if (live.language != null && live.language != session.typingLanguage) {
+        " · текст ${session.typingLanguage.name}"
+    } else {
+        ""
+    }
+    return "${keys.name} · $layer$needed$hold$otherText"
 }
 
 /** Слоты для тестов: легенда тапа на базовом английском слое. */

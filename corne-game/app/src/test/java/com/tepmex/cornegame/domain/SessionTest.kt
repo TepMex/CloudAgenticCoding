@@ -184,4 +184,78 @@ class SessionTest {
         )
         assertNull(mapHardwareKey(61, 0))
     }
+
+    @Test
+    fun keyUpWithoutUnicodeStillDeliversWhatDownSaw() {
+        val down = stepHardware(
+            phase = HARDWARE_DOWN,
+            keyCode = 44,
+            unicodeChar = 'з'.code,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+        )
+        assertNull(down.deliver)
+        assertTrue(down.consumed)
+        val up = stepHardware(
+            phase = HARDWARE_UP,
+            keyCode = 44,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = down.pending,
+        )
+        assertEquals(TrainerAction.Character('з'), up.deliver)
+        assertTrue(up.pending.isEmpty())
+    }
+
+    @Test
+    fun keyDownWithoutUnicodeUsesTheCharacterFromUp() {
+        val down = stepHardware(
+            phase = HARDWARE_DOWN,
+            keyCode = 45,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+        )
+        assertFalse(down.consumed)
+        val up = stepHardware(
+            phase = HARDWARE_UP,
+            keyCode = 45,
+            unicodeChar = 'q'.code,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = down.pending,
+        )
+        assertEquals(TrainerAction.Character('q'), up.deliver)
+    }
+
+    @Test
+    fun heldKeyDoesNotRepeatIntoTheSession() {
+        val down = stepHardware(
+            phase = HARDWARE_DOWN,
+            keyCode = 45,
+            unicodeChar = 'q'.code,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+        )
+        val repeat = stepHardware(
+            phase = HARDWARE_DOWN,
+            keyCode = 45,
+            unicodeChar = 'q'.code,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 4,
+            pending = down.pending,
+        )
+        assertNull(repeat.deliver)
+        assertEquals(down.pending, repeat.pending)
+    }
 }

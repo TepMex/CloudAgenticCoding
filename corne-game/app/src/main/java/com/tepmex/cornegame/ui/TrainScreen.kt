@@ -2,6 +2,7 @@ package com.tepmex.cornegame.ui
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +42,7 @@ fun TrainScreen(
     onLanguage: (Language) -> Unit,
     onOpenProgress: () -> Unit,
     onOpenSettings: () -> Unit,
+    onContact: (TrainerAction, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -48,21 +51,35 @@ fun TrainScreen(
             .padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "Corne",
                 style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                softWrap = false,
             )
             Spacer(Modifier.width(8.dp))
             LanguageSwitch(
                 selected = state.settings.language,
                 onLanguage = onLanguage,
             )
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onOpenProgress) { Text("Прогресс") }
-            TextButton(onClick = onOpenSettings) { Text("Настройки") }
+            Spacer(Modifier.width(8.dp))
+            TextButton(
+                onClick = onOpenProgress,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text("Прогресс", maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+            }
+            TextButton(
+                onClick = onOpenSettings,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text("Настройки", maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+            }
         }
         TargetLine(
             target = state.session.target,
@@ -70,7 +87,7 @@ fun TrainScreen(
         )
         Spacer(Modifier.height(4.dp))
         StatsRow(stats = state.session.stats(state.nowMs))
-        val model = keyboardModel(state.session)
+        val model = keyboardModel(state.session, state.board, state.legends)
         Text(
             text = model.caption,
             style = MaterialTheme.typography.labelLarge,
@@ -85,6 +102,7 @@ fun TrainScreen(
             errorNonce = state.errorNonce,
             lastWrong = state.lastWrong,
             onAction = onAction,
+            onContact = onContact,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
