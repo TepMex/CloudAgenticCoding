@@ -176,4 +176,5 @@ data class TutorUiState(
     val reader: ReaderUi? = null,
     val busy: String? = null,
     val error: String? = null,
+    val readingNote: String = "",
 )

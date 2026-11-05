@@ -2,6 +2,10 @@
 
 These traces use the local fake model and the v2 contracts. They contain no API key. They show wiring, not that a live model follows the pedagogy. Semantic evaluation against a hosted model was not run.
 
+## What the reader shows
+
+On the fragment, a long press selects any span. The original characters stay in place and gain a highlight. «Не понимаю» saves that span for the review and does not call the model. «Объяснить сейчас» is a separate button. A tap on a character still opens the word sheet, and «Не понимаю» there marks that expression in the current fragment. After the review, each answer shows a verdict — «Верно», «Частично верно», «Неверно», «Нет ответа», or «Нельзя надёжно оценить» — and the explanation sits under that verdict. A selection review sits under its quote.
+
 ## Prepare, mark for review, answer, evaluate
 
 1. The app opens `他天天读书，手不释卷。` and the learner marks `手不释卷` with timing `WITH_REVIEW` and no comment. That mark does not call the model.

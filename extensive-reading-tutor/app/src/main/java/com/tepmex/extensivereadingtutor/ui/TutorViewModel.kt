@@ -173,6 +173,9 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
             state.copy(
                 reader = current.copy(index = index),
                 lesson = current.pages[index].lesson,
+                pendingStart = null,
+                pendingEnd = null,
+                selectionComment = "",
             )
         }
         viewModelScope.launch {
@@ -247,6 +250,8 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
         _state.update { it.copy(pendingStart = startUtf16, pendingEnd = endUtf16, error = null) }
     }
 
+    override fun cancelSelection() = clearPendingSelection()
+
     override fun setSelectionType(type: String) {
         _state.update { it.copy(selectionType = type) }
     }
@@ -256,22 +261,25 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     fun clearPendingSelection() {
-        _state.update { it.copy(pendingStart = null, pendingEnd = null, selectionComment = "") }
+        _state.update { it.copy(pendingStart = null, pendingEnd = null, selectionComment = "", selectionType = "GENERAL") }
     }
 
     override fun saveSelection(now: Boolean) {
-        val lesson = _state.value.lesson ?: return
         val start = _state.value.pendingStart ?: return
         val end = _state.value.pendingEnd ?: return
+        val reader = _state.value.reader ?: return
+        val place = reader.pages.getOrNull(reader.index)?.place ?: return
         val type = runCatching { SelectionRequestType.valueOf(_state.value.selectionType) }.getOrDefault(SelectionRequestType.GENERAL)
+        val comment = _state.value.selectionComment.ifBlank { null }
         launch(if (now) "Объясняю выделение" else null) {
+            val session = ensurePageLesson(reader.bookId, place) ?: return@launch
             when (
                 val marked = graph.lessons.markUtf16(
-                    SessionId(lesson.sessionId),
+                    session.id,
                     start,
                     end,
                     type,
-                    _state.value.selectionComment.ifBlank { null },
+                    comment,
                     if (now) HelpTiming.NOW else HelpTiming.WITH_REVIEW,
                 )
             ) {
@@ -279,17 +287,55 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
                 is AppResult.Ok -> {
                     clearPendingSelection()
                     if (now) {
-                        when (val explained = graph.lessons.explainSelection(SessionId(lesson.sessionId), marked.value.id)) {
+                        when (val explained = graph.lessons.explainSelection(session.id, marked.value.id)) {
                             is AppResult.Err -> _state.update { it.copy(error = explained.error.explain()) }
                             is AppResult.Ok -> {
                                 if (explained.value.selectionRevision == marked.value.revision && explained.value.explanation != null) {
-                                    graph.lessons.revealExplanation(SessionId(lesson.sessionId), marked.value.id, marked.value.revision)
+                                    graph.lessons.revealExplanation(session.id, marked.value.id, marked.value.revision)
                                 }
                             }
                         }
                     }
-                    graph.read { it.session(SessionId(lesson.sessionId)) }?.let { showLesson(it, keepDrafts = true) }
+                    val index = _state.value.reader?.index ?: 0
+                    refreshReader(reader.bookId, index)
                 }
+            }
+        }
+    }
+
+    fun markShownWord() {
+        val word = _state.value.selectedWord ?: return
+        val reader = _state.value.reader
+        val page = reader?.pages?.getOrNull(reader.index)
+        if (reader == null || page == null) {
+            _state.update { it.copy(error = "Откройте страницу книги, чтобы отметить место.") }
+            return
+        }
+        val at = page.text.indexOf(word)
+        if (at < 0) {
+            _state.update { it.copy(error = "Этого места нет в текущем фрагменте.") }
+            return
+        }
+        _state.update {
+            it.copy(
+                pendingStart = at,
+                pendingEnd = at + word.length,
+                selectionType = "MEANING",
+                selectionComment = "",
+                word = null,
+                selectedWord = null,
+            )
+        }
+        saveSelection(now = false)
+    }
+
+    override fun reviseSelection(id: String, type: String, comment: String) {
+        val lesson = _state.value.lesson ?: _state.value.reader?.pages?.getOrNull(_state.value.reader?.index ?: return)?.lesson ?: return
+        val parsed = runCatching { SelectionRequestType.valueOf(type) }.getOrDefault(SelectionRequestType.GENERAL)
+        launch(null) {
+            when (val result = graph.lessons.updateSelection(SessionId(lesson.sessionId), SelectionId(id), parsed, comment.ifBlank { null })) {
+                is AppResult.Err -> _state.update { it.copy(error = result.error.explain()) }
+                is AppResult.Ok -> graph.read { it.session(SessionId(lesson.sessionId)) }?.let { showLesson(it, keepDrafts = true) }
             }
         }
     }
@@ -410,6 +456,7 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
         }
         val loaded = graph.read { loadShelf(it) }
         val preferences = graph.learner.preferences(com.tepmex.extensivereadingtutor.domain.LOCAL_LEARNER)
+        val readingNote = graph.learner.readingNote(com.tepmex.extensivereadingtutor.domain.LOCAL_LEARNER)
         _state.update { current ->
             current.copy(
                 shelf = loaded.books,
@@ -424,7 +471,21 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
                 extraBodyJson = if (current.connectionDirty) current.extraBodyJson else settings.extraBodyJson,
                 timeoutSeconds = if (current.connectionDirty) current.timeoutSeconds else settings.timeoutSeconds.toString(),
                 keyStored = graph.hasApiKey(),
+                readingNote = readingNote,
             )
+        }
+    }
+
+    private suspend fun ensurePageLesson(bookId: String, place: String): LessonSession? {
+        val page = _state.value.reader?.pages?.firstOrNull { it.place == place }
+        val existing = page?.lesson?.sessionId?.let { id -> graph.read { it.session(SessionId(id)) } }
+        if (existing != null) return existing
+        return when (val created = graph.lessons.openPageLesson(BookId(bookId), place)) {
+            is AppResult.Err -> {
+                _state.update { it.copy(error = created.error.explain()) }
+                null
+            }
+            is AppResult.Ok -> created.value
         }
     }
 
@@ -490,7 +551,13 @@ class TutorViewModel(private val graph: TutorGraph) : ViewModel(), LessonActions
     }
 
     private fun ReaderUi.withLesson(updated: LessonPanel) = copy(
-        pages = pages.map { if (it.lesson?.sessionId == updated.sessionId) it.copy(lesson = updated) else it },
+        pages = pages.map { page ->
+            when {
+                page.lesson?.sessionId == updated.sessionId -> page.copy(lesson = updated)
+                page.lesson == null && page.place == pages.getOrNull(index)?.place && page.text == updated.original -> page.copy(lesson = updated)
+                else -> page
+            }
+        },
     )
 
     private fun updateLesson(transform: (LessonPanel) -> LessonPanel) {

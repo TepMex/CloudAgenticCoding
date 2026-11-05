@@ -28,7 +28,7 @@ Domain types do not import Android or HTTP. Room entities are not the domain typ
 1. A fragment's text and anchors never change after insert.
 2. Anchor quotes equal the block slice at their code-point range.
 3. Completed fragments tile the book from the start with no gap and no overlap.
-4. At most one non-completed lesson exists per book, and per fragment.
+4. A fragment keeps at most one non-completed lesson. Several fragments of one book may each have their own.
 5. The cursor moves only in the transaction that marks a lesson `COMPLETED`.
 6. A prepared lesson's questions quote the stored fragment. The model cannot replace that fragment.
 7. A submission is written once. Drafts stop once it exists.
@@ -97,7 +97,7 @@ app/src/main/java/com/tepmex/extensivereadingtutor/
   llm/           gateway, OpenAI adapter, JSON
   storage/       store port, in-memory, Room
   security/      keystore envelope
-  ui/            debug harness
+  ui/            phone reader, lesson feed, settings
 ```
 
 ## Risks
@@ -105,4 +105,4 @@ app/src/main/java/com/tepmex/extensivereadingtutor/
 - The EPUB extractor does not understand every publisher's markup. The original file is kept so a better extractor can replace it behind `EpubTextExtractor`.
 - A retry can produce a different review than the lost response. The app keeps the one that committed.
 - v2 knowledge rules are versioned heuristics. They are easy to recompute and easy to replace without rewriting the ledger. Passing the unit tests does not show that a live model teaches well.
-- The debug screen will be thrown away. Use cases are the API that the next UI should call.
+- The reader is the lesson surface. Use cases stay the API the screens call.

@@ -25,6 +25,31 @@ fun utf16ToCodePointRange(text: String, startUtf16: Int, endUtf16: Int): Pair<In
     return text.codePointCount(0, start) to text.codePointCount(0, end)
 }
 
+fun codePointRangeToUtf16(text: String, startCodePoint: Int, endCodePoint: Int): Pair<Int, Int>? {
+    val total = text.codePointCount(0, text.length)
+    if (startCodePoint < 0 || endCodePoint > total || startCodePoint >= endCodePoint) return null
+    val start = text.offsetByCodePoints(0, startCodePoint)
+    val end = text.offsetByCodePoints(0, endCodePoint)
+    if (start >= end) return null
+    return start to end
+}
+
+/**
+ * A drag or a caret becomes a half-open UTF-16 range that does not split a surrogate pair.
+ * A zero-width caret selects the code point under it.
+ */
+fun normalizedUtf16Selection(text: String, startUtf16: Int, endUtf16: Int): Pair<Int, Int>? {
+    if (text.isEmpty()) return null
+    val direct = utf16ToCodePointRange(text, startUtf16, endUtf16)
+    val points = direct ?: run {
+        val caret = snapCodePointBoundary(text, minOf(startUtf16, endUtf16).coerceIn(0, text.length), preferEnd = false)
+        if (caret >= text.length) return null
+        val next = (caret + Character.charCount(text.codePointAt(caret))).coerceAtMost(text.length)
+        utf16ToCodePointRange(text, caret, next)
+    } ?: return null
+    return codePointRangeToUtf16(text, points.first, points.second)
+}
+
 fun snapCodePointBoundary(text: String, utf16: Int, preferEnd: Boolean): Int {
     if (utf16 <= 0) return 0
     if (utf16 >= text.length) return text.length

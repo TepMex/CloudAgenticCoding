@@ -65,6 +65,10 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                                     onSettle = model::settlePage,
                                     onRequest = model::requestIteration,
                                     actions = model,
+                                    pendingStart = state.pendingStart,
+                                    pendingEnd = state.pendingEnd,
+                                    selectionType = state.selectionType,
+                                    selectionComment = state.selectionComment,
                                 )
                             }
                         }
@@ -76,7 +80,7 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                 }
                 if (showTabs) TutorTabs(state.tab, model::selectTab)
             }
-            state.word?.let { word -> WordSheet(word, model::dismissWord) }
+            state.word?.let { word -> WordSheet(word, model::dismissWord, model::markShownWord) }
             state.error?.let { message ->
                 Text(
                     message,
@@ -153,7 +157,7 @@ private fun tabGlyph(tab: Tab): String = when (tab) {
 }
 
 @Composable
-private fun WordSheet(word: WordSheetUi, onClose: () -> Unit) {
+private fun WordSheet(word: WordSheetUi, onClose: () -> Unit, onMark: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
@@ -193,6 +197,19 @@ private fun WordSheet(word: WordSheetUi, onClose: () -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
             Text(word.gloss, color = TutorText, fontSize = 16.sp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Не понимаю",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(TutorBlue)
+                    .clickable(onClick = onMark)
+                    .padding(vertical = 12.dp),
+            )
             word.example?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = TutorMuted, fontSize = 14.sp)

@@ -277,8 +277,12 @@ fun ProfileScreen(state: TutorUiState, onSettings: () -> Unit) {
                 Box(Modifier.size(10.dp).clip(CircleShape).background(TutorBlue))
                 Column {
                     Text("Настройки ИИ и обучения", fontWeight = FontWeight.SemiBold, color = TutorText)
-                    Text("$model · $level · $language", color = TutorMuted, fontSize = 13.sp)
+                    Text("$model · самооценка $level · $language", color = TutorMuted, fontSize = 13.sp)
                 }
+            }
+            if (state.readingNote.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(state.readingNote, color = TutorSecondary, fontSize = 14.sp, lineHeight = 20.sp)
             }
             SectionLabel("Активность")
             SurfaceCard {

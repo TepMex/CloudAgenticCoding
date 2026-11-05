@@ -250,6 +250,13 @@ class LearnerService(
     suspend fun preferences(learnerId: LearnerId): com.tepmex.extensivereadingtutor.domain.LearnerPreferences? =
         store.read { it.preferences(learnerId) }
 
+    suspend fun readingNote(learnerId: LearnerId): String = store.read { db ->
+        val observations = db.observations(learnerId)
+        val retracted = observations.mapNotNull { item -> db.retraction(item.id)?.observationId }.toSet()
+        val profile = readingProfile(EvidenceUnitReducer().reduce(observations, retracted))
+        "${profile.summary} ${profile.limitation}"
+    }
+
     fun replaceProjection(db: com.tepmex.extensivereadingtutor.storage.StoreSession, learnerId: LearnerId) {
         val observations = db.observations(learnerId)
         val retracted = observations.mapNotNull { item ->

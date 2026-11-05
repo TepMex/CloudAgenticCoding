@@ -9,8 +9,10 @@ import com.tepmex.extensivereadingtutor.domain.BookBlock
 import com.tepmex.extensivereadingtutor.domain.BookId
 import com.tepmex.extensivereadingtutor.domain.FragmentId
 import com.tepmex.extensivereadingtutor.domain.TextCursor
+import com.tepmex.extensivereadingtutor.books.normalizedUtf16Selection
 import com.tepmex.extensivereadingtutor.ui.PinyinSyllable
 import com.tepmex.extensivereadingtutor.ui.pullUpRelease
+import com.tepmex.extensivereadingtutor.ui.selectionFromPress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,6 +51,19 @@ class ReaderLogicTest {
         assertFalse(pullUpRelease(atEnd = true, pullPx = 200f, armed = false, thresholdPx = 72f))
         assertFalse(pullUpRelease(atEnd = true, pullPx = Float.NaN, armed = true, thresholdPx = 72f))
         assertTrue(pullUpRelease(atEnd = true, pullPx = 72f, armed = true, thresholdPx = 72f))
+    }
+
+    @Test
+    fun pressSelectionKeepsASupplementaryCharacterWhole() {
+        val text = "甲\uD840\uDC00乙丙"
+        val first = selectionFromPress(text, null, 1)
+        assertEquals(1 to 3, first)
+        assertEquals("\uD840\uDC00", text.substring(first!!.first, first.second))
+        val grown = selectionFromPress(text, first, 3)
+        assertEquals("\uD840\uDC00乙", text.substring(grown!!.first, grown.second))
+        val caretOnLowSurrogate = normalizedUtf16Selection(text, 2, 2)
+        assertEquals(1 to 3, caretOnLowSurrogate)
+        assertFalse(Character.isHighSurrogate(text[grown.second - 1]) && grown.second < text.length && Character.isLowSurrogate(text[grown.second]))
     }
 
     @Test
