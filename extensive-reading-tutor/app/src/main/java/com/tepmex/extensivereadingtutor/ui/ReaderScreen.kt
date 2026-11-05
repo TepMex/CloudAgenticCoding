@@ -42,8 +42,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,9 +54,12 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
+import com.tepmex.extensivereadingtutor.books.codePointRangeToUtf16
+import com.tepmex.extensivereadingtutor.books.normalizedUtf16Selection
 import com.tepmex.extensivereadingtutor.domain.AnswerVerdict
 import com.tepmex.extensivereadingtutor.domain.SessionStatus
 import com.tepmex.extensivereadingtutor.domain.SubjectiveDifficulty
+import com.tepmex.extensivereadingtutor.pedagogy.LessonPolicyConfig
 import kotlinx.coroutines.delay
 
 @Composable
@@ -63,6 +69,10 @@ fun ReaderScreen(
     onSettle: (Int) -> Unit,
     onRequest: () -> Unit,
     actions: LessonActions,
+    pendingStart: Int? = null,
+    pendingEnd: Int? = null,
+    selectionType: String = "GENERAL",
+    selectionComment: String = "",
 ) {
     if (reader.pages.isEmpty()) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
@@ -94,6 +104,11 @@ fun ReaderScreen(
                 onPulling = { if (pageIndex == pager.currentPage) pulling = it },
                 onRequest = onRequest,
                 actions = actions,
+                pendingStart = if (pageIndex == pager.currentPage) pendingStart else null,
+                pendingEnd = if (pageIndex == pager.currentPage) pendingEnd else null,
+                selectionType = selectionType,
+                selectionComment = selectionComment,
+                selecting = pageIndex == pager.currentPage,
             )
         }
     }
@@ -133,6 +148,11 @@ fun ReaderPage(
     onPulling: (Boolean) -> Unit,
     onRequest: () -> Unit,
     actions: LessonActions,
+    pendingStart: Int? = null,
+    pendingEnd: Int? = null,
+    selectionType: String = "GENERAL",
+    selectionComment: String = "",
+    selecting: Boolean = false,
 ) {
     val scroll = rememberScrollState()
     val density = LocalDensity.current
@@ -190,24 +210,37 @@ fun ReaderPage(
         if (page.chapter.isNotBlank()) {
             Text(page.chapter, color = TutorMuted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 12.dp))
         }
+        val pending = if (selecting && pendingStart != null && pendingEnd != null) pendingStart to pendingEnd else null
         if (showPinyin) {
-            RubyPassage(page.text) { word -> actions.openExpression(word, page.text) }
-        } else {
-            var layout by remember(page.text) { mutableStateOf<TextLayoutResult?>(null) }
-            Text(
-                page.text,
-                color = TutorText,
-                fontSize = 20.sp,
-                lineHeight = 34.sp,
-                onTextLayout = { layout = it },
-                modifier = Modifier.pointerInput(page.text) {
-                    detectTapGestures { offset ->
-                        val index = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
-                        val word = PinyinSyllable.hanRunAt(page.text, index) ?: return@detectTapGestures
-                        actions.openExpression(word, page.text)
-                    }
-                },
+            RubyPassage(
+                text = page.text,
+                marks = page.lesson?.selections.orEmpty(),
+                pending = pending,
+                onWord = { actions.openExpression(it, page.text) },
+                onSelect = actions::selectRange,
             )
+        } else {
+            PlainPassage(
+                text = page.text,
+                marks = page.lesson?.selections.orEmpty(),
+                pending = pending,
+                onWord = { actions.openExpression(it, page.text) },
+                onSelect = actions::selectRange,
+            )
+        }
+        if (selecting && pending != null) {
+            SelectionOffer(
+                text = page.text,
+                start = pending.first,
+                end = pending.second,
+                type = selectionType,
+                comment = selectionComment,
+                locked = page.lesson?.submitted == true,
+                actions = actions,
+            )
+        }
+        page.lesson?.selections?.takeIf { it.isNotEmpty() }?.let { marks ->
+            SavedMarks(marks, page.lesson?.submitted == true, actions)
         }
         page.lesson?.let { lesson ->
             val sections = visibleLessonSections(lesson.status, lesson.submitted)
@@ -234,20 +267,42 @@ fun ReaderPage(
 }
 
 @Composable
-private fun RubyPassage(text: String, onWord: (String) -> Unit) {
-    text.split('\n').forEach { line ->
+private fun RubyPassage(
+    text: String,
+    marks: List<SelectionUi>,
+    pending: Pair<Int, Int>?,
+    onWord: (String) -> Unit,
+    onSelect: (Int, Int) -> Unit,
+) {
+    var utf16 = 0
+    text.split('\n').forEachIndexed { lineIndex, line ->
+        if (lineIndex > 0) utf16 += 1
         FlowRow(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
             var index = 0
             while (index < line.length) {
                 val cp = line.codePointAt(index)
+                val count = Character.charCount(cp)
                 val glyph = String(Character.toChars(cp))
                 val han = Hanzi.isHanzi(cp)
                 val reading = if (han) PinyinSyllable.of(glyph) else ""
+                val start = utf16 + index
+                val end = start + count
+                val marked = marks.any { mark -> rangeOverlaps(text, mark.start, mark.end, start, end) } ||
+                    (pending != null && start < pending.second && end > pending.first)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .padding(bottom = 2.dp)
-                        .then(if (han) Modifier.clickable { onWord(glyph) } else Modifier),
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (marked) TutorAmberSoft else Color.Transparent)
+                        .pointerInput(text, start, pending) {
+                            detectTapGestures(
+                                onTap = { if (han) onWord(glyph) },
+                                onLongPress = {
+                                    selectionFromPress(text, pending, start)?.let { (from, to) -> onSelect(from, to) }
+                                },
+                            )
+                        },
                 ) {
                     Text(
                         if (han && reading.isNotEmpty()) reading else " ",
@@ -259,9 +314,10 @@ private fun RubyPassage(text: String, onWord: (String) -> Unit) {
                     )
                     Text(glyph, color = TutorText, fontSize = 22.sp, lineHeight = 28.sp)
                 }
-                index += Character.charCount(cp)
+                index += count
             }
         }
+        utf16 += line.length
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -301,6 +357,17 @@ private fun QuestionsBlock(lesson: LessonPanel, actions: LessonActions) {
         )
     }
     Spacer(Modifier.height(14.dp))
+    if (!lesson.submitted) {
+        Text(
+            if (lesson.wantsMore) "Подробнее включено" else "Нужно подробнее",
+            color = if (lesson.wantsMore) TutorBlue else TutorSecondary,
+            fontSize = 15.sp,
+            modifier = Modifier.clickable { actions.setWantsMore(!lesson.wantsMore) },
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    AnswerField(lesson.unclear, "Что осталось неясным", lesson.submitted, actions::setUnclear)
+    Spacer(Modifier.height(8.dp))
     AnswerField(lesson.comment, "Обратная связь", lesson.submitted, actions::setComment)
     if (!lesson.submitted) {
         Spacer(Modifier.height(12.dp))
@@ -410,6 +477,207 @@ private fun verdictColors(verdict: AnswerVerdict): Pair<Color, Color> = when (ve
     AnswerVerdict.NOT_ASSESSABLE -> TutorMuted to TutorTrack
 }
 
+@Composable
+private fun PlainPassage(
+    text: String,
+    marks: List<SelectionUi>,
+    pending: Pair<Int, Int>?,
+    onWord: (String) -> Unit,
+    onSelect: (Int, Int) -> Unit,
+) {
+    val saved = TutorBlueSoft
+    val active = TutorAmberSoft
+    val annotated = remember(text, marks, pending, saved, active) {
+        highlightedPassage(text, marks, pending, saved, active)
+    }
+    var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        annotated,
+        color = TutorText,
+        fontSize = 20.sp,
+        lineHeight = 34.sp,
+        onTextLayout = { layout = it },
+        modifier = Modifier.pointerInput(text, pending) {
+            detectTapGestures(
+                onTap = { offset ->
+                    val index = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
+                    val word = PinyinSyllable.hanRunAt(text, index) ?: return@detectTapGestures
+                    onWord(word)
+                },
+                onLongPress = { offset ->
+                    val index = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
+                    val range = selectionFromPress(text, pending, index) ?: return@detectTapGestures
+                    onSelect(range.first, range.second)
+                },
+            )
+        },
+    )
+}
+
+@Composable
+private fun SelectionOffer(
+    text: String,
+    start: Int,
+    end: Int,
+    type: String,
+    comment: String,
+    locked: Boolean,
+    actions: LessonActions,
+) {
+    val range = normalizedUtf16Selection(text, start, end) ?: return
+    val quote = text.substring(range.first, range.second)
+    val points = quote.codePointCount(0, quote.length)
+    val limit = LessonPolicyConfig().maxSelectionCodePoints
+    Spacer(Modifier.height(16.dp))
+    Text(quote.replace('\n', ' '), color = TutorText, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+    if (points > limit) {
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Выделение $points знаков длиннее лимита $limit. Сократите диапазон. Текст не обрезан.",
+            color = TutorRed,
+            fontSize = 14.sp,
+        )
+    } else {
+        Spacer(Modifier.height(4.dp))
+        Text("Удержите другой край, чтобы расширить.", color = TutorMuted, fontSize = 13.sp)
+    }
+    if (!locked) {
+        Spacer(Modifier.height(8.dp))
+        TypeChips(type, actions::setSelectionType)
+        Spacer(Modifier.height(8.dp))
+        AnswerField(comment, "Уточнение, если нужно", false, actions::setSelectionComment)
+        Spacer(Modifier.height(10.dp))
+        PrimaryButton("Не понимаю", enabled = points <= limit) { actions.saveSelection(false) }
+        Text(
+            "Разобрать вместе с ответами",
+            color = TutorMuted,
+            fontSize = 13.sp,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            textAlign = TextAlign.Center,
+        )
+    }
+    Text(
+        "Отмена",
+        color = TutorMuted,
+        fontSize = 14.sp,
+        modifier = Modifier.fillMaxWidth().clickable { actions.cancelSelection() }.padding(vertical = 6.dp),
+        textAlign = TextAlign.Center,
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "Объяснить сейчас",
+        color = TutorBlue,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = points <= limit) { actions.saveSelection(true) }
+            .padding(vertical = 8.dp),
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun SavedMarks(marks: List<SelectionUi>, submitted: Boolean, actions: LessonActions) {
+    marks.forEach { mark ->
+        Spacer(Modifier.height(12.dp))
+        Text(mark.quote.replace('\n', ' '), fontWeight = FontWeight.SemiBold, color = TutorText)
+        Text(selectionTypeLabel(mark.type), color = TutorMuted, fontSize = 12.sp)
+        if (mark.comment.isNotBlank()) {
+            Text(mark.comment, color = TutorSecondary, fontSize = 15.sp)
+        }
+        mark.explanation?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, color = TutorText, fontSize = 15.sp, lineHeight = 22.sp)
+        }
+        if (!submitted) {
+            Spacer(Modifier.height(6.dp))
+            TypeChips(mark.type) { type ->
+                actions.reviseSelection(mark.id, type, mark.comment)
+            }
+            var draft by remember(mark.id, mark.revision) { mutableStateOf(mark.comment) }
+            Spacer(Modifier.height(6.dp))
+            AnswerField(draft, "Уточнение", false) { draft = it }
+            if (draft != mark.comment) {
+                Text(
+                    "Сохранить уточнение",
+                    color = TutorBlue,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 4.dp).clickable {
+                        actions.reviseSelection(mark.id, mark.type, draft)
+                    },
+                )
+            }
+            Text(
+                "Удалить",
+                color = TutorRed,
+                modifier = Modifier.padding(top = 4.dp).clickable { actions.removeSelection(mark.id) },
+            )
+        }
+        if (mark.explanation == null) {
+            Text(
+                "Объяснить сейчас",
+                color = TutorBlue,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 4.dp).clickable { actions.explainSaved(mark.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TypeChips(selected: String, onSelect: (String) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        selectionTypeOptions.forEach { (id, label) ->
+            val on = id == selected
+            Text(
+                label,
+                color = if (on) Color.White else TutorText,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(if (on) TutorBlue else TutorTrack)
+                    .clickable { onSelect(id) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+internal fun selectionFromPress(text: String, pending: Pair<Int, Int>?, fingerUtf16: Int): Pair<Int, Int>? {
+    val touched = normalizedUtf16Selection(text, fingerUtf16, fingerUtf16) ?: return null
+    if (pending == null) return touched
+    val from = minOf(pending.first, touched.first)
+    val to = maxOf(pending.second, touched.second)
+    return normalizedUtf16Selection(text, from, to)
+}
+
+private fun highlightedPassage(
+    text: String,
+    marks: List<SelectionUi>,
+    pending: Pair<Int, Int>?,
+    saved: Color,
+    active: Color,
+): AnnotatedString = buildAnnotatedString {
+    append(text)
+    marks.forEach { mark ->
+        val range = codePointRangeToUtf16(text, mark.start, mark.end) ?: return@forEach
+        addStyle(SpanStyle(background = saved), range.first, range.second)
+    }
+    if (pending != null) {
+        val range = normalizedUtf16Selection(text, pending.first, pending.second) ?: return@buildAnnotatedString
+        addStyle(SpanStyle(background = active), range.first, range.second)
+    }
+}
+
+private fun rangeOverlaps(text: String, startCodePoint: Int, endCodePoint: Int, utf16Start: Int, utf16End: Int): Boolean {
+    val range = codePointRangeToUtf16(text, startCodePoint, endCodePoint) ?: return false
+    return utf16Start < range.second && utf16End > range.first
+}
+
 private class PagePull {
     var canRequest: Boolean = true
     var fire: () -> Unit = {}
@@ -424,9 +692,11 @@ interface LessonActions {
     fun evaluateAgain() {}
     fun complete() {}
     fun selectRange(startUtf16: Int, endUtf16: Int) {}
+    fun cancelSelection() {}
     fun openExpression(expression: String, sentence: String) {}
     fun explainSaved(id: String) {}
     fun removeSelection(id: String) {}
+    fun reviseSelection(id: String, type: String, comment: String) {}
     fun setSelectionType(type: String) {}
     fun setSelectionComment(comment: String) {}
     fun saveSelection(now: Boolean) {}

@@ -232,6 +232,22 @@ fun questionTypeLabel(type: QuestionType): String = when (type) {
     QuestionType.ACTIVE_PRODUCTION -> "Своими словами"
 }
 
+fun selectionTypeLabel(type: String): String = when (type) {
+    "MEANING" -> "Смысл"
+    "GRAMMAR" -> "Грамматика"
+    "REFERENCE" -> "Отсылка"
+    "CUSTOM" -> "Свой вопрос"
+    else -> "Общее"
+}
+
+val selectionTypeOptions = listOf(
+    "GENERAL" to "Общее",
+    "MEANING" to "Смысл",
+    "GRAMMAR" to "Грамматика",
+    "REFERENCE" to "Отсылка",
+    "CUSTOM" to "Свой вопрос",
+)
+
 fun verdictLabel(verdict: AnswerVerdict): String = when (verdict) {
     AnswerVerdict.CORRECT -> "Верно"
     AnswerVerdict.PARTIAL -> "Частично верно"
