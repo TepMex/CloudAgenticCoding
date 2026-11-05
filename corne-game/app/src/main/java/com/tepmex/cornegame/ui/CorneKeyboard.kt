@@ -4,7 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,14 +18,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -112,6 +118,7 @@ fun CorneKeyboard(
     errorNonce: Int,
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
+    onContact: (TrainerAction, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val flash = remember { Animatable(0f) }
@@ -160,6 +167,7 @@ fun CorneKeyboard(
                         flashAlpha = flashAlpha,
                         lastWrong = lastWrong,
                         onAction = onAction,
+                        onContact = onContact,
                     )
                     KeyboardHalf(
                         rows = model.rightRows,
@@ -171,6 +179,7 @@ fun CorneKeyboard(
                         flashAlpha = flashAlpha,
                         lastWrong = lastWrong,
                         onAction = onAction,
+                        onContact = onContact,
                     )
                 }
             }
@@ -189,6 +198,7 @@ private fun KeyboardHalf(
     flashAlpha: Float,
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
+    onContact: (TrainerAction, Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         rows.forEach { row ->
@@ -207,6 +217,7 @@ private fun KeyboardHalf(
                             flashAlpha = flashAlpha,
                             lastWrong = lastWrong,
                             onAction = onAction,
+                            onContact = onContact,
                             modifier = Modifier
                                 .offset(y = drop)
                                 .size(keySize),
@@ -227,8 +238,12 @@ private fun KeyButton(
     flashAlpha: Float,
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
+    onContact: (TrainerAction, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tap by rememberUpdatedState(face.tap)
+    val contact by rememberUpdatedState(onContact)
+    val action by rememberUpdatedState(onAction)
     val scheme = MaterialTheme.colorScheme
     val base = when {
         fingerColors -> face.finger.zoneColor()
@@ -264,11 +279,26 @@ private fun KeyButton(
                 },
                 shape = shape,
             )
-            .semantics { contentDescription = "Клавиша ${face.legend.ifEmpty { face.id.toString() }}" }
-            .combinedClickable(
-                onClick = { onAction(face.tap) },
-                onLongClick = face.longPress?.let { action -> { onAction(action) } },
-            ),
+            .semantics {
+                contentDescription = "Клавиша ${face.legend.ifEmpty { face.id.toString() }}"
+                role = Role.Button
+                onClick {
+                    action(tap)
+                    true
+                }
+            }
+            .pointerInput(face.id) {
+                detectTapGestures(
+                    onPress = {
+                        val started = tap
+                        val modifier = started.isHoldModifier()
+                        if (modifier) contact(started, true)
+                        val released = tryAwaitRelease()
+                        if (modifier) contact(started, false)
+                        else if (released) action(tap)
+                    },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -293,6 +323,12 @@ private fun KeyButton(
         }
     }
 }
+
+private fun TrainerAction.isHoldModifier(): Boolean =
+    this == TrainerAction.Shift ||
+        this == TrainerAction.Lower ||
+        this == TrainerAction.Upper ||
+        this == TrainerAction.Alt
 
 private fun faceProduces(face: KeyFace, char: Char): Boolean {
     val tap = (face.tap as? TrainerAction.Character)?.value

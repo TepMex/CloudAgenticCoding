@@ -1,6 +1,7 @@
 package com.tepmex.cornegame.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -200,5 +201,57 @@ class LayoutsTest {
         assertEquals("_", russian.rightRows[1][4].legend)
         assertEquals(".", russian.rightRows[2][4].legend)
         assertEquals("/", russian.leftRows[0][5].legend)
+    }
+
+    @Test
+    fun heldShiftShowsWhatTheKeyProducesNow() {
+        val held = keyboardModel(
+            TypingSession(Language.EN, "A"),
+            BoardLive(hardwareShift = true),
+        )
+        assertEquals("A", held.leftRows[1][1].legend)
+        assertTrue(held.leftRows[1][1].primary)
+        assertFalse(held.leftRows[2][0].primary)
+
+        val lower = keyboardModel(
+            TypingSession(Language.EN, "a").copy(latch = Latch.LOWER),
+            BoardLive(hardwareShift = true),
+        )
+        assertEquals("&", lower.rightRows[0][0].legend)
+        assertEquals("(", lower.leftRows[0][2].legend)
+        assertEquals("~", lower.leftRows[0][1].legend)
+
+        val russian = keyboardModel(
+            TypingSession(Language.RU, "а").copy(latch = Latch.LOWER),
+            BoardLive(hardwareShift = true),
+        )
+        assertEquals("Ё", russian.leftRows[0][1].legend)
+        assertEquals("?", russian.rightRows[0][0].legend)
+        assertEquals(",", russian.rightRows[2][4].legend)
+    }
+
+    @Test
+    fun keyboardLayoutReplacesLegendsAndExerciseLanguageStaysInTheCaption() {
+        val table = LegendTable(plain = mapOf(45 to 'й'), shifted = mapOf(45 to 'Й'))
+        val model = keyboardModel(
+            TypingSession(Language.EN, "a"),
+            BoardLive(language = Language.RU),
+            table,
+        )
+        assertEquals("й", model.leftRows[0][1].legend)
+        assertEquals(TrainerAction.Character('й'), model.leftRows[0][1].tap)
+        assertTrue(model.caption.contains("RU"))
+        assertTrue(model.caption.contains("текст EN"))
+    }
+
+    @Test
+    fun fingerOnLayerShowsThatLayerBeforeTheLatch() {
+        val model = keyboardModel(
+            TypingSession(Language.EN, "a"),
+            BoardLive(screenLower = true),
+        )
+        assertEquals("(", model.leftRows[0][2].legend)
+        assertEquals("7", model.rightRows[0][0].legend)
+        assertTrue(model.caption.contains("знаки"))
     }
 }

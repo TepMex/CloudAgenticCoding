@@ -10,8 +10,10 @@ import com.tepmex.cornegame.data.FileSettingsStore
 import com.tepmex.cornegame.data.SessionHistoryStore
 import com.tepmex.cornegame.data.SessionRecord
 import com.tepmex.cornegame.data.SettingsStore
+import com.tepmex.cornegame.domain.BoardLive
 import com.tepmex.cornegame.domain.InputEffect
 import com.tepmex.cornegame.domain.Language
+import com.tepmex.cornegame.domain.LegendTable
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.TypingSession
 import com.tepmex.cornegame.domain.generatePrompt
@@ -44,6 +46,8 @@ data class TrainUiState(
     val errorNonce: Int,
     val lastWrong: Char?,
     val history: List<SessionRecord>,
+    val board: BoardLive = BoardLive(),
+    val legends: LegendTable = LegendTable(),
 )
 
 class TrainViewModel(
@@ -52,6 +56,7 @@ class TrainViewModel(
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val random: Random = Random.Default,
 ) : ViewModel() {
+    private var screenModifierUsed = false
     private val _state: MutableStateFlow<TrainUiState>
     val state: StateFlow<TrainUiState>
 
@@ -76,8 +81,56 @@ class TrainViewModel(
         }
     }
 
+    fun onHardwareModifiers(shift: Boolean, alt: Boolean) {
+        _state.update { state ->
+            val board = state.board
+            if (board.hardwareShift == shift && board.hardwareAlt == alt) state
+            else state.copy(board = board.copy(hardwareShift = shift, hardwareAlt = alt))
+        }
+    }
+
+    fun onInputLanguage(language: Language?) {
+        _state.update { state ->
+            if (state.board.language == language) state
+            else state.copy(board = state.board.copy(language = language))
+        }
+    }
+
+    fun onLegendTable(table: LegendTable) {
+        _state.update { state ->
+            if (state.legends == table) state else state.copy(legends = table)
+        }
+    }
+
+    /** Палец на Shift, Alt, L1 или L2. Пока зажат, легенды живые. Короткий тап защёлкивает. */
+    fun onKeyContact(action: TrainerAction, down: Boolean) {
+        if (!action.isScreenModifier()) return
+        _state.update { state ->
+            val board = state.board
+            val next = when (action) {
+                TrainerAction.Shift -> board.copy(screenShift = down)
+                TrainerAction.Lower -> board.copy(screenLower = down)
+                TrainerAction.Upper -> board.copy(screenUpper = down)
+                TrainerAction.Alt -> board.copy(screenAlt = down)
+                else -> board
+            }
+            state.copy(board = next)
+        }
+        if (down) return
+        if (screenModifierUsed) {
+            screenModifierUsed = false
+        } else {
+            onTrainerAction(action)
+        }
+    }
+
     fun onTrainerAction(action: TrainerAction) {
         val current = _state.value
+        if (action is TrainerAction.Character &&
+            (current.board.screenShift || current.board.screenLower || current.board.screenUpper)
+        ) {
+            screenModifierUsed = true
+        }
         if (current.screen != AppScreen.Train || current.session.completed) return
         val (next, effect) = current.session.apply(action, clock())
         if (effect.completed && !current.session.completed) {
@@ -100,6 +153,7 @@ class TrainViewModel(
         if (language == _state.value.settings.language) return
         val settings = _state.value.settings.copy(language = language)
         settingsStore.save(settings)
+        screenModifierUsed = false
         _state.update {
             it.copy(
                 settings = settings,
@@ -108,11 +162,18 @@ class TrainViewModel(
                 errorNonce = 0,
                 lastWrong = null,
                 nowMs = clock(),
+                board = it.board.copy(
+                    screenShift = false,
+                    screenAlt = false,
+                    screenLower = false,
+                    screenUpper = false,
+                ),
             )
         }
     }
 
     fun restart() {
+        screenModifierUsed = false
         _state.update {
             it.copy(
                 session = newSession(it.settings.language),
@@ -120,6 +181,12 @@ class TrainViewModel(
                 errorNonce = 0,
                 lastWrong = null,
                 nowMs = clock(),
+                board = it.board.copy(
+                    screenShift = false,
+                    screenAlt = false,
+                    screenLower = false,
+                    screenUpper = false,
+                ),
             )
         }
     }
@@ -174,6 +241,12 @@ class TrainViewModel(
         return (action as? TrainerAction.Character)?.value
     }
 }
+
+private fun TrainerAction.isScreenModifier(): Boolean =
+    this == TrainerAction.Shift ||
+        this == TrainerAction.Lower ||
+        this == TrainerAction.Upper ||
+        this == TrainerAction.Alt
 
 fun trainViewModelFactory(context: Context): ViewModelProvider.Factory =
     object : ViewModelProvider.Factory {
