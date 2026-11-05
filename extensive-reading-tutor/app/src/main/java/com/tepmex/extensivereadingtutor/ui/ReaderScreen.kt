@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -117,11 +119,11 @@ fun ReaderScreen(
 @Composable
 private fun ReaderTopBar(title: String, onBack: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp).height(44.dp),
+        Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp).heightIn(min = 44.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onBack),
+            Modifier.defaultMinSize(40.dp, 40.dp).clip(CircleShape).clickable(onClick = onBack),
             contentAlignment = Alignment.Center,
         ) {
             Text("‹", fontSize = 28.sp, color = TutorText)

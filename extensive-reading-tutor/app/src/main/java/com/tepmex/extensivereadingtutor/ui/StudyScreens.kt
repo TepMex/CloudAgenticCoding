@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -257,11 +260,25 @@ fun ProfileScreen(state: TutorUiState, onSettings: () -> Unit) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             SectionLabel("Мой прогресс")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                ProfileStat(reading.toString(), "книги")
-                ProfileStat(words.toString(), "слов")
-                ProfileStat(chars.toString(), "знаков")
-                ProfileStat(state.observations.size.toString(), "наблюдений")
+            if (largeSystemFont()) {
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    maxItemsInEachRow = 2,
+                ) {
+                    ProfileStat(reading.toString(), "книги", Modifier.widthIn(min = 140.dp))
+                    ProfileStat(words.toString(), "слов", Modifier.widthIn(min = 140.dp))
+                    ProfileStat(chars.toString(), "знаков", Modifier.widthIn(min = 140.dp))
+                    ProfileStat(state.observations.size.toString(), "наблюдений", Modifier.widthIn(min = 140.dp))
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ProfileStat(reading.toString(), "книги")
+                    ProfileStat(words.toString(), "слов")
+                    ProfileStat(chars.toString(), "знаков")
+                    ProfileStat(state.observations.size.toString(), "наблюдений")
+                }
             }
             Spacer(Modifier.height(12.dp))
             Row(
@@ -288,7 +305,10 @@ fun ProfileScreen(state: TutorUiState, onSettings: () -> Unit) {
             SurfaceCard {
                 Heatmap(state.completedDays.toSet(), state.observationDays.toSet())
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Legend(TutorBlue, "Занятие")
                     Legend(Color(0xFFB9D0FF), "Наблюдение")
                     Legend(TutorTrack, "Нет")
@@ -304,6 +324,7 @@ private fun Heatmap(completed: Set<LocalDate>, observed: Set<LocalDate>) {
     val today = LocalDate.now()
     val start = today.minusDays((today.dayOfWeek.value - 1 + 19 * 7).toLong())
     val weeks = 20
+    val labelScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     Column(Modifier.horizontalScroll(rememberScrollState())) {
         Row {
             repeat(weeks) { week ->
@@ -313,7 +334,14 @@ private fun Heatmap(completed: Set<LocalDate>, observed: Set<LocalDate>) {
                 } else {
                     ""
                 }
-                Text(label, modifier = Modifier.size(width = 14.dp, height = 16.dp), fontSize = 8.sp, color = TutorMuted, maxLines = 1)
+                Text(
+                    label,
+                    modifier = Modifier.size(width = 14.dp, height = 16.dp),
+                    fontSize = (8f / labelScale).sp,
+                    color = TutorMuted,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         Row {
@@ -344,8 +372,8 @@ private fun Legend(color: Color, label: String) {
 }
 
 @Composable
-private fun ProfileStat(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun ProfileStat(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TutorText)
         Text(label, color = TutorMuted, fontSize = 12.sp)
     }
