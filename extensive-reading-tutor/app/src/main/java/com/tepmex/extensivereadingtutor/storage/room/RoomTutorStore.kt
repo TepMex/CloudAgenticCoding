@@ -636,26 +636,53 @@ abstract class TutorDatabase : RoomDatabase() {
             context,
             TutorDatabase::class.java,
             "tutor.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).addCallback(object : Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_fragment ON lesson_sessions(fragmentId) WHERE status != 'COMPLETED'")
-            }
-        }).build()
+        ).withTutorSchema().build()
     }
 }
 
-val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(db: SupportSQLiteDatabase) {
+/**
+ * Room compares every index on `lesson_sessions` with [SessionEntity] after a migration.
+ * The partial guards are not on that entity, so they have to be absent while Room checks
+ * the table. [TutorSchemaCallback] creates the fragment guard again once the check has passed.
+ * A later migration must extend [SchemaMigration] so the same drop happens before the next check.
+ */
+internal abstract class SchemaMigration(startVersion: Int, endVersion: Int) : Migration(startVersion, endVersion) {
+    final override fun migrate(db: SupportSQLiteDatabase) {
+        applyChanges(db)
+        db.execSQL("DROP INDEX IF EXISTS one_active_book")
+        db.execSQL("DROP INDEX IF EXISTS one_active_fragment")
+    }
+
+    protected abstract fun applyChanges(db: SupportSQLiteDatabase)
+}
+
+private fun SupportSQLiteDatabase.ensureOneActiveFragment() {
+    execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_fragment ON lesson_sessions(fragmentId) WHERE status != 'COMPLETED'")
+}
+
+internal val TutorSchemaCallback = object : RoomDatabase.Callback() {
+    override fun onCreate(db: SupportSQLiteDatabase) {
+        db.ensureOneActiveFragment()
+    }
+
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        if (!db.isReadOnly) db.ensureOneActiveFragment()
+    }
+}
+
+internal fun RoomDatabase.Builder<TutorDatabase>.withTutorSchema(): RoomDatabase.Builder<TutorDatabase> =
+    addMigrations(MIGRATION_1_2, MIGRATION_2_3).addCallback(TutorSchemaCallback)
+
+val MIGRATION_1_2: Migration = object : SchemaMigration(1, 2) {
+    override fun applyChanges(db: SupportSQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS pedagogy_documents (kind TEXT NOT NULL, ownerId TEXT NOT NULL, payloadJson TEXT NOT NULL, PRIMARY KEY(kind, ownerId))",
         )
     }
 }
 
-val MIGRATION_2_3 = object : Migration(2, 3) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("DROP INDEX IF EXISTS one_active_book")
-    }
+val MIGRATION_2_3: Migration = object : SchemaMigration(2, 3) {
+    override fun applyChanges(db: SupportSQLiteDatabase) = Unit
 }
 
 class RoomTutorStore(private val database: TutorDatabase) : TutorStore {
