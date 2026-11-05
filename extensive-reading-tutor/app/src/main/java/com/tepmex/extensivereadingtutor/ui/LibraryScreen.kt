@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -54,7 +54,15 @@ fun LibraryScreen(
             Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Мои книги", modifier = Modifier.weight(1f), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = TutorText)
+            Text(
+                "Мои книги",
+                modifier = Modifier.weight(1f),
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = TutorText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             BoxPlus(onImport)
         }
         Column(
@@ -131,7 +139,7 @@ fun LibraryScreen(
 @Composable
 private fun BoxPlus(onClick: () -> Unit) {
     androidx.compose.foundation.layout.Box(
-        Modifier.size(36.dp).clip(CircleShape).background(TutorBlue).clickable(onClick = onClick),
+        Modifier.defaultMinSize(36.dp, 36.dp).clip(CircleShape).background(TutorBlue).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text("+", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)

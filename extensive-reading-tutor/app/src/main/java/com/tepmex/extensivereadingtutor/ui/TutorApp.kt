@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,6 +91,8 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
                         .padding(bottom = if (showTabs) 72.dp else 16.dp)
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp)
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState())
                         .clip(RoundedCornerShape(14.dp))
                         .background(TutorRedSoft)
                         .clickable { model.dismissError() }
@@ -116,32 +123,45 @@ fun TutorApp(model: TutorViewModel, onImport: () -> Unit) {
 }
 
 @Composable
-private fun TutorTabs(selected: Tab, onSelect: (Tab) -> Unit) {
+internal fun TutorTabs(selected: Tab, onSelect: (Tab) -> Unit) {
+    val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    // Four Russian labels do not fit a phone width at 200%. Keep them fully
+    // visible and still larger than the default 100% size.
+    val chrome = if (scale > LargeSystemFontScale) LargeSystemFontScale / scale else 1f
     Row(
         Modifier
             .fillMaxWidth()
             .background(TutorCard)
             .navigationBarsPadding()
-            .height(58.dp),
+            .heightIn(min = 58.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TabItem(Tab.BOOKS, "Книги", selected, onSelect)
-        TabItem(Tab.STUDY, "Учёба", selected, onSelect)
-        TabItem(Tab.KNOWLEDGE, "Словарь", selected, onSelect)
-        TabItem(Tab.PROFILE, "Профиль", selected, onSelect)
+        TabItem(Tab.BOOKS, "Книги", selected, onSelect, chrome)
+        TabItem(Tab.STUDY, "Учёба", selected, onSelect, chrome)
+        TabItem(Tab.KNOWLEDGE, "Словарь", selected, onSelect, chrome)
+        TabItem(Tab.PROFILE, "Профиль", selected, onSelect, chrome)
     }
 }
 
 @Composable
-private fun TabItem(tab: Tab, label: String, selected: Tab, onSelect: (Tab) -> Unit) {
+private fun TabItem(tab: Tab, label: String, selected: Tab, onSelect: (Tab) -> Unit, chrome: Float) {
     val color = if (tab == selected) TutorBlue else TutorMuted
     Column(
-        Modifier.clickable { onSelect(tab) }.padding(horizontal = 8.dp),
+        Modifier.clickable { onSelect(tab) }.padding(horizontal = 2.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(tabGlyph(tab), color = color, fontSize = 16.sp, textAlign = TextAlign.Center)
-        Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text(tabGlyph(tab), color = color, fontSize = (16f * chrome).sp, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+        Text(
+            label,
+            color = color,
+            fontSize = (11f * chrome).sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Visible,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -172,7 +192,15 @@ private fun WordSheet(word: WordSheetUi, onClose: () -> Unit) {
                 .padding(18.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(word.expression, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = TutorText)
+                Text(
+                    word.expression,
+                    modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp,
+                    color = TutorText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text("Закрыть", color = TutorBlue, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable(onClick = onClose))
             }
             if (word.sentence.isNotBlank()) {

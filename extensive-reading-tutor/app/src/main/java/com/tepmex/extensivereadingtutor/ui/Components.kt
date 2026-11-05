@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,10 +53,10 @@ fun ScreenHeader(
 ) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         if (onBack != null || title != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(40.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 40.dp)) {
                 if (onBack != null) {
                     Box(
-                        Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onBack),
+                        Modifier.defaultMinSize(36.dp, 36.dp).clip(CircleShape).clickable(onClick = onBack),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("‹", fontSize = 28.sp, color = TutorText)
@@ -85,30 +88,42 @@ fun PrimaryButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (enabled) TutorBlue else TutorTrack)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (enabled) Color.White else TutorMuted, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(
+            text,
+            color = if (enabled) Color.White else TutorMuted,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
 @Composable
 fun Segmented(options: List<Pair<String, String>>, value: String, onChange: (String) -> Unit) {
+    val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val crowded = scale > LargeSystemFontScale
+    // Three labels such as «Завершено 12» do not fit a phone width at 200%.
+    // Keep the 150% size, which still fits, instead of clipping the last one.
+    val chrome = if (crowded) LargeSystemFontScale / scale else 1f
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(TutorTrack)
             .padding(3.dp),
+        horizontalArrangement = if (crowded) Arrangement.SpaceEvenly else Arrangement.Start,
     ) {
         options.forEach { (id, label) ->
             val selected = id == value
             Box(
                 Modifier
-                    .weight(1f)
+                    .then(if (crowded) Modifier else Modifier.weight(1f))
                     .clip(RoundedCornerShape(10.dp))
                     .background(if (selected) TutorCard else Color.Transparent)
                     .clickable { onChange(id) }
@@ -117,11 +132,12 @@ fun Segmented(options: List<Pair<String, String>>, value: String, onChange: (Str
             ) {
                 Text(
                     label,
-                    fontSize = 13.sp,
+                    fontSize = (13f * chrome).sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (selected) TutorText else TutorSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    softWrap = !crowded,
+                    overflow = if (crowded) TextOverflow.Visible else TextOverflow.Ellipsis,
                 )
             }
         }
@@ -150,6 +166,9 @@ fun ProgressBar(percent: Int) {
 fun BookCover(title: String, author: String, seed: Int, large: Boolean) {
     val palette = CoverPalettes[seed.absoluteValue % CoverPalettes.size]
     val glyphs = titleCodePoints(title).take(4)
+    val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val glyphSize = (if (large) 18f else 13f) / scale
+    val glyphLine = (if (large) 20f else 15f) / scale
     Column(
         Modifier
             .size(if (large) 86.dp else 54.dp, if (large) 122.dp else 78.dp)
@@ -162,10 +181,10 @@ fun BookCover(title: String, author: String, seed: Int, large: Boolean) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             glyphs.forEach { glyph ->
-                Text(glyph, color = palette.ink, fontWeight = FontWeight.Bold, fontSize = if (large) 18.sp else 13.sp, lineHeight = if (large) 20.sp else 15.sp)
+                Text(glyph, color = palette.ink, fontWeight = FontWeight.Bold, fontSize = glyphSize.sp, lineHeight = glyphLine.sp, maxLines = 1, softWrap = false)
             }
         }
-        Text(author.take(10), color = palette.ink.copy(alpha = 0.8f), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(author.take(10), color = palette.ink.copy(alpha = 0.8f), fontSize = (8f / scale).sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 

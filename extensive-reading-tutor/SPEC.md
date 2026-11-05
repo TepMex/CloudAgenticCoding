@@ -34,7 +34,7 @@ Android tutor for one learner who reads a real book in a foreign language with a
 | Lesson API | `LessonService` methods below |
 | Model | `LessonAi.prepareLesson`, `LessonAi.evaluateAnswers`, and `LessonAi.explainSelection` when the learner asks to explain a selection now |
 | HTTP | `LlmProvider.generate` via OpenAI-compatible `chat/completions` |
-| Database | Room `tutor.db`, schema version 3. Migration 1→2 adds `pedagogy_documents` and does not drop lesson rows. Migration 2→3 drops the partial index that allowed only one non-completed lesson per book. One non-completed lesson per fragment remains. |
+| Database | Room `tutor.db`, schema version 3. Migration 1→2 adds `pedagogy_documents` and does not drop lesson rows. Migration 2→3 drops the partial indexes Room does not model, including the one that allowed only one non-completed lesson per book. Opening the database puts back the partial index that keeps one non-completed lesson per fragment. |
 | Settings | DataStore `tutor_settings` for base URL, model name, extra JSON, timeout seconds, `show_pinyin`, and `reader_stop_<bookId>` |
 | Journal | `LlmExchangeLog` file `llm-exchanges.json`, newest 40 |
 | Secrets | `SecretStore`, Android Keystore AES-GCM on device |
@@ -179,6 +179,7 @@ The launcher is the phone UI. A bottom bar switches Книги, Учёба, Сл
 7. **Профиль** counts shelf and ledger figures. The activity grid uses completed-lesson days and observation days.
 8. **Настройки** edits the OpenAI-compatible base URL, the keystore key, the model name, the timeout in seconds, and a text field of extra Chat Completions JSON. It also saves `LearnerPreferences`: self-assessed level, explanation language, difficulty, hint depth, and target fragment size. Toggles that are not preferences are not shown. Журнал запросов opens from this screen.
 9. **Журнал запросов** lists model attempts, newest first. A row shows the operation, time, duration, status, and token counts. The row opens one exchange. Запрос and Ответ each open a raw screen: HTTP headers and the body, both pretty-printed JSON when the text is JSON, with syntax coloring. The Authorization value is `[redacted]`. Очистить журнал deletes the file.
+10. At a system font scale of 150% and above, including Android’s maximum of 200%, the tab labels, the shelf filters, and the profile counts stay fully visible. The reader back control and the import button grow with the font. Lettering drawn on a book cover stays inside the cover. A long error can be scrolled and does not cover the whole screen.
 
 ## Out of scope
 
@@ -197,3 +198,4 @@ Accounts, sync, shared study, voice, audio, a scheduler such as Anki, embeddings
 9. `./gradlew test assembleRelease` succeeds.
 10. A custom JSON object is merged into the chat body, including nested fields. An extra `messages` key does not call the network. The journal stores that attempt with `Authorization` redacted and keeps token counts from `usage`. A timeout typed in settings is the timeout passed to HTTP.
 11. Pretty-printed JSON uses separate colors for keys, strings, numbers, and `true` / `false` / `null`.
+12. A version 1 or version 2 database that still has the partial lesson indexes opens at version 3, keeps the lesson row, allows two open lessons on different fragments of one book, and rejects a second open lesson on the same fragment. At font scale 2 the labels «Книги», «Учёба», «Словарь», «Профиль», «Завершено», and «наблюдений» are fully visible.
