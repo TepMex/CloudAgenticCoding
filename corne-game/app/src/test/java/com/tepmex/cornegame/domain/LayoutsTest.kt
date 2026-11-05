@@ -1,7 +1,6 @@
 package com.tepmex.cornegame.domain
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,9 +37,9 @@ class LayoutsTest {
         assertEquals("␣", baseLegend(Language.EN, 23))
         assertEquals("␣", baseLegend(Language.EN, 42))
         assertEquals("⌫", baseLegend(Language.EN, 29))
-        assertEquals('[', baseHold(Language.EN, 28))
-        assertEquals(']', baseHold(Language.EN, 37))
-        assertEquals('`', baseHold(Language.EN, 5))
+        assertNull(baseHold(Language.EN, 28))
+        assertNull(baseHold(Language.EN, 37))
+        assertNull(baseHold(Language.EN, 5))
     }
 
     @Test
@@ -54,9 +53,9 @@ class LayoutsTest {
         assertEquals('б', baseOutput(Language.RU, 38))
         assertEquals('ю', baseOutput(Language.RU, 39))
         assertEquals('.', baseOutput(Language.RU, 40))
-        assertEquals('х', baseHold(Language.RU, 28))
-        assertEquals('ъ', baseHold(Language.RU, 37))
-        assertEquals('ё', baseHold(Language.RU, 5))
+        assertNull(baseHold(Language.RU, 28))
+        assertNull(baseHold(Language.RU, 37))
+        assertNull(baseHold(Language.RU, 5))
         assertTrue('х' !in baseLetters(Language.RU))
         assertTrue('ъ' !in baseLetters(Language.RU))
         assertTrue('ё' !in baseLetters(Language.RU))
@@ -88,13 +87,15 @@ class LayoutsTest {
         assertEquals(Latch.NONE, strokeFor('.', Language.RU)?.latch)
 
         val yo = strokeFor('ё', Language.RU)
-        assertEquals(Latch.NONE, yo?.latch)
-        assertEquals(true, yo?.hold)
-        assertEquals(setOf(5), yo?.keyIds)
+        assertEquals(Latch.LOWER, yo?.latch)
+        assertEquals(false, yo?.hold)
+        assertEquals(setOf(1), yo?.keyIds)
+        assertEquals(setOf(8), strokeFor('х', Language.RU)?.keyIds)
+        assertEquals(setOf(9), strokeFor('ъ', Language.RU)?.keyIds)
+        assertEquals(Latch.LOWER, strokeFor('`', Language.EN)?.latch)
+        assertEquals(setOf(1), strokeFor('`', Language.EN)?.keyIds)
 
-        assertNotNull(strokeFor('Ё', Language.RU))
-        assertEquals(Latch.SHIFT, strokeFor('Ё', Language.RU)?.latch)
-        assertEquals(true, strokeFor('Ё', Language.RU)?.hold)
+        assertNull(strokeFor('Ё', Language.RU))
         assertNull(strokeFor('€', Language.EN))
     }
 
@@ -157,7 +158,47 @@ class LayoutsTest {
         assertEquals("F1", model.rightRows[2][0].legend)
         assertEquals("F12", model.rightRows[2][3].legend)
         assertEquals("*", model.leftRows[0][0].legend)
+        assertEquals("Calc", model.leftRows[3][3].legend)
+        assertEquals(";", model.rightRows[1][5].legend)
         assertEquals("L1", model.leftRows[3][4].legend)
         assertEquals("L2", model.rightRows[3][1].legend)
+
+        val russian = keyboardModel(session.copy(language = Language.RU))
+        assertEquals("ж", russian.rightRows[1][5].legend)
+    }
+
+    @Test
+    fun lowerLayerMatchesVialExport() {
+        val english = keyboardModel(
+            TypingSession(Language.EN, "a").copy(latch = Latch.LOWER),
+        )
+        assertEquals("Esc", english.leftRows[0][0].legend)
+        assertEquals("`", english.leftRows[0][1].legend)
+        assertEquals("(", english.leftRows[0][2].legend)
+        assertEquals("[", english.leftRows[1][2].legend)
+        assertEquals("{", english.leftRows[2][2].legend)
+        assertEquals("4", english.rightRows[1][0].legend)
+        assertEquals(".", english.rightRows[1][3].legend)
+        assertEquals("_", english.rightRows[1][4].legend)
+        assertEquals("\\", english.rightRows[1][5].legend)
+        assertEquals("1", english.rightRows[2][0].legend)
+        assertEquals("=", english.rightRows[2][3].legend)
+        assertEquals("/", english.rightRows[2][4].legend)
+        assertEquals("Alt", english.leftRows[3][3].legend)
+
+        val russian = keyboardModel(
+            TypingSession(Language.RU, "а").copy(latch = Latch.LOWER),
+        )
+        assertEquals("ё", russian.leftRows[0][1].legend)
+        assertEquals("х", russian.leftRows[1][2].legend)
+        assertEquals("ъ", russian.leftRows[1][3].legend)
+        assertEquals("Х", russian.leftRows[2][2].legend)
+        assertEquals("Ъ", russian.leftRows[2][3].legend)
+        assertEquals("Б", russian.leftRows[2][4].legend)
+        assertEquals("Ю", russian.leftRows[2][5].legend)
+        assertEquals(".", russian.rightRows[1][3].legend)
+        assertEquals("_", russian.rightRows[1][4].legend)
+        assertEquals(".", russian.rightRows[2][4].legend)
+        assertEquals("/", russian.leftRows[0][5].legend)
     }
 }

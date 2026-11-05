@@ -2,14 +2,18 @@ package com.tepmex.cornegame.domain
 
 /**
  * Cornedeon 2M (v2m): матрица 4×6 на половинку, 48 клавиш.
- * Источник — прошивка alko-kbd/zmk-cornedeon-2mod, файл config/cornedeon_2mod.keymap
- * и геометрия config/info.json (keyboard_name «Cornedeon 2M ZMK»).
+ * Источник — выгрузка Vial `cornedeon_v2m.vil` (реальная раскладка клавиатуры).
+ * Слои 0–2 совпадают с `keymaps/vial/keymap.c` в alko-kbd/cornedeon_2mod.
+ * Правая половинка в файле Vial записана от внешнего края к внутреннему:
+ * на экран она разворачивается слева направо.
  *
- * Слои прошивки: 0 база, 1 Lower (MO на левом большом), 2 Upper (MO на правом).
- * Shift — модификатор, не отдельный слой прошивки: он даёт прописные и сдвинутые знаки.
- * Буквы русского слоя — это те же HID-коды QWERTY, прочитанные раскладкой ЙЦУКЕН.
- * Удержание T / P / M — mod-tap: grave, `[`, `]`.
- * Переключение языка — левый Alt, затем Shift (сочетание Windows по умолчанию).
+ * Слои прошивки: 0 база, 1 Lower (`FN_MO13` / `TL_LOWR` на левом большом),
+ * 2 Upper (`FN_MO23` / `TL_UPPR` на правом). Одновременное удержание обоих
+ * включает слой 3; в упражнение он не входит.
+ * Shift — модификатор ОС, не слой прошивки: прописные и сдвинутые знаки базы.
+ * Mod-tap в выгрузке нет: `` ` `` `[` `]` и русские `ё` `х` `ъ` живут на Lower.
+ * Буквы русского слоя — те же HID-коды, прочитанные раскладкой ЙЦУКЕН.
+ * Цифровой блок (`KC_KP_*`) от языка не зависит. Переключение языка — левый Alt, затем Shift.
  */
 
 enum class Language {
@@ -143,6 +147,7 @@ private val NAMED: Map<String, Slot> = buildMap {
     put("scr", named("Scr", Role.NONE))
     put("men", named("Menu", Role.NONE))
     put("xx", named("·", Role.NONE))
+    put("calc", named("Calc", Role.NONE))
     for (n in 1..12) {
         put("f$n", named("F$n", Role.NONE))
     }
@@ -184,90 +189,103 @@ private fun literal(token: String): Slot {
 // Сначала четыре ряда левой половинки, затем четыре ряда правой. Ряд больших — четвёртый.
 private val enBase = grid(
     """
-    esc q w e r t/`
+    esc q w e r t
     tab a s d f g
     sft z x c v b
     ctl left right alt l1 sp
-    y u i o p/[ bs
+    y u i o p bs
     h j k l ; '
-    n m/] , . / sft
+    n m , . / sft
     sp l2 gui up down ctl
     """,
 )
 
 private val enShift = grid(
     """
-    esc Q W E R T/~
+    esc Q W E R T
     tab A S D F G
     sft Z X C V B
     ctl left right alt l1 sp
-    Y U I O P/{ bs
+    Y U I O P bs
     H J K L : "
-    N M/} < > ? sft
+    N M < > ? sft
     sp l2 gui up down ctl
     """,
 )
 
 private val enLower = grid(
     """
-    ~ xx ( ) * /
+    esc ` ( ) * /
     tab xx [ ] + -
     sft xx { } < >
     ctl home end alt l1 ent
     7 8 9 0 ins del
-    4 5 6 . / \
-    1 2 3 = _ sft
+    4 5 6 . _ \
+    1 2 3 = / sft
     ent l2 gui pgu pgd ctl
     """,
 )
 
 private val ruBase = grid(
     """
-    esc й ц у к е/ё
+    esc й ц у к е
     tab ф ы в а п
     sft я ч с м и
     ctl left right alt l1 sp
-    н г ш щ з/х bs
+    н г ш щ з bs
     р о л д ж э
-    т ь/ъ б ю . sft
+    т ь б ю . sft
     sp l2 gui up down ctl
     """,
 )
 
 private val ruShift = grid(
     """
-    esc Й Ц У К Е/Ё
+    esc Й Ц У К Е
     tab Ф Ы В А П
     sft Я Ч С М И
     ctl left right alt l1 sp
-    Н Г Ш Щ З/Х bs
+    Н Г Ш Щ З bs
     Р О Л Д Ж Э
-    Т Ь/Ъ Б Ю , sft
+    Т Ь Б Ю , sft
     sp l2 gui up down ctl
     """,
 )
 
 private val ruLower = grid(
     """
-    Ё xx ( ) * .
+    esc ё ( ) * /
     tab xx х ъ + -
     sft xx Х Ъ Б Ю
     ctl home end alt l1 ent
     7 8 9 0 ins del
-    4 5 6 ю . \
-    1 2 3 = _ sft
+    4 5 6 . _ \
+    1 2 3 = . sft
     ent l2 gui pgu pgd ctl
     """,
 )
 
-private val upper = grid(
+private val enUpper = grid(
     """
     * / 0 7 8 9
     + - . 4 5 6
     sft xx = 1 2 3
-    ctl home end alt l1 pent
+    ctl home end calc l1 pent
     f7 f8 f9 f10 prt pau
-    f4 f5 f6 f11 num scr
+    f4 f5 f6 f11 num ;
+    f1 f2 f3 f12 men sft
+    ent l2 caps pgu pgd ctl
+    """,
+)
+
+private val ruUpper = grid(
+    """
+    * / 0 7 8 9
+    + - . 4 5 6
+    sft xx = 1 2 3
+    ctl home end calc l1 pent
+    f7 f8 f9 f10 prt pau
+    f4 f5 f6 f11 num ж
     f1 f2 f3 f12 men sft
     ent l2 caps pgu pgd ctl
     """,
@@ -277,7 +295,7 @@ private fun slots(language: Language, latch: Latch): List<Slot> = when (latch) {
     Latch.NONE -> if (language == Language.EN) enBase else ruBase
     Latch.SHIFT -> if (language == Language.EN) enShift else ruShift
     Latch.LOWER -> if (language == Language.EN) enLower else ruLower
-    Latch.UPPER -> upper
+    Latch.UPPER -> if (language == Language.EN) enUpper else ruUpper
 }
 
 private fun Slot.tapAction(): TrainerAction = when (role) {
@@ -316,7 +334,7 @@ fun fingerFor(id: Int): Finger {
     }
 }
 
-/** Буквы тапа базового слоя. Удержание и Lower в словарь слов не входят. */
+/** Буквы тапа базового слоя. Lower в словарь слов не входит. */
 fun baseLetters(language: Language): Set<Char> =
     slots(language, Latch.NONE).mapNotNull { slot ->
         slot.output?.takeIf { it.isLetter() }
