@@ -1,6 +1,7 @@
 package com.tepmex.extensivereadingtutor
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -61,6 +62,14 @@ class TutorGraph(
     suspend fun hasApiKey(): Boolean = !secrets.get(DEFAULT_PROVIDER).isNullOrBlank()
 
     suspend fun loadSettings(): Settings = settings.read()
+
+    suspend fun readerPlace(bookId: String): String? = settings.readerPlace(bookId)
+
+    suspend fun saveReaderPlace(bookId: String, place: String) = settings.saveReaderPlace(bookId, place)
+
+    suspend fun showPinyin(): Boolean = settings.showPinyin()
+
+    suspend fun saveShowPinyin(show: Boolean) = settings.saveShowPinyin(show)
 
     suspend fun probeModel(): AppResult<String> {
         val current = settings.read()
@@ -195,11 +204,27 @@ class SettingsStore(private val context: Context) {
 
     fun modelFlow() = context.tutorSettings.data.map { it[MODEL].orEmpty() }
 
+    suspend fun readerPlace(bookId: String): String? =
+        context.tutorSettings.data.first()[stringPreferencesKey(placeKey(bookId))]
+
+    suspend fun saveReaderPlace(bookId: String, place: String) {
+        context.tutorSettings.edit { it[stringPreferencesKey(placeKey(bookId))] = place }
+    }
+
+    suspend fun showPinyin(): Boolean = context.tutorSettings.data.first()[PINYIN] ?: false
+
+    suspend fun saveShowPinyin(show: Boolean) {
+        context.tutorSettings.edit { it[PINYIN] = show }
+    }
+
     private companion object {
         val BASE = stringPreferencesKey("base_url")
         val MODEL = stringPreferencesKey("model")
         val EXTRA = stringPreferencesKey("extra_body")
         val TIMEOUT = longPreferencesKey("timeout_seconds")
+        val PINYIN = booleanPreferencesKey("show_pinyin")
+
+        fun placeKey(bookId: String) = "reader_stop_$bookId"
     }
 }
 

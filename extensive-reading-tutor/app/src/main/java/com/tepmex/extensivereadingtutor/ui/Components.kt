@@ -101,7 +101,7 @@ fun Segmented(options: List<Pair<String, String>>, value: String, onChange: (Str
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFE8EAEF))
+            .background(TutorTrack)
             .padding(3.dp),
     ) {
         options.forEach { (id, label) ->
@@ -110,7 +110,7 @@ fun Segmented(options: List<Pair<String, String>>, value: String, onChange: (Str
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (selected) Color.White else Color.Transparent)
+                    .background(if (selected) TutorCard else Color.Transparent)
                     .clickable { onChange(id) }
                     .padding(vertical = 8.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center,

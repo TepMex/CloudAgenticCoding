@@ -17,3 +17,4 @@
 -keep,includedescriptorclasses class com.tepmex.extensivereadingtutor.**$$serializer { *; }
 -keepclassmembers class com.tepmex.extensivereadingtutor.llm.** { *; }
 -keepclassmembers class com.tepmex.extensivereadingtutor.storage.room.** { *; }
+-keep class net.sourceforge.pinyin4j.** { *; }

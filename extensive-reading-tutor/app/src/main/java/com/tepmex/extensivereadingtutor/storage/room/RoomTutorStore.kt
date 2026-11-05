@@ -417,6 +417,9 @@ interface TutorDao {
     @Query("SELECT * FROM fragments WHERE id = :id")
     fun fragment(id: String): FragmentEntity?
 
+    @Query("SELECT * FROM fragments WHERE bookId = :bookId")
+    fun fragments(bookId: String): List<FragmentEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     fun insertAnchors(entities: List<AnchorEntity>)
 
@@ -622,7 +625,7 @@ interface TutorDao {
         ObservationEntity::class, RetractionEntity::class, ConceptEntity::class, KnowledgeEntity::class,
         CallEntity::class, ProviderEntity::class, CounterEntity::class, PedagogyDocumentEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class TutorDatabase : RoomDatabase() {
@@ -633,9 +636,8 @@ abstract class TutorDatabase : RoomDatabase() {
             context,
             TutorDatabase::class.java,
             "tutor.db",
-        ).addMigrations(MIGRATION_1_2).addCallback(object : Callback() {
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).addCallback(object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_book ON lesson_sessions(bookId) WHERE status != 'COMPLETED'")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS one_active_fragment ON lesson_sessions(fragmentId) WHERE status != 'COMPLETED'")
             }
         }).build()
@@ -647,6 +649,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS pedagogy_documents (kind TEXT NOT NULL, ownerId TEXT NOT NULL, payloadJson TEXT NOT NULL, PRIMARY KEY(kind, ownerId))",
         )
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP INDEX IF EXISTS one_active_book")
     }
 }
 
@@ -728,10 +736,17 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
 
     override fun fragment(id: FragmentId): BookFragment? {
         val row = dao.fragment(id.value) ?: return null
-        val anchors = dao.anchors(id.value).map {
+        return row.toFragment(dao.anchors(id.value))
+    }
+
+    override fun fragments(bookId: BookId): List<BookFragment> =
+        dao.fragments(bookId.value).map { row -> row.toFragment(dao.anchors(row.id)) }
+
+    private fun FragmentEntity.toFragment(anchors: List<AnchorEntity>): BookFragment {
+        val mapped = anchors.map {
             TextAnchor(BookId(it.bookId), it.spineIndex, it.spineHref, BlockId(it.blockId), it.startCodePoint, it.endCodePoint, it.quote, it.quoteSha256)
         }
-        return BookFragment(FragmentId(row.id), BookId(row.bookId), anchors, row.originalText, row.textHash, row.chapterTitle, row.chapterHref, row.codePointLength, row.segmentationVersion)
+        return BookFragment(FragmentId(id), BookId(bookId), mapped, originalText, textHash, chapterTitle, chapterHref, codePointLength, segmentationVersion)
     }
 
     override fun progress(bookId: BookId): ReadingProgress? = dao.progress(bookId.value)?.let {
@@ -760,8 +775,6 @@ private class RoomSession(private val dao: TutorDao) : StoreSession {
     }
 
     override fun insertSession(session: LessonSession) = guard {
-        val activeBook = dao.activeSession(session.bookId.value)
-        if (activeBook != null) throw StoreConstraintException("active book session")
         dao.insertSession(
             SessionEntity(
                 session.id.value, session.bookId.value, session.fragmentId.value, session.learnerId.value,

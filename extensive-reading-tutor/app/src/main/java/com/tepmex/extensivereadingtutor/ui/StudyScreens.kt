@@ -44,7 +44,7 @@ import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 
 @Composable
-fun StudyScreen(state: TutorUiState, onOpenBook: (String) -> Unit, onContinue: (String) -> Unit, onWord: (String) -> Unit) {
+fun StudyScreen(state: TutorUiState, onOpenBook: (String) -> Unit, onWord: (String) -> Unit) {
     val current = state.shelf.firstOrNull { !it.done } ?: state.shelf.firstOrNull()
     val due = state.knowledge.filter { it.status == KnowledgeStatus.NEEDS_REVIEW }
     Column(Modifier.fillMaxSize()) {
@@ -64,8 +64,8 @@ fun StudyScreen(state: TutorUiState, onOpenBook: (String) -> Unit, onContinue: (
                         fontSize = 13.sp,
                     )
                     Spacer(Modifier.height(12.dp))
-                    PrimaryButton(if (current.done) "Открыть книгу" else "Продолжить занятие") {
-                        if (current.done) onOpenBook(current.id) else onContinue(current.id)
+                    PrimaryButton(if (current.done) "Открыть книгу" else "Читать") {
+                        onOpenBook(current.id)
                     }
                 }
             } else {
@@ -354,6 +354,7 @@ private fun knowledgeTitle(row: LearnerKnowledgeState, concepts: List<Concept>):
         ?: row.diagnosticKey
         ?: skillLabel(row.skillType)
 
+@Composable
 private fun knowledgeColors(status: KnowledgeStatus): Pair<Color, Color> = when (status) {
     KnowledgeStatus.LEARNING -> TutorBlue to TutorBlueSoft
     KnowledgeStatus.NEEDS_REVIEW -> TutorAmber to TutorAmberSoft

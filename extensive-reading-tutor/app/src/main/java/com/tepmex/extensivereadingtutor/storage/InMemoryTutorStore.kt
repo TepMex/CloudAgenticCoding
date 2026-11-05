@@ -182,6 +182,9 @@ class InMemoryTutorStore : TutorStore {
 
         override fun fragment(id: FragmentId): BookFragment? = mem.fragments[id]
 
+        override fun fragments(bookId: BookId): List<BookFragment> =
+            mem.fragments.values.filter { it.bookId == bookId }
+
         override fun progress(bookId: BookId): ReadingProgress? = mem.progress[bookId]
 
         override fun saveProgress(progress: ReadingProgress) {
@@ -196,9 +199,6 @@ class InMemoryTutorStore : TutorStore {
             mem.completed.filter { it.bookId == bookId }
 
         override fun insertSession(session: LessonSession) {
-            if (mem.sessions.values.any { it.bookId == session.bookId && it.status != SessionStatus.COMPLETED }) {
-                throw StoreConstraintException("active book session")
-            }
             if (mem.sessions.values.any { it.fragmentId == session.fragmentId && it.status != SessionStatus.COMPLETED }) {
                 throw StoreConstraintException("active fragment session")
             }

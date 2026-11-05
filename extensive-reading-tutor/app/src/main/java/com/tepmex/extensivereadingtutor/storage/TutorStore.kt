@@ -67,6 +67,7 @@ interface StoreSession {
 
     fun insertFragment(fragment: BookFragment)
     fun fragment(id: FragmentId): BookFragment?
+    fun fragments(bookId: BookId): List<BookFragment>
 
     fun progress(bookId: BookId): ReadingProgress?
     fun saveProgress(progress: ReadingProgress)
