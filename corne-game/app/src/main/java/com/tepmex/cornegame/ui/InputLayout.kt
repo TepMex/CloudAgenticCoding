@@ -23,6 +23,40 @@ internal data class KeyboardLayout(
     val legends: LegendTable,
 )
 
+/**
+ * Поля KeyEvent для лога. [unicodeChar] — уже прочитанный символ с metaState,
+ * тот же, что уходит в сессию. [unicodeBare] — символ без модификаторов.
+ */
+@Suppress("DEPRECATION")
+internal fun readHardwareTrace(event: KeyEvent, unicodeChar: Int, unicodeBare: Int): HardwareKeyTrace {
+    val deviceName = InputDevice.getDevice(event.deviceId)?.name ?: "-"
+    return HardwareKeyTrace(
+        phase = event.action,
+        keyCode = event.keyCode,
+        keyLabel = KeyEvent.keyCodeToString(event.keyCode),
+        scanCode = event.scanCode,
+        unicodeChar = unicodeChar,
+        unicodeBare = unicodeBare,
+        metaState = event.metaState,
+        shift = event.isShiftPressed,
+        alt = event.isAltPressed,
+        ctrl = event.isCtrlPressed,
+        capsLock = event.isCapsLockOn,
+        meta = event.isMetaPressed,
+        function = event.isFunctionPressed,
+        repeatCount = event.repeatCount,
+        deviceId = event.deviceId,
+        deviceName = deviceName,
+        source = event.source,
+        flags = event.flags,
+        characters = event.characters,
+        displayLabel = event.displayLabel,
+        number = event.number,
+        downTime = event.downTime,
+        eventTime = event.eventTime,
+    )
+}
+
 private fun keyboardMap(deviceId: Int): KeyCharacterMap? {
     if (deviceId >= 0) {
         val device = InputDevice.getDevice(deviceId)

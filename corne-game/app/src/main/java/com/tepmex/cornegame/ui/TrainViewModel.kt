@@ -11,6 +11,7 @@ import com.tepmex.cornegame.data.SessionHistoryStore
 import com.tepmex.cornegame.data.SessionRecord
 import com.tepmex.cornegame.data.SettingsStore
 import com.tepmex.cornegame.domain.BoardLive
+import com.tepmex.cornegame.domain.HardwareStep
 import com.tepmex.cornegame.domain.InputEffect
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LegendTable
@@ -57,8 +58,11 @@ class TrainViewModel(
     private val random: Random = Random.Default,
 ) : ViewModel() {
     private var screenModifierUsed = false
+    private var lastKeyboardSig: String? = null
     private val _state: MutableStateFlow<TrainUiState>
     val state: StateFlow<TrainUiState>
+    private val _debug = MutableStateFlow<List<String>>(emptyList())
+    val debugLog: StateFlow<List<String>> = _debug.asStateFlow()
 
     init {
         val settings = settingsStore.load()
@@ -73,6 +77,10 @@ class TrainViewModel(
         )
         _state = MutableStateFlow(initial)
         state = _state.asStateFlow()
+        debug(
+            "START target=\"${initial.session.target}\" lang=${initial.settings.language} | " +
+                uiSnapshot(initial),
+        )
         viewModelScope.launch {
             while (isActive) {
                 delay(200)
@@ -87,6 +95,83 @@ class TrainViewModel(
             if (board.hardwareShift == shift && board.hardwareAlt == alt) state
             else state.copy(board = board.copy(hardwareShift = shift, hardwareAlt = alt))
         }
+    }
+
+    /** Состояние до разбора клавиши: по нему лог показывает, что изменилось после. */
+    fun debugBaseline(): TrainUiState = _state.value
+
+    fun noteBoot(versionName: String, versionCode: Long) {
+        val current = _state.value
+        debug(
+            "BOOT $versionName ($versionCode) | ${uiSnapshot(current)} " +
+                "target=\"${current.session.target}\"",
+        )
+    }
+
+    /**
+     * Раскладка, которую увидела активность. Пишем только когда подпись меняется,
+     * иначе каждая клавиша повторяла бы одну и ту же строку.
+     */
+    fun noteKeyboard(
+        deviceId: Int,
+        found: Boolean,
+        language: Language?,
+        table: LegendTable,
+        cleared: Boolean,
+    ) {
+        val sample = legendSample(table)
+        val signature = "$deviceId|$found|${language ?: "-"}|$sample|$cleared"
+        if (signature == lastKeyboardSig) return
+        lastKeyboardSig = signature
+        debug(
+            "KBD device=$deviceId found=${bit(found)} lang=${language ?: "-"} " +
+                "cleared=${bit(cleared)} $sample",
+        )
+    }
+
+    /**
+     * Аппаратная клавиша уже прошла через модификаторы и раскладку.
+     * [before] снят до этих обновлений, поэтому строка UI видит и Shift, и символ.
+     */
+    fun onHardwareKey(before: TrainUiState, trace: HardwareKeyTrace, step: HardwareStep) {
+        debug(formatKey(trace))
+        debug(formatStep(step))
+        val afterLayout = _state.value
+        if (before.legends != afterLayout.legends || before.board.language != afterLayout.board.language) {
+            debug(
+                "LAYOUT kbd=${afterLayout.board.language ?: "-"} ${legendSample(afterLayout.legends)}",
+            )
+        }
+        val deliver = step.deliver
+        val applied = deliver?.let { applyAction(it, origin = null) }
+        val after = _state.value
+        debug(
+            formatUiReaction(
+                before = before,
+                after = after,
+                action = deliver,
+                ignored = applied?.ignored == true,
+                mistake = applied?.mistake == true,
+                moved = applied?.moved == true,
+            ),
+        )
+    }
+
+    fun onPointer(
+        phase: String,
+        id: Int,
+        legend: String,
+        action: TrainerAction,
+        released: Boolean?,
+    ) {
+        val tail = if (released == null) "" else " released=${bit(released)}"
+        debug("POINTER $phase id=$id legend=$legend action=${action.traceLabel()}$tail")
+    }
+
+    fun clearDebug() {
+        _debug.value = emptyList()
+        val current = _state.value
+        debug("CLEAR | ${uiSnapshot(current)} target=\"${current.session.target}\"")
     }
 
     fun onInputLanguage(language: Language?) {
@@ -105,6 +190,7 @@ class TrainViewModel(
     /** Палец на Shift, Alt, L1 или L2. Пока зажат, легенды живые. Короткий тап защёлкивает. */
     fun onKeyContact(action: TrainerAction, down: Boolean) {
         if (!action.isScreenModifier()) return
+        val before = _state.value
         _state.update { state ->
             val board = state.board
             val next = when (action) {
@@ -116,22 +202,39 @@ class TrainViewModel(
             }
             state.copy(board = next)
         }
-        if (down) return
+        if (down) {
+            debug("TOUCH down ${action.traceLabel()} | ${uiDelta(before, _state.value)}")
+            return
+        }
         if (screenModifierUsed) {
             screenModifierUsed = false
+            debug("TOUCH up ${action.traceLabel()} HOLD-USED | ${uiDelta(before, _state.value)}")
         } else {
+            debug("TOUCH up ${action.traceLabel()} SHORT | ${uiDelta(before, _state.value)}")
             onTrainerAction(action)
         }
     }
 
     fun onTrainerAction(action: TrainerAction) {
+        applyAction(action, origin = "screen")
+    }
+
+    private fun applyAction(action: TrainerAction, origin: String?): ApplyResult {
         val current = _state.value
         if (action is TrainerAction.Character &&
             (current.board.screenShift || current.board.screenLower || current.board.screenUpper)
         ) {
             screenModifierUsed = true
         }
-        if (current.screen != AppScreen.Train || current.session.completed) return
+        if (current.screen != AppScreen.Train || current.session.completed) {
+            if (origin != null) {
+                debug(
+                    "ACTION $origin ${action.traceLabel()} IGNORED " +
+                        "screen=${current.screen} done=${bit(current.session.completed)}",
+                )
+            }
+            return ApplyResult(ignored = true, mistake = false, moved = false)
+        }
         val (next, effect) = current.session.apply(action, clock())
         if (effect.completed && !current.session.completed) {
             persist(next)
@@ -146,6 +249,19 @@ class TrainViewModel(
                 history = if (effect.completed) historyStore.load() else it.history,
             )
         }
+        val after = _state.value
+        val moved = after.session != current.session ||
+            after.screen != current.screen ||
+            after.errorNonce != current.errorNonce
+        if (origin != null) {
+            val verdict = when {
+                effect.mistake -> "MISS expected=${showChar(current.session.nextChar)}"
+                moved -> "OK"
+                else -> "NOOP"
+            }
+            debug("ACTION $origin ${action.traceLabel()} $verdict | ${uiDelta(current, after)}")
+        }
+        return ApplyResult(ignored = false, mistake = effect.mistake, moved = moved)
     }
 
     fun setLanguage(language: Language) {
@@ -170,6 +286,8 @@ class TrainViewModel(
                 ),
             )
         }
+        val current = _state.value
+        debug("CHIP lang=$language | target=\"${current.session.target}\" | ${uiSnapshot(current)}")
     }
 
     fun restart() {
@@ -189,6 +307,8 @@ class TrainViewModel(
                 ),
             )
         }
+        val current = _state.value
+        debug("RESTART | target=\"${current.session.target}\" | ${uiSnapshot(current)}")
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) {
@@ -197,14 +317,17 @@ class TrainViewModel(
             settingsStore.save(next)
             it.copy(settings = next)
         }
+        debug("SETTINGS | ${uiSnapshot(_state.value)}")
     }
 
     fun openProgress() {
         _state.update { it.copy(screen = AppScreen.Progress, history = historyStore.load()) }
+        debug("NAV Progress | ${uiSnapshot(_state.value)}")
     }
 
     fun openSettings() {
         _state.update { it.copy(screen = AppScreen.Settings) }
+        debug("NAV Settings | ${uiSnapshot(_state.value)}")
     }
 
     /** Назад из прогресса и настроек: к результату, если сессия уже кончилась. */
@@ -213,6 +336,7 @@ class TrainViewModel(
             val screen = if (it.session.completed) AppScreen.Results else AppScreen.Train
             it.copy(screen = screen)
         }
+        debug("NAV ${_state.value.screen} | ${uiSnapshot(_state.value)}")
     }
 
     private fun persist(session: TypingSession) {
@@ -240,7 +364,20 @@ class TrainViewModel(
         if (!effect.mistake) return null
         return (action as? TrainerAction.Character)?.value
     }
+
+    private fun debug(line: String) {
+        val stamped = "${debugStamp(clock())} $line"
+        _debug.update { (it + stamped).takeLast(DEBUG_LOG_LIMIT) }
+    }
 }
+
+private data class ApplyResult(
+    val ignored: Boolean,
+    val mistake: Boolean,
+    val moved: Boolean,
+)
+
+private fun bit(value: Boolean): Int = if (value) 1 else 0
 
 private fun TrainerAction.isScreenModifier(): Boolean =
     this == TrainerAction.Shift ||
