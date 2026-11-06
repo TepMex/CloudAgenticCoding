@@ -23,6 +23,8 @@ import com.tepmex.cornegame.ui.trainViewModelFactory
  *
  * Символ читаем на ACTION_DOWN и отдаём на ACTION_UP. У части Bluetooth-клавиатур
  * unicode на UP уже пустой — тогда берём то, что запомнили на DOWN.
+ * Буква вне виртуальной карты приходит одним ACTION_MULTIPLE: KEYCODE_UNKNOWN
+ * и getCharacters() (в логе это chars="э"). Её отдаём сразу, отпускания нет.
  * Зажатые Shift и Alt и раскладка клавиатуры обновляют легенды сразу.
  */
 class MainActivity : ComponentActivity() {
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
             altDown = event.isAltPressed,
             repeatCount = event.repeatCount,
             pending = pendingHardware,
+            characters = trace.characters,
         )
         pendingHardware = step.pending
         trainViewModel.onHardwareModifiers(step.shiftDown, step.altDown)

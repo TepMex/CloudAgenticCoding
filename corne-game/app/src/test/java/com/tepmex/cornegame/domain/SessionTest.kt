@@ -196,7 +196,7 @@ class SessionTest {
             repeatCount = 0,
             pending = emptyMap(),
         )
-        assertNull(down.deliver)
+        assertTrue(down.deliver.isEmpty())
         assertTrue(down.consumed)
         val up = stepHardware(
             phase = HARDWARE_UP,
@@ -207,7 +207,7 @@ class SessionTest {
             repeatCount = 0,
             pending = down.pending,
         )
-        assertEquals(TrainerAction.Character('з'), up.deliver)
+        assertEquals(listOf(TrainerAction.Character('з')), up.deliver)
         assertTrue(up.pending.isEmpty())
     }
 
@@ -232,7 +232,59 @@ class SessionTest {
             repeatCount = 0,
             pending = down.pending,
         )
-        assertEquals(TrainerAction.Character('q'), up.deliver)
+        assertEquals(listOf(TrainerAction.Character('q')), up.deliver)
+    }
+
+    @Test
+    fun multipleUnknownKeyTypesTheCharacterString() {
+        val held = stepHardware(
+            phase = HARDWARE_DOWN,
+            keyCode = 45,
+            unicodeChar = 'q'.code,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+        )
+        val step = stepHardware(
+            phase = HARDWARE_MULTIPLE,
+            keyCode = 0,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = held.pending,
+            characters = "э",
+        )
+        assertEquals(listOf(TrainerAction.Character('э')), step.deliver)
+        assertTrue(step.consumed)
+        assertEquals(held.pending, step.pending)
+        val both = stepHardware(
+            phase = HARDWARE_MULTIPLE,
+            keyCode = 0,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+            characters = "Эж",
+        )
+        assertEquals(
+            listOf(TrainerAction.Character('Э'), TrainerAction.Character('ж')),
+            both.deliver,
+        )
+        val blank = stepHardware(
+            phase = HARDWARE_MULTIPLE,
+            keyCode = 0,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+            characters = "\n",
+        )
+        assertTrue(blank.deliver.isEmpty())
+        assertFalse(blank.consumed)
     }
 
     @Test
@@ -255,7 +307,7 @@ class SessionTest {
             repeatCount = 4,
             pending = down.pending,
         )
-        assertNull(repeat.deliver)
+        assertTrue(repeat.deliver.isEmpty())
         assertEquals(down.pending, repeat.pending)
     }
 }

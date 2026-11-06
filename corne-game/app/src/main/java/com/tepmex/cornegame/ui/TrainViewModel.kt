@@ -142,19 +142,35 @@ class TrainViewModel(
                 "LAYOUT kbd=${afterLayout.board.language ?: "-"} ${legendSample(afterLayout.legends)}",
             )
         }
-        val deliver = step.deliver
-        val applied = deliver?.let { applyAction(it, origin = null) }
-        val after = _state.value
-        debug(
-            formatUiReaction(
-                before = before,
-                after = after,
-                action = deliver,
-                ignored = applied?.ignored == true,
-                mistake = applied?.mistake == true,
-                moved = applied?.moved == true,
-            ),
-        )
+        if (step.deliver.isEmpty()) {
+            debug(
+                formatUiReaction(
+                    before = before,
+                    after = _state.value,
+                    action = null,
+                    ignored = false,
+                    mistake = false,
+                    moved = false,
+                ),
+            )
+            return
+        }
+        var cursor = before
+        for (action in step.deliver) {
+            val applied = applyAction(action, origin = null)
+            val after = _state.value
+            debug(
+                formatUiReaction(
+                    before = cursor,
+                    after = after,
+                    action = action,
+                    ignored = applied.ignored,
+                    mistake = applied.mistake,
+                    moved = applied.moved,
+                ),
+            )
+            cursor = after
+        }
     }
 
     fun onPointer(

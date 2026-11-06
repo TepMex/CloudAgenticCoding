@@ -4,6 +4,7 @@ import com.tepmex.cornegame.data.AppSettings
 import com.tepmex.cornegame.data.FileSessionHistory
 import com.tepmex.cornegame.data.FileSettingsStore
 import com.tepmex.cornegame.domain.HARDWARE_DOWN
+import com.tepmex.cornegame.domain.HARDWARE_MULTIPLE
 import com.tepmex.cornegame.domain.HARDWARE_UP
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.Latch
@@ -126,6 +127,42 @@ class DebugLogTest {
         assertTrue(text.contains("idx 0→1"))
         assertTrue(text.contains("hi="))
         assertTrue(text.contains("cap=\""))
+    }
+
+    @Test
+    fun unknownMultipleCharacterAdvancesTheLesson() {
+        val viewModel = viewModel()
+        val expected = viewModel.state.value.session.nextChar
+        check(expected != null)
+        val before = viewModel.debugBaseline()
+        val step = stepHardware(
+            phase = HARDWARE_MULTIPLE,
+            keyCode = 0,
+            unicodeChar = 0,
+            shiftDown = false,
+            altDown = false,
+            repeatCount = 0,
+            pending = emptyMap(),
+            characters = expected.toString(),
+        )
+        viewModel.onHardwareKey(
+            before,
+            HardwareKeyTrace(
+                phase = HARDWARE_MULTIPLE,
+                keyCode = 0,
+                keyLabel = "KEYCODE_UNKNOWN",
+                characters = expected.toString(),
+            ),
+            step,
+        )
+        assertEquals(1, viewModel.state.value.session.index)
+        val text = viewModel.debugLog.value.joinToString("\n")
+        assertTrue(text.contains("KEY multiple code=0 KEYCODE_UNKNOWN"))
+        assertTrue(text.contains("chars=\"$expected\""))
+        assertTrue(text.contains("deliver=char"))
+        assertTrue(text.contains("action=char"))
+        assertTrue(text.contains("OK"))
+        assertTrue(text.contains("idx 0→1"))
     }
 
     @Test
