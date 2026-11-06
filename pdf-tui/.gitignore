@@ -1,0 +1,16 @@
+# Cargo build output (keep Cargo.lock for reproducible application builds)
+/target/
+
+# Rust tooling backups and profiling output
+**/*.rs.bk
+*.profraw
+*.profdata
+
+# Local editor and OS files
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
