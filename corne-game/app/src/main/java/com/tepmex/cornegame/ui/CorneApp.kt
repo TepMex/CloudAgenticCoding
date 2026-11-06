@@ -2,7 +2,9 @@ package com.tepmex.cornegame.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -13,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun CorneApp(viewModel: TrainViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val debugLog by viewModel.debugLog.collectAsStateWithLifecycle()
     ErrorFeedback(
         errorNonce = state.errorNonce,
         enabled = state.settings.vibrate,
@@ -23,36 +26,43 @@ fun CorneApp(viewModel: TrainViewModel) {
         viewModel.closeOverlay()
     }
     Scaffold { padding ->
-        Box(
+        Column(
             Modifier
                 .padding(padding)
                 .fillMaxSize(),
         ) {
-            when (state.screen) {
-                AppScreen.Train -> TrainScreen(
-                    state = state,
-                    onAction = viewModel::onTrainerAction,
-                    onLanguage = viewModel::setLanguage,
-                    onOpenProgress = viewModel::openProgress,
-                    onOpenSettings = viewModel::openSettings,
-                    onContact = viewModel::onKeyContact,
-                )
-                AppScreen.Results -> ResultsScreen(
-                    state = state,
-                    onAgain = viewModel::restart,
-                    onLanguage = viewModel::setLanguage,
-                    onOpenProgress = viewModel::openProgress,
-                )
-                AppScreen.Progress -> ProgressScreen(
-                    history = state.history,
-                    onBack = viewModel::closeOverlay,
-                )
-                AppScreen.Settings -> SettingsScreen(
-                    settings = state.settings,
-                    onBack = viewModel::closeOverlay,
-                    onChange = viewModel::updateSettings,
-                )
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (state.screen) {
+                    AppScreen.Train -> TrainScreen(
+                        state = state,
+                        onAction = viewModel::onTrainerAction,
+                        onLanguage = viewModel::setLanguage,
+                        onOpenProgress = viewModel::openProgress,
+                        onOpenSettings = viewModel::openSettings,
+                        onContact = viewModel::onKeyContact,
+                        onPointer = viewModel::onPointer,
+                    )
+                    AppScreen.Results -> ResultsScreen(
+                        state = state,
+                        onAgain = viewModel::restart,
+                        onLanguage = viewModel::setLanguage,
+                        onOpenProgress = viewModel::openProgress,
+                    )
+                    AppScreen.Progress -> ProgressScreen(
+                        history = state.history,
+                        onBack = viewModel::closeOverlay,
+                    )
+                    AppScreen.Settings -> SettingsScreen(
+                        settings = state.settings,
+                        onBack = viewModel::closeOverlay,
+                        onChange = viewModel::updateSettings,
+                    )
+                }
             }
+            DebugLogBar(
+                lines = debugLog,
+                onClear = viewModel::clearDebug,
+            )
         }
     }
 }

@@ -119,6 +119,7 @@ fun CorneKeyboard(
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit = { _, _ -> },
+    onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit = { _, _, _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val flash = remember { Animatable(0f) }
@@ -168,6 +169,7 @@ fun CorneKeyboard(
                         lastWrong = lastWrong,
                         onAction = onAction,
                         onContact = onContact,
+                        onPointer = onPointer,
                     )
                     KeyboardHalf(
                         rows = model.rightRows,
@@ -180,6 +182,7 @@ fun CorneKeyboard(
                         lastWrong = lastWrong,
                         onAction = onAction,
                         onContact = onContact,
+                        onPointer = onPointer,
                     )
                 }
             }
@@ -199,6 +202,7 @@ private fun KeyboardHalf(
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
+    onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         rows.forEach { row ->
@@ -218,6 +222,7 @@ private fun KeyboardHalf(
                             lastWrong = lastWrong,
                             onAction = onAction,
                             onContact = onContact,
+                            onPointer = onPointer,
                             modifier = Modifier
                                 .offset(y = drop)
                                 .size(keySize),
@@ -239,11 +244,14 @@ private fun KeyButton(
     lastWrong: Char?,
     onAction: (TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
+    onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tap by rememberUpdatedState(face.tap)
+    val legend by rememberUpdatedState(face.legend)
     val contact by rememberUpdatedState(onContact)
     val action by rememberUpdatedState(onAction)
+    val pointer by rememberUpdatedState(onPointer)
     val scheme = MaterialTheme.colorScheme
     val base = when {
         fingerColors -> face.finger.zoneColor()
@@ -283,6 +291,7 @@ private fun KeyButton(
                 contentDescription = "Клавиша ${face.legend.ifEmpty { face.id.toString() }}"
                 role = Role.Button
                 onClick {
+                    pointer("click", face.id, legend, tap, true)
                     action(tap)
                     true
                 }
@@ -291,9 +300,12 @@ private fun KeyButton(
                 detectTapGestures(
                     onPress = {
                         val started = tap
+                        val name = legend
+                        pointer("down", face.id, name, started, null)
                         val modifier = started.isHoldModifier()
                         if (modifier) contact(started, true)
                         val released = tryAwaitRelease()
+                        pointer("up", face.id, name, started, released)
                         if (modifier) contact(started, false)
                         else if (released) action(tap)
                     },

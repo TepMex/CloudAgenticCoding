@@ -43,6 +43,7 @@ fun TrainScreen(
     onOpenProgress: () -> Unit,
     onOpenSettings: () -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
+    onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -103,6 +104,7 @@ fun TrainScreen(
             lastWrong = state.lastWrong,
             onAction = onAction,
             onContact = onContact,
+            onPointer = onPointer,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
