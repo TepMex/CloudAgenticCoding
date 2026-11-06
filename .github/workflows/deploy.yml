@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'djvu-tui/**'
   workflow_dispatch:
     inputs:
       full_deploy:
