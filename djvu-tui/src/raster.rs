@@ -5,28 +5,36 @@
 pub enum Symbols {
     #[default]
     Braille,
+    BrailleFilled,
     Blocks,
+    Mosaic,
 }
 
 impl Symbols {
     pub fn samples(self) -> (u32, u32) {
         match self {
             Self::Braille => (2, 4),
+            Self::BrailleFilled => (4, 8),
             Self::Blocks => (2, 2),
+            Self::Mosaic => (4, 4),
         }
     }
 
     pub fn toggle(&mut self) {
         *self = match self {
-            Self::Braille => Self::Blocks,
-            Self::Blocks => Self::Braille,
+            Self::Braille => Self::BrailleFilled,
+            Self::BrailleFilled => Self::Blocks,
+            Self::Blocks => Self::Mosaic,
+            Self::Mosaic => Self::Braille,
         };
     }
 
     pub fn name(self) -> &'static str {
         match self {
             Self::Braille => "braille",
+            Self::BrailleFilled => "braille+fill",
             Self::Blocks => "blocks",
+            Self::Mosaic => "mosaic (experimental)",
         }
     }
 }
@@ -97,6 +105,10 @@ impl CellGrid {
     }
 }
 
+#[path = "mosaic_templates.rs"]
+mod mosaic_templates;
+const MOSAIC_LOOKUP: &[u8; 65536] = include_bytes!(concat!(env!("OUT_DIR"), "/mosaic_lookup.bin"));
+
 const BRAILLE_BITS: [[u8; 2]; 4] = [[0, 3], [1, 4], [2, 5], [6, 7]];
 const QUADRANTS: [char; 16] = [
     ' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█',
@@ -115,13 +127,16 @@ pub fn render(
         image.pixels.len(),
         image.width as usize * image.height as usize
     );
+    if symbols == Symbols::BrailleFilled {
+        return render_filled(image, threshold, dither, origin);
+    }
     let (sx, sy) = symbols.samples();
     let width = image.width.div_ceil(sx);
     let height = image.height.div_ceil(sy);
     let mut cells = Vec::with_capacity(width as usize * height as usize);
     for row in 0..height {
         for col in 0..width {
-            let mut mask = 0u8;
+            let mut mask = 0u16;
             for y in 0..sy {
                 for x in 0..sx {
                     let (px, py) = (col * sx + x, row * sy + y);
@@ -139,7 +154,9 @@ pub fn render(
                     if ink {
                         let bit = match symbols {
                             Symbols::Braille => BRAILLE_BITS[y as usize][x as usize],
+                            Symbols::BrailleFilled => unreachable!(),
                             Symbols::Blocks => (y * 2 + x) as u8,
+                            Symbols::Mosaic => (y * 4 + x) as u8,
                         };
                         mask |= 1 << bit;
                     }
@@ -148,8 +165,75 @@ pub fn render(
             cells.push(match symbols {
                 Symbols::Braille if mask != 0 => char::from_u32(0x2800 + u32::from(mask)).unwrap(),
                 Symbols::Braille => ' ',
+                Symbols::BrailleFilled => unreachable!(),
                 Symbols::Blocks => QUADRANTS[mask as usize],
+                Symbols::Mosaic => {
+                    mosaic_templates::TEMPLATES[MOSAIC_LOOKUP[mask as usize] as usize].0
+                }
             });
+        }
+    }
+    CellGrid {
+        width,
+        height,
+        cells,
+    }
+}
+
+// Each Braille dot gets the average of a 2×2 high-resolution patch. A block
+// is used only when every sample agrees with an entire quadrant pattern.
+fn render_filled(image: &GrayImage, threshold: u8, dither: bool, origin: (u32, u32)) -> CellGrid {
+    let width = image.width.div_ceil(4);
+    let height = image.height.div_ceil(8);
+    let mut cells = Vec::with_capacity((width * height) as usize);
+    for row in 0..height {
+        for col in 0..width {
+            let mut quadrant_counts = [0u8; 4];
+            let mut dot_sums = [[0u16; 2]; 4];
+            for y in 0..8 {
+                for x in 0..4 {
+                    let (px, py) = (col * 4 + x, row * 8 + y);
+                    let value = if px < image.width && py < image.height {
+                        image.pixels[(py * image.width + px) as usize]
+                    } else {
+                        255
+                    };
+                    if value <= threshold {
+                        quadrant_counts[((y / 4) * 2 + x / 2) as usize] += 1;
+                    }
+                    dot_sums[(y / 2) as usize][(x / 2) as usize] += u16::from(value);
+                }
+            }
+            let exact = !dither && quadrant_counts.iter().all(|&n| n == 0 || n == 8);
+            if exact {
+                let mask = quadrant_counts
+                    .iter()
+                    .enumerate()
+                    .fold(0, |m, (i, &n)| m | (usize::from(n == 8) << i));
+                cells.push(QUADRANTS[mask]);
+            } else {
+                let mut mask = 0u32;
+                for y in 0..4 {
+                    for x in 0..2 {
+                        let value = dot_sums[y][x] / 4;
+                        let ink = if dither {
+                            let bx = (origin.0 / 2 + col * 2 + x as u32) % 4;
+                            let by = (origin.1 / 2 + row * 4 + y as u32) % 4;
+                            255 - value > u16::from(BAYER[by as usize][bx as usize]) * 16 + 8
+                        } else {
+                            value <= u16::from(threshold)
+                        };
+                        if ink {
+                            mask |= 1 << BRAILLE_BITS[y][x];
+                        }
+                    }
+                }
+                cells.push(if mask == 0 {
+                    ' '
+                } else {
+                    char::from_u32(0x2800 + mask).unwrap()
+                });
+            }
         }
     }
     CellGrid {
@@ -162,6 +246,80 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mosaic_templates_and_mode_cycle() {
+        for &(character, pattern) in mosaic_templates::TEMPLATES {
+            assert_eq!(
+                mosaic_templates::TEMPLATES[MOSAIC_LOOKUP[pattern as usize] as usize].0,
+                character
+            );
+        }
+        let mut mode = Symbols::Braille;
+        for expected in [
+            Symbols::BrailleFilled,
+            Symbols::Blocks,
+            Symbols::Mosaic,
+            Symbols::Braille,
+        ] {
+            mode.toggle();
+            assert_eq!(mode, expected);
+        }
+        let image = GrayImage {
+            width: 1,
+            height: 1,
+            pixels: vec![0],
+        };
+        assert_eq!(
+            render(&image, Symbols::Mosaic, 127, false, (0, 0))
+                .cells
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn filled_braille_requires_complete_quadrants() {
+        for (mask, &expected) in QUADRANTS.iter().enumerate() {
+            let pixels = (0..8)
+                .flat_map(|y| {
+                    (0..4).map(move |x| {
+                        if mask & (1 << ((y / 4) * 2 + x / 2)) != 0 {
+                            0
+                        } else {
+                            255
+                        }
+                    })
+                })
+                .collect();
+            let image = GrayImage {
+                width: 4,
+                height: 8,
+                pixels,
+            };
+            assert_eq!(
+                render(&image, Symbols::BrailleFilled, 127, false, (0, 0)).cells[0],
+                expected
+            );
+        }
+        let mut image = GrayImage {
+            width: 4,
+            height: 8,
+            pixels: vec![255; 32],
+        };
+        image.pixels[0] = 0;
+        assert_eq!(
+            render(&image, Symbols::BrailleFilled, 127, false, (0, 0)).cells,
+            vec![' ']
+        );
+        image.pixels[1] = 0;
+        image.pixels[4] = 0;
+        image.pixels[5] = 0;
+        assert_eq!(
+            render(&image, Symbols::BrailleFilled, 127, false, (0, 0)).cells,
+            vec!['⠁']
+        );
+    }
 
     #[test]
     fn all_braille_masks_and_dot_positions() {
@@ -207,7 +365,12 @@ mod tests {
 
     #[test]
     fn blank_solid_and_partial_cells() {
-        for symbols in [Symbols::Braille, Symbols::Blocks] {
+        for symbols in [
+            Symbols::Braille,
+            Symbols::BrailleFilled,
+            Symbols::Blocks,
+            Symbols::Mosaic,
+        ] {
             let (width, height) = symbols.samples();
             for value in [0, 255] {
                 let image = GrayImage {
@@ -220,7 +383,7 @@ mod tests {
                     glyph,
                     if value == 255 {
                         ' '
-                    } else if symbols == Symbols::Braille {
+                    } else if matches!(symbols, Symbols::Braille | Symbols::BrailleFilled) {
                         '⣿'
                     } else {
                         '█'

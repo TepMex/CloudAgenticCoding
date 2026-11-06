@@ -467,7 +467,7 @@ impl App {
             let popup = centred(area, 76, 22);
             frame.render_widget(Clear, popup);
             frame.render_widget(Paragraph::new(
-                "Files\n  ↑↓ select · Enter open · Backspace parent\n  o / Esc file browser · Esc return to document\n\nReading\n  Space / PgDown next · PgUp previous\n  g jump to page · + / - zoom · 0 fit\n  ↑↓←→ pan when zoomed\n  v auto / single / spread\n  r Braille / blocks · d Bayer dithering\n  i invert black and white\n\nFirst page is a cover. Spreads: 2–3, 4–5, …\nZoom focuses the selected page. UTF-8 required.\n\n? / Esc close help · q / Ctrl-C quit")
+                "Files\n  ↑↓ select · Enter open · Backspace parent\n  o / Esc file browser · Esc return to document\n\nReading\n  Space / PgDown next · PgUp previous\n  g jump to page · + / - zoom · 0 fit\n  ↑↓←→ pan when zoomed\n  v auto / single / spread\n  r Braille / fill / blocks / mosaic · d Bayer dithering\n  i invert black and white\n\nFirst page is a cover. Spreads: 2–3, 4–5, …\nZoom focuses the selected page. UTF-8 required.\n\n? / Esc close help · q / Ctrl-C quit")
                 .style(style).wrap(Wrap { trim: false }).block(Block::default().borders(Borders::ALL).title(" djvu-tui ")), popup);
         }
     }

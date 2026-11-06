@@ -22,7 +22,12 @@ fn decode_bilevel_colour_shared_dictionary_and_rotation() {
             assert_eq!((doc.pages()[0].width, doc.pages()[0].height), (480, 320));
         }
         let mut view = View::new(0.5);
-        for symbols in [Symbols::Braille, Symbols::Blocks] {
+        for symbols in [
+            Symbols::Braille,
+            Symbols::BrailleFilled,
+            Symbols::Blocks,
+            Symbols::Mosaic,
+        ] {
             for dither in [false, true] {
                 let layout = view.layout(doc.pages(), (100, 40));
                 let first = doc
@@ -63,7 +68,12 @@ fn region_render_matches_cell_crop_and_cancelled_work_is_reusable() {
     let mut doc = Document::from_bytes(support::bilevel()).unwrap();
     let mut view = View::new(0.5);
     let layout = view.layout(doc.pages(), (80, 40));
-    for symbols in [Symbols::Braille, Symbols::Blocks] {
+    for symbols in [
+        Symbols::Braille,
+        Symbols::BrailleFilled,
+        Symbols::Blocks,
+        Symbols::Mosaic,
+    ] {
         for dither in [false, true] {
             let whole = doc
                 .render(&layout, symbols, dither, &Cancellation::default())
