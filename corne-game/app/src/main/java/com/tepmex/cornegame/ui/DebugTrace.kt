@@ -174,7 +174,7 @@ internal fun formatPending(pending: Map<Int, TrainerAction>): String =
     }
 
 internal fun formatStep(step: HardwareStep): String {
-    val deliver = step.deliver?.traceLabel() ?: "-"
+    val deliver = step.deliver.joinToString(",") { it.traceLabel() }.ifEmpty { "-" }
     return "STEP consumed=${bit(step.consumed)} deliver=$deliver " +
         "shift=${bit(step.shiftDown)} alt=${bit(step.altDown)} pending=${formatPending(step.pending)}"
 }

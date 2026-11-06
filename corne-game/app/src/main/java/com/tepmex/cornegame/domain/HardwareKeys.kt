@@ -8,6 +8,8 @@ package com.tepmex.cornegame.domain
  * Регистр не срезается: прописная приходит как unicode уже с Shift.
  * Enter на Cornedeon 2M — клавиша слоя знаков, не пробел.
  * Смена языка с аппаратной клавиатуры — Shift при зажатом Alt.
+ * Буква вне виртуальной карты (в логе «э») приходит не парой DOWN/UP,
+ * а одним ACTION_MULTIPLE: код UNKNOWN и строка getCharacters().
  */
 object AndroidKeyCodes {
     const val ALT_LEFT = 57
@@ -20,13 +22,14 @@ object AndroidKeyCodes {
     const val NUMPAD_ENTER = 160
 }
 
-/** ACTION_DOWN / ACTION_UP, те же числа, что у Android KeyEvent. */
+/** ACTION_DOWN / ACTION_UP / ACTION_MULTIPLE, те же числа, что у Android KeyEvent. */
 const val HARDWARE_DOWN = 0
 const val HARDWARE_UP = 1
+const val HARDWARE_MULTIPLE = 2
 
 data class HardwareStep(
     val pending: Map<Int, TrainerAction>,
-    val deliver: TrainerAction?,
+    val deliver: List<TrainerAction>,
     val shiftDown: Boolean,
     val altDown: Boolean,
     val consumed: Boolean,
@@ -37,6 +40,10 @@ data class HardwareStep(
  * У части Bluetooth-клавиатур на UP unicode уже 0: если смотреть только UP,
  * нажатие пропадает, хотя буква на DOWN была.
  * Повтор зажатой клавиши в сессию не идёт.
+ *
+ * [characters] — строка KeyEvent.getCharacters(). Её присылает ACTION_MULTIPLE,
+ * когда символа нет в виртуальной карте: unicode пустой, код UNKNOWN.
+ * Такую букву отдаём сразу, пары UP у события нет.
  */
 fun stepHardware(
     phase: Int,
@@ -46,11 +53,18 @@ fun stepHardware(
     altDown: Boolean,
     repeatCount: Int,
     pending: Map<Int, TrainerAction>,
+    characters: String? = null,
 ): HardwareStep {
+    if (phase == HARDWARE_MULTIPLE) {
+        val typed = actionsFromCharacters(characters)
+        if (typed.isNotEmpty()) {
+            return HardwareStep(pending, typed, shiftDown, altDown, consumed = true)
+        }
+    }
     if (phase != HARDWARE_DOWN && phase != HARDWARE_UP) {
         return HardwareStep(
             pending = pending - keyCode,
-            deliver = null,
+            deliver = emptyList(),
             shiftDown = shiftDown,
             altDown = altDown,
             consumed = keyCode in pending,
@@ -58,18 +72,36 @@ fun stepHardware(
     }
     if (phase == HARDWARE_DOWN) {
         if (repeatCount > 0) {
-            return HardwareStep(pending, null, shiftDown, altDown, consumed = keyCode in pending)
+            return HardwareStep(pending, emptyList(), shiftDown, altDown, consumed = keyCode in pending)
         }
         val mapped = mapHardwareKey(keyCode, unicodeChar, altDown)
-            ?: return HardwareStep(pending, null, shiftDown, altDown, consumed = false)
-        return HardwareStep(pending + (keyCode to mapped), null, shiftDown, altDown, consumed = true)
+            ?: return HardwareStep(pending, emptyList(), shiftDown, altDown, consumed = false)
+        return HardwareStep(pending + (keyCode to mapped), emptyList(), shiftDown, altDown, consumed = true)
     }
     pending[keyCode]?.let { saved ->
-        return HardwareStep(pending - keyCode, saved, shiftDown, altDown, consumed = true)
+        return HardwareStep(pending - keyCode, listOf(saved), shiftDown, altDown, consumed = true)
     }
     val mapped = mapHardwareKey(keyCode, unicodeChar, altDown)
-        ?: return HardwareStep(pending, null, shiftDown, altDown, consumed = false)
-    return HardwareStep(pending, mapped, shiftDown, altDown, consumed = true)
+        ?: return HardwareStep(pending, emptyList(), shiftDown, altDown, consumed = false)
+    return HardwareStep(pending, listOf(mapped), shiftDown, altDown, consumed = true)
+}
+
+/**
+ * Символы из ACTION_MULTIPLE. Перевод строки и таб по-прежнему не ввод:
+ * Enter на этой клавиатуре — слой, не пробел.
+ */
+internal fun actionsFromCharacters(characters: String?): List<TrainerAction> {
+    if (characters.isNullOrEmpty()) return emptyList()
+    val out = ArrayList<TrainerAction>(characters.length)
+    var index = 0
+    while (index < characters.length) {
+        val code = characters.codePointAt(index)
+        if (code in 1..0xFFFF) {
+            mapHardwareKey(0, code)?.let { out += it }
+        }
+        index += Character.charCount(code)
+    }
+    return out
 }
 
 fun mapHardwareKey(keyCode: Int, unicodeChar: Int, altPressed: Boolean = false): TrainerAction? {
