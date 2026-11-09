@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">НЕДЕЛЯ</string>
     <string name="tab_week">Неделя</string>
+    <string name="tab_step">Шаг</string>
     <string name="tab_archive">Архив</string>
     <string name="tab_settings">Настройки</string>
     <string name="week_title">Неделя</string>
@@ -28,6 +29,22 @@
     <string name="delete_task_confirm">Удалить задачу?</string>
     <string name="progress">%1$d из %2$d</string>
     <string name="archive_empty">Завершённых недель пока нет. В ленте новые недели стоят внизу.</string>
+    <string name="copy_plan">Скопировать план</string>
+    <string name="plan_done">выполнено</string>
+    <string name="plan_not_done">не выполнено</string>
+    <string name="notice_plan_copied">План скопирован</string>
+    <string name="notice_plan_copy_failed">Не удалось скопировать</string>
+    <string name="step_compare">Сравнение</string>
+    <string name="step_rating">Рейтинг</string>
+    <string name="step_prompt">Что сделать следующим?</string>
+    <string name="step_empty">На этой неделе нет невыполненных дел.</string>
+    <string name="step_need_two">Нужны хотя бы два невыполненных дела, чтобы выбрать следующий шаг.</string>
+    <string name="step_draw">Ничья</string>
+    <string name="step_skip">Пропустить</string>
+    <string name="step_undo">Отменить выбор</string>
+    <string name="step_open_count">не выполнено: %1$d</string>
+    <string name="step_rating_meta">%1$d · сравнений %2$d</string>
+    <string name="step_choose">Выбрать %1$s</string>
     <string name="settings_debug">Отладочный режим</string>
     <string name="settings_debug_help">Подменяет дату устройства. Планы пишутся в ту же базу.</string>
     <string name="debug_new_monday">Новый понедельник</string>
@@ -36,7 +53,7 @@
     <string name="debug_real">Реальное время</string>
     <string name="debug_clear">Очистить данные</string>
     <string name="clear_title">Удалить все данные?</string>
-    <string name="clear_body">Спринты, блоки и задачи будут стёрты с этого устройства.</string>
+    <string name="clear_body">Спринты, блоки, задачи и рейтинг шага будут стёрты с этого устройства.</string>
     <string name="debug_date">Сейчас для приложения: %1$s</string>
     <string name="debug_planning_on">Планирование открыто</string>
     <string name="debug_planning_off">Планирование закрыто</string>

@@ -17,6 +17,7 @@ import kotlinx.coroutines.sync.withLock
 class WeekRepository(
     private val db: WeekDatabase,
     private val dao: WeekDao,
+    private val stepDao: StepDao,
 ) {
     private val gate = Mutex()
 
@@ -142,6 +143,8 @@ class WeekRepository(
             dao.deleteAllTasks()
             dao.deleteAllBlocks()
             dao.deleteAllSprints()
+            stepDao.deleteAllComparisons()
+            stepDao.deleteAllRatings()
         }
     }
 

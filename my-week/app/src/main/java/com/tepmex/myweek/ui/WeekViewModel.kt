@@ -8,15 +8,23 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.tepmex.myweek.MyWeekApp
 import com.tepmex.myweek.data.EmojiMemory
+import com.tepmex.myweek.data.StepRepository
 import com.tepmex.myweek.data.WeekRepository
 import com.tepmex.myweek.data.WeekSettings
 import com.tepmex.myweek.domain.DebugCalendar
 import com.tepmex.myweek.domain.EmojiChoices
 import com.tepmex.myweek.domain.Palette
 import com.tepmex.myweek.domain.Sprint
+import com.tepmex.myweek.domain.StepElo
+import com.tepmex.myweek.domain.StepGroups
+import com.tepmex.myweek.domain.StepOption
+import com.tepmex.myweek.domain.StepPairs
+import com.tepmex.myweek.domain.StepStanding
+import com.tepmex.myweek.domain.Task
 import com.tepmex.myweek.domain.TaskText
 import com.tepmex.myweek.domain.WeekPhase
 import com.tepmex.myweek.domain.WeekRules
+import kotlin.math.roundToInt
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,10 +42,42 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-enum class Tab { Week, Archive, Settings }
+enum class Tab { Week, Step, Archive, Settings }
 
-enum class Notice { PlanningClosed, NotThisWeek, SaveFailed, AlreadyOrdinary, AlreadyReal }
+enum class Notice {
+    PlanningClosed,
+    NotThisWeek,
+    SaveFailed,
+    AlreadyOrdinary,
+    AlreadyReal,
+    PlanCopied,
+    PlanCopyFailed,
+}
+
+enum class StepPane { Compare, Rating }
+
+data class StepCard(
+    val key: String,
+    val emoji: String,
+    val label: String,
+    val openCount: Int,
+    val rating: Int,
+    val comparisonCount: Int,
+    val rank: Int,
+)
+
+data class StepUi(
+    val pane: StepPane,
+    val loading: Boolean,
+    val cards: List<StepCard>,
+    val left: StepCard?,
+    val right: StepCard?,
+    val canUndo: Boolean,
+    val busy: Boolean,
+)
 
 sealed interface Editor {
     val identity: String
@@ -89,6 +129,7 @@ data class SettingsUi(
 
 class WeekViewModel(
     private val repository: WeekRepository,
+    private val steps: StepRepository,
     private val settings: WeekSettings,
     private val emojiMemory: EmojiMemory,
     versionName: String,
@@ -98,6 +139,11 @@ class WeekViewModel(
 
     val tab = MutableStateFlow(Tab.Week)
     val editor = MutableStateFlow<Editor?>(null)
+    private val stepPane = MutableStateFlow(StepPane.Compare)
+    private val pairKeys = MutableStateFlow<Pair<String, String>?>(null)
+    private val stepBusy = MutableStateFlow(false)
+    private val pairGate = Mutex()
+    private val pairs = StepPairs()
     val notices = MutableSharedFlow<Notice>(extraBufferCapacity = 4)
     val emojiChoices: StateFlow<List<String>> = combine(
         repository.observeEmojiUsage(),
@@ -135,6 +181,40 @@ class WeekViewModel(
     val archive: StateFlow<ArchiveUi> = repository.observeArchived()
         .flatMapLatest { sprints -> flowOf(ArchiveUi.Ready(sprints)) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ArchiveUi.Loading)
+
+    val step: StateFlow<StepUi> = combine(
+        combine(
+            home,
+            steps.observeStandings(),
+            steps.observeComparisonCount(),
+            pairKeys,
+        ) { week, standings, comparisons, pair ->
+            StepSnap(week, standings, comparisons, pair)
+        },
+        stepPane,
+        stepBusy,
+    ) { snap, pane, busy ->
+        if (snap.week is HomeUi.Loading) {
+            StepUi(pane, loading = true, cards = emptyList(), left = null, right = null, canUndo = snap.comparisons > 0, busy = busy)
+        } else {
+            val tasks = (snap.week as HomeUi.Ready).sprint?.blocks?.flatMap { it.tasks }.orEmpty()
+            val cards = stepCards(StepGroups.active(tasks, snap.standings))
+            val byKey = cards.associateBy { it.key }
+            StepUi(
+                pane = pane,
+                loading = false,
+                cards = cards,
+                left = snap.pair?.first?.let(byKey::get),
+                right = snap.pair?.second?.let(byKey::get),
+                canUndo = snap.comparisons > 0,
+                busy = busy,
+            )
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        StepUi(StepPane.Compare, loading = true, cards = emptyList(), left = null, right = null, canUndo = false, busy = false),
+    )
 
     val settingsUi: StateFlow<SettingsUi> = combine(settings.debug, settings.overrideDate, home) { debug, override, homeUi ->
         val ready = homeUi as? HomeUi.Ready
@@ -192,9 +272,64 @@ class WeekViewModel(
             emojiMemory.rememberAll(usage.keys, seen)
         }
         publishClock()
+        watchStepPairs()
     }
 
     fun onVisible() = publishClock()
+
+    fun setStepPane(pane: StepPane) {
+        stepPane.value = pane
+    }
+
+    fun chooseStep(leftKey: String, rightKey: String, outcome: StepElo.Outcome) {
+        viewModelScope.launch(Dispatchers.IO) {
+            pairGate.withLock {
+                val pair = pairKeys.value ?: return@withLock
+                if (pair.first != leftKey || pair.second != rightKey) return@withLock
+                val active = StepGroups.active(currentTasks(), steps.standings())
+                val left = active.firstOrNull { it.key == leftKey } ?: return@withLock
+                val right = active.firstOrNull { it.key == rightKey } ?: return@withLock
+                stepBusy.value = true
+                try {
+                    steps.record(left, right, outcome)
+                    reselectStep(activeAfter = null)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "step compare failed", e)
+                    notices.tryEmit(Notice.SaveFailed)
+                } finally {
+                    stepBusy.value = false
+                }
+            }
+        }
+    }
+
+    fun undoStep() {
+        viewModelScope.launch(Dispatchers.IO) {
+            pairGate.withLock {
+                stepBusy.value = true
+                try {
+                    if (steps.undo()) reselectStep(activeAfter = null)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "step undo failed", e)
+                    notices.tryEmit(Notice.SaveFailed)
+                } finally {
+                    stepBusy.value = false
+                }
+            }
+        }
+    }
+
+    fun noteCopied() {
+        notices.tryEmit(Notice.PlanCopied)
+    }
+
+    fun noteCopyFailed() {
+        notices.tryEmit(Notice.PlanCopyFailed)
+    }
 
     fun selectTab(next: Tab) {
         tab.value = next
@@ -380,6 +515,34 @@ class WeekViewModel(
         }
     }
 
+    private fun watchStepPairs() {
+        viewModelScope.launch {
+            combine(home, steps.observeStandings()) { week, standings ->
+                val ready = week as? HomeUi.Ready ?: return@combine null
+                StepGroups.active(ready.sprint?.blocks?.flatMap { it.tasks }.orEmpty(), standings)
+            }.collect { active ->
+                if (active == null) return@collect
+                pairGate.withLock {
+                    val current = pairKeys.value
+                    val keys = active.map { it.key }.toSet()
+                    if (current != null && current.first in keys && current.second in keys) return@withLock
+                    reselectStep(active)
+                }
+            }
+        }
+    }
+
+    private suspend fun reselectStep(activeAfter: List<StepOption>?) {
+        val active = activeAfter ?: StepGroups.active(currentTasks(), steps.standings())
+        val next = pairs.select(active, steps.history())
+        pairKeys.value = next?.let { it.leftKey to it.rightKey }
+    }
+
+    private fun currentTasks(): List<Task> {
+        val ready = home.value as? HomeUi.Ready ?: return emptyList()
+        return ready.sprint?.blocks?.flatMap { it.tasks }.orEmpty()
+    }
+
     private fun publishClock() {
         clock.trySend(settings.today())
     }
@@ -391,13 +554,33 @@ class WeekViewModel(
         return Duration.between(now, next).toMillis().coerceIn(1_000L, 86_400_000L)
     }
 
+    private data class StepSnap(
+        val week: HomeUi,
+        val standings: Map<String, StepStanding>,
+        val comparisons: Int,
+        val pair: Pair<String, String>?,
+    )
+
     companion object {
         private const val TAG = "MyWeek"
+
+        private fun stepCards(options: List<StepOption>): List<StepCard> =
+            options.mapIndexed { index, option ->
+                StepCard(
+                    key = option.key,
+                    emoji = option.emoji,
+                    label = option.label,
+                    openCount = option.openCount,
+                    rating = option.rating.roundToInt(),
+                    comparisonCount = option.comparisonCount,
+                    rank = index + 1,
+                )
+            }
 
         fun factory(app: MyWeekApp): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                WeekViewModel(app.repository, app.settings, app.emojiMemory, app.versionName) as T
+                WeekViewModel(app.repository, app.steps, app.settings, app.emojiMemory, app.versionName) as T
         }
     }
 }

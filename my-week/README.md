@@ -10,7 +10,8 @@ The UI is Russian.
 - Blocks with a name, a default emoji, and a translucent color. New tasks open with the block emoji
 - The emoji picker remembers ones you type and lists the most-used first
 - Checklist ticks for the whole week
-- Archive feed, oldest week on top, newest at the bottom
+- Archive feed, oldest week on top, newest at the bottom. Each week can be copied as plain text with emoji and done / not-done status
+- **Шаг**, between Неделя and Архив, pairs unfinished tasks of the current week and shows their Elo rating. Неделя stays the default tab
 - New week starts as a copy of the previous one, with ticks cleared
 - Debug mode with test dates: new Monday, ordinary day, next day, real time
 
