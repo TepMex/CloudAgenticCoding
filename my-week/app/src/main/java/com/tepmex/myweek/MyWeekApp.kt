@@ -3,12 +3,16 @@ package com.tepmex.myweek
 import android.app.Application
 import android.content.pm.PackageManager
 import com.tepmex.myweek.data.EmojiMemory
+import com.tepmex.myweek.data.StepRepository
 import com.tepmex.myweek.data.WeekDatabase
 import com.tepmex.myweek.data.WeekRepository
 import com.tepmex.myweek.data.WeekSettings
 
 class MyWeekApp : Application() {
     lateinit var repository: WeekRepository
+        private set
+
+    lateinit var steps: StepRepository
         private set
 
     lateinit var settings: WeekSettings
@@ -29,6 +33,7 @@ class MyWeekApp : Application() {
         settings = WeekSettings(this)
         emojiMemory = EmojiMemory(this)
         val database = WeekDatabase.create(this)
-        repository = WeekRepository(database, database.weekDao())
+        repository = WeekRepository(database, database.weekDao(), database.stepDao())
+        steps = StepRepository(database, database.stepDao())
     }
 }

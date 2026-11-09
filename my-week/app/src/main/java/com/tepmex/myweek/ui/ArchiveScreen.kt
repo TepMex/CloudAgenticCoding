@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,6 +25,7 @@ import com.tepmex.myweek.domain.Sprint
 @Composable
 fun ArchiveScreen(
     state: ArchiveUi,
+    onCopy: (Sprint) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sprints = (state as? ArchiveUi.Ready)?.sprints.orEmpty()
@@ -46,22 +49,30 @@ fun ArchiveScreen(
         contentPadding = PaddingValues(bottom = 12.dp, top = 12.dp),
     ) {
         items(items = sprints.asReversed(), key = { it.id }, contentType = { "sprint" }) { sprint ->
-            ArchivedSprint(sprint)
+            ArchivedSprint(sprint, onCopy)
         }
     }
 }
 
 @Composable
-private fun ArchivedSprint(sprint: Sprint) {
+private fun ArchivedSprint(sprint: Sprint, onCopy: (Sprint) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Text(
             text = sprintDate(sprint.weekStart),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 8.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
                 .semantics { heading() },
         )
+        TextButton(
+            onClick = { onCopy(sprint) },
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .heightIn(min = 48.dp),
+        ) {
+            Text(stringResource(R.string.copy_plan))
+        }
         if (sprint.blocks.isEmpty()) {
             Text(
                 text = stringResource(R.string.empty_tracking),

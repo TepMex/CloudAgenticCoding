@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -26,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.myweek.R
+import com.tepmex.myweek.domain.PlanText
 import com.tepmex.myweek.domain.WeekPhase
 
 @Composable
@@ -44,6 +48,8 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                 Notice.SaveFailed -> context.getString(R.string.notice_save_failed)
                 Notice.AlreadyOrdinary -> context.getString(R.string.notice_already_ordinary)
                 Notice.AlreadyReal -> context.getString(R.string.notice_already_real)
+                Notice.PlanCopied -> context.getString(R.string.notice_plan_copied)
+                Notice.PlanCopyFailed -> context.getString(R.string.notice_plan_copy_failed)
             }
             snackbar.showSnackbar(text)
         }
@@ -73,6 +79,12 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                         label = { Text(stringResource(R.string.tab_week)) },
                     )
                     NavigationBarItem(
+                        selected = tab == Tab.Step,
+                        onClick = { viewModel.selectTab(Tab.Step) },
+                        icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_step)) },
+                    )
+                    NavigationBarItem(
                         selected = tab == Tab.Archive,
                         onClick = { viewModel.selectTab(Tab.Archive) },
                         icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
@@ -98,6 +110,7 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                 onEditTask = viewModel::openTask,
                 modifier = contentModifier,
             )
+            Tab.Step -> StepRoute(viewModel, contentModifier)
             Tab.Archive -> ArchiveRoute(viewModel, contentModifier)
             Tab.Settings -> SettingsRoute(viewModel, contentModifier)
         }
@@ -140,9 +153,39 @@ fun WeekApp(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun StepRoute(viewModel: WeekViewModel, modifier: Modifier) {
+    val step by viewModel.step.collectAsStateWithLifecycle()
+    StepScreen(
+        state = step,
+        onPane = viewModel::setStepPane,
+        onChoose = viewModel::chooseStep,
+        onUndo = viewModel::undoStep,
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun ArchiveRoute(viewModel: WeekViewModel, modifier: Modifier) {
     val archive by viewModel.archive.collectAsStateWithLifecycle()
-    ArchiveScreen(state = archive, modifier = modifier)
+    val context = LocalContext.current
+    ArchiveScreen(
+        state = archive,
+        onCopy = { sprint ->
+            val text = PlanText.render(
+                sprint,
+                done = context.getString(R.string.plan_done),
+                notDone = context.getString(R.string.plan_not_done),
+            )
+            try {
+                context.getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText(context.getString(R.string.copy_plan), text))
+                viewModel.noteCopied()
+            } catch (_: RuntimeException) {
+                viewModel.noteCopyFailed()
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
