@@ -49,9 +49,11 @@ class MainActivity : ComponentActivity() {
     private val usbEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                UsbManager.ACTION_USB_DEVICE_ATTACHED,
-                UsbManager.ACTION_USB_DEVICE_DETACHED,
-                -> usb?.refresh()
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> usb?.refresh()
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    usb?.releaseActive()
+                    usb?.refresh()
+                }
             }
         }
     }
@@ -85,6 +87,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         noteOsMap(deviceId = -1)
         usb?.refresh()
+    }
+
+    override fun onPause() {
+        trainViewModel.releaseScreenHolds()
+        super.onPause()
     }
 
     override fun onDestroy() {

@@ -24,6 +24,7 @@ import com.tepmex.cornegame.domain.Resolved
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.TypingSession
 import com.tepmex.cornegame.domain.generatePrompt
+import com.tepmex.cornegame.domain.offeredCharacters
 import com.tepmex.cornegame.domain.serviceExercises
 import com.tepmex.cornegame.domain.shortcutExercises
 import java.io.File
@@ -281,7 +282,10 @@ class TrainViewModel(
         }
     }
 
-    /** Палец на Shift, Alt, L1 или L2. Пока зажат, легенды живые. Короткий тап защёлкивает. */
+    /**
+     * Палец на модификаторе. L1 и L2 только удерживаются: отпускание слой не защёлкивает.
+     * Короткий тап Shift по-прежнему защёлкивает регистр, Alt — шаг смены языка.
+     */
     fun onKeyContact(action: TrainerAction, down: Boolean) {
         if (!action.isScreenModifier()) return
         val before = _state.value
@@ -302,6 +306,11 @@ class TrainViewModel(
             debug("TOUCH down ${action.traceLabel()} | ${uiDelta(before, _state.value)}")
             return
         }
+        if (action == TrainerAction.Lower || action == TrainerAction.Upper) {
+            if (screenModifierUsed) screenModifierUsed = false
+            debug("TOUCH up ${action.traceLabel()} MOMENTARY | ${uiDelta(before, _state.value)}")
+            return
+        }
         if (screenModifierUsed) {
             screenModifierUsed = false
             debug("TOUCH up ${action.traceLabel()} HOLD-USED | ${uiDelta(before, _state.value)}")
@@ -315,6 +324,30 @@ class TrainViewModel(
         onTrainerAction(action)
     }
 
+    /** Палец ушёл, жест отменён, экран закрыт или активность потеряла фокус. */
+    fun releaseScreenHolds() {
+        screenModifierUsed = false
+        _state.update { state ->
+            val board = state.board
+            if (!board.screenShift && !board.screenAlt && !board.screenCtrl && !board.screenMeta &&
+                !board.screenLower && !board.screenUpper
+            ) {
+                state
+            } else {
+                state.copy(
+                    board = board.copy(
+                        screenShift = false,
+                        screenAlt = false,
+                        screenCtrl = false,
+                        screenMeta = false,
+                        screenLower = false,
+                        screenUpper = false,
+                    ),
+                )
+            }
+        }
+    }
+
     fun onScreenKey(keyCode: Int, action: TrainerAction) {
         if (action.isScreenModifier()) return
         val current = _state.value
@@ -324,6 +357,12 @@ class TrainViewModel(
             if (blocking && action is TrainerAction.Character) {
                 screenModifierUsed = true
                 debug("ACTION screen ${action.traceLabel()} BLOCKED mods=$mods")
+                return
+            }
+            if (action is TrainerAction.Character &&
+                action.value !in offeredCharacters(current.session, current.board, current.legends)
+            ) {
+                applyAction(action, origin = "screen", forceMiss = true)
                 return
             }
             applyAction(action, origin = "screen")
@@ -356,7 +395,7 @@ class TrainViewModel(
         applyAction(action, origin = "screen")
     }
 
-    private fun applyAction(action: TrainerAction, origin: String?): ApplyResult {
+    private fun applyAction(action: TrainerAction, origin: String?, forceMiss: Boolean = false): ApplyResult {
         val current = _state.value
         if (action is TrainerAction.Character &&
             (
@@ -375,7 +414,11 @@ class TrainViewModel(
             }
             return ApplyResult(ignored = true, mistake = false, moved = false)
         }
-        val (next, effect) = current.session.apply(action, clock())
+        val (next, effect) = if (forceMiss && action is TrainerAction.Character) {
+            current.session.rejectOffLayer(action.value, clock())
+        } else {
+            current.session.apply(action, clock())
+        }
         if (effect.completed && !current.session.completed) {
             persist(next)
         }
@@ -532,16 +575,19 @@ class TrainViewModel(
     }
 
     fun openProgress() {
+        releaseScreenHolds()
         _state.update { it.copy(screen = AppScreen.Progress, history = historyStore.load()) }
         debug("NAV Progress | ${uiSnapshot(_state.value)}")
     }
 
     fun openSettings() {
+        releaseScreenHolds()
         _state.update { it.copy(screen = AppScreen.Settings) }
         debug("NAV Settings | ${uiSnapshot(_state.value)}")
     }
 
     fun openUsb() {
+        releaseScreenHolds()
         _state.update { it.copy(screen = AppScreen.Usb) }
         debug("NAV Usb | ${uiSnapshot(_state.value)}")
     }
