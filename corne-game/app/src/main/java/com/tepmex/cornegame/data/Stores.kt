@@ -16,6 +16,7 @@ data class AppSettings(
     val vibrate: Boolean = true,
     val keyScale: Float = 1f,
     val language: Language = Language.EN,
+    val inputDiagnostics: Boolean = false,
 )
 
 data class SessionRecord(
@@ -51,6 +52,7 @@ class FileSettingsStore(private val file: File) : SettingsStore {
                 vibrate = json.optBoolean("vibrate", true),
                 keyScale = json.optDouble("keyScale", 1.0).toFloat().coerceIn(0.65f, 1f),
                 language = language,
+                inputDiagnostics = json.optBoolean("inputDiagnostics", false),
             )
         } catch (_: Exception) {
             AppSettings()
@@ -64,6 +66,7 @@ class FileSettingsStore(private val file: File) : SettingsStore {
             .put("vibrate", settings.vibrate)
             .put("keyScale", settings.keyScale.toDouble())
             .put("language", settings.language.name)
+            .put("inputDiagnostics", settings.inputDiagnostics)
         file.parentFile?.mkdirs()
         file.writeText(json.toString())
     }

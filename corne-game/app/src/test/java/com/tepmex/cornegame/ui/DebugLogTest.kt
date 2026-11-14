@@ -3,9 +3,12 @@ package com.tepmex.cornegame.ui
 import com.tepmex.cornegame.data.AppSettings
 import com.tepmex.cornegame.data.FileSessionHistory
 import com.tepmex.cornegame.data.FileSettingsStore
+import com.tepmex.cornegame.domain.AndroidKeyCodes
 import com.tepmex.cornegame.domain.HARDWARE_DOWN
 import com.tepmex.cornegame.domain.HARDWARE_MULTIPLE
 import com.tepmex.cornegame.domain.HARDWARE_UP
+import com.tepmex.cornegame.domain.HardwareEvent
+import com.tepmex.cornegame.domain.InputMachine
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.Latch
 import com.tepmex.cornegame.domain.LegendTable
@@ -68,65 +71,73 @@ class DebugLogTest {
     }
 
     @Test
-    fun releaseWithEmptyUnicodeStillAdvancesAndLogsTheHighlight() {
+    fun downWithEmptyUnicodeTypesTheLayoutCharacterAndUpDoesNotRepeatIt() {
         val viewModel = viewModel()
-        val expected = viewModel.state.value.session.nextChar
-        check(expected != null)
+        check(viewModel.state.value.session.nextChar == '(')
         val beforeDown = viewModel.debugBaseline()
         val down = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 45,
-            unicodeChar = expected.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
+            InputMachine(),
+            HardwareEvent(
+                phase = HARDWARE_DOWN,
+                keyCode = AndroidKeyCodes.DIGIT_9,
+                unicodeChar = 0,
+                shift = true,
+                language = Language.EN,
+                deviceId = 8,
+            ),
         )
+        viewModel.onHardwareModifiers(shift = true, alt = false)
         viewModel.onHardwareKey(
             beforeDown,
             HardwareKeyTrace(
                 phase = HARDWARE_DOWN,
-                keyCode = 45,
-                keyLabel = "KEYCODE_Q",
-                unicodeChar = expected.code,
+                keyCode = AndroidKeyCodes.DIGIT_9,
+                keyLabel = "KEYCODE_9",
+                unicodeChar = 0,
+                shift = true,
+                deviceId = 8,
             ),
             down,
         )
-        assertEquals(0, viewModel.state.value.session.index)
+        assertEquals(1, viewModel.state.value.session.index)
 
         val beforeUp = viewModel.debugBaseline()
         val up = stepHardware(
-            phase = HARDWARE_UP,
-            keyCode = 45,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = down.pending,
+            down.machine,
+            HardwareEvent(
+                phase = HARDWARE_UP,
+                keyCode = AndroidKeyCodes.DIGIT_9,
+                unicodeChar = 0,
+                shift = true,
+                language = Language.EN,
+                deviceId = 8,
+            ),
         )
         viewModel.onHardwareKey(
             beforeUp,
             HardwareKeyTrace(
                 phase = HARDWARE_UP,
-                keyCode = 45,
-                keyLabel = "KEYCODE_Q",
+                keyCode = AndroidKeyCodes.DIGIT_9,
+                keyLabel = "KEYCODE_9",
                 unicodeChar = 0,
+                deviceId = 8,
             ),
             up,
         )
 
         assertEquals(1, viewModel.state.value.session.index)
         val text = viewModel.debugLog.value.joinToString("\n")
-        assertTrue(text.contains("KEY down code=45 KEYCODE_Q"))
-        assertTrue(text.contains("pending=45:char"))
-        assertTrue(text.contains("KEY up code=45 KEYCODE_Q"))
+        assertTrue(text.contains("KEY down code=${AndroidKeyCodes.DIGIT_9} KEYCODE_9"))
+        assertTrue(text.contains("KEY up code=${AndroidKeyCodes.DIGIT_9} KEYCODE_9"))
         assertTrue(text.contains("uni=0"))
-        assertTrue(text.contains("deliver=char"))
-        assertTrue(text.contains("action=char"))
+        assertTrue(text.contains("deliver=char'('"))
+        assertTrue(text.contains("action=char'('"))
         assertTrue(text.contains("OK"))
         assertTrue(text.contains("idx 0→1"))
         assertTrue(text.contains("hi="))
         assertTrue(text.contains("cap=\""))
+        assertTrue(text.contains("source=PHYSICAL"))
+        assertEquals(1, text.split("idx 0→1").size - 1)
     }
 
     @Test
@@ -136,14 +147,13 @@ class DebugLogTest {
         check(expected != null)
         val before = viewModel.debugBaseline()
         val step = stepHardware(
-            phase = HARDWARE_MULTIPLE,
-            keyCode = 0,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
-            characters = expected.toString(),
+            InputMachine(),
+            HardwareEvent(
+                phase = HARDWARE_MULTIPLE,
+                keyCode = 0,
+                characters = expected.toString(),
+                deviceId = -1,
+            ),
         )
         viewModel.onHardwareKey(
             before,
@@ -152,6 +162,7 @@ class DebugLogTest {
                 keyCode = 0,
                 keyLabel = "KEYCODE_UNKNOWN",
                 characters = expected.toString(),
+                deviceId = -1,
             ),
             step,
         )
@@ -163,6 +174,7 @@ class DebugLogTest {
         assertTrue(text.contains("action=char"))
         assertTrue(text.contains("OK"))
         assertTrue(text.contains("idx 0→1"))
+        assertTrue(text.contains("source=TEXT"))
     }
 
     @Test
@@ -171,13 +183,13 @@ class DebugLogTest {
         val before = viewModel.debugBaseline()
         viewModel.onHardwareModifiers(shift = true, alt = false)
         val step = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 59,
-            unicodeChar = 0,
-            shiftDown = true,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
+            InputMachine(),
+            HardwareEvent(
+                phase = HARDWARE_DOWN,
+                keyCode = 59,
+                shift = true,
+                deviceId = 8,
+            ),
         )
         assertFalse(step.consumed)
         viewModel.onHardwareKey(
@@ -187,13 +199,14 @@ class DebugLogTest {
                 keyCode = 59,
                 keyLabel = "KEYCODE_SHIFT_LEFT",
                 shift = true,
+                deviceId = 8,
             ),
             step,
         )
         assertTrue(viewModel.state.value.board.hardwareShift)
         val text = viewModel.debugLog.value.joinToString("\n")
         assertTrue(text.contains("KEY down code=59 KEYCODE_SHIFT_LEFT"))
-        assertTrue(text.contains("STEP consumed=0 deliver=-"))
+        assertTrue(text.contains("consumed=0 deliver=-"))
         assertTrue(text.contains("Δ"))
         assertTrue(text.contains("hwS1"))
         assertTrue(text.contains("cap=\""))

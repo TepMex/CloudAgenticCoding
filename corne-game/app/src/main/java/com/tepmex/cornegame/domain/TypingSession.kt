@@ -10,6 +10,21 @@ sealed class TrainerAction {
 
     /** Alt удерживается, Shift отпущен: аппаратное сочетание смены языка. */
     data object AltShift : TrainerAction()
+    data object Ctrl : TrainerAction()
+    data object Meta : TrainerAction()
+
+    /** Непечатная клавиша. Текст упражнения её не ждёт. */
+    data class KeyPress(val keyCode: Int) : TrainerAction()
+
+    /**
+     * Сочетание. [modifiers] — виды модификаторов без различия левой и правой стороны.
+     * Засчитывается в момент нажатия основной клавиши, пока модификаторы удерживаются.
+     */
+    data class Shortcut(
+        val keyCode: Int,
+        val modifiers: Set<KeyModifier>,
+    ) : TrainerAction()
+
     data object Unexpected : TrainerAction()
 }
 
@@ -98,6 +113,11 @@ data class TypingSession(
             TrainerAction.Upper -> onLayer(Latch.UPPER, nowMs)
             TrainerAction.Alt -> onAlt(nowMs)
             TrainerAction.AltShift -> onAltShift(nowMs)
+            TrainerAction.Ctrl,
+            TrainerAction.Meta,
+            is TrainerAction.KeyPress,
+            is TrainerAction.Shortcut,
+            -> this to InputEffect(mistake = false, completed = false)
             TrainerAction.Unexpected -> fail(typed = '·', nowMs)
             is TrainerAction.Character -> onCharacter(action.value, nowMs)
         }
@@ -146,7 +166,9 @@ data class TypingSession(
 
     private fun onAltShift(nowMs: Long): Pair<TypingSession, InputEffect> {
         if (nextChar == LANGUAGE_SWITCH) return commitStep(nowMs)
-        return fail(typed = LANGUAGE_SWITCH, nowMs)
+        // Сочетание смены языка не является ошибкой, пока оно не стоит в задании.
+        // Событие при этом не перехватывается безусловно: его ещё видит система.
+        return this to InputEffect(mistake = false, completed = false)
     }
 
     private fun onCharacter(typed: Char, nowMs: Long): Pair<TypingSession, InputEffect> {

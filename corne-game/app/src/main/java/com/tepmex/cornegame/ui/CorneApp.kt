@@ -11,17 +11,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tepmex.cornegame.domain.UsbDiagnosticsController
 
 @Composable
-fun CorneApp(viewModel: TrainViewModel) {
+fun CorneApp(viewModel: TrainViewModel, usb: UsbDiagnosticsController) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val debugLog by viewModel.debugLog.collectAsStateWithLifecycle()
+    val firmware by usb.state.collectAsStateWithLifecycle()
     ErrorFeedback(
         errorNonce = state.errorNonce,
         enabled = state.settings.vibrate,
     )
     BackHandler(
-        enabled = state.screen == AppScreen.Progress || state.screen == AppScreen.Settings,
+        enabled = state.screen == AppScreen.Progress ||
+            state.screen == AppScreen.Settings ||
+            state.screen == AppScreen.Usb,
     ) {
         viewModel.closeOverlay()
     }
@@ -35,12 +39,14 @@ fun CorneApp(viewModel: TrainViewModel) {
                 when (state.screen) {
                     AppScreen.Train -> TrainScreen(
                         state = state,
-                        onAction = viewModel::onTrainerAction,
                         onLanguage = viewModel::setLanguage,
+                        onDrill = viewModel::setDrill,
                         onOpenProgress = viewModel::openProgress,
                         onOpenSettings = viewModel::openSettings,
                         onContact = viewModel::onKeyContact,
                         onPointer = viewModel::onPointer,
+                        onScreenKey = viewModel::onScreenKey,
+                        firmware = firmware,
                     )
                     AppScreen.Results -> ResultsScreen(
                         state = state,
@@ -56,6 +62,11 @@ fun CorneApp(viewModel: TrainViewModel) {
                         settings = state.settings,
                         onBack = viewModel::closeOverlay,
                         onChange = viewModel::updateSettings,
+                        onOpenUsb = viewModel::openUsb,
+                    )
+                    AppScreen.Usb -> UsbScreen(
+                        controller = usb,
+                        onBack = viewModel::closeOverlay,
                     )
                 }
             }

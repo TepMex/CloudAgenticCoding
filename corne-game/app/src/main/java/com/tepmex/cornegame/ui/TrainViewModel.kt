@@ -10,14 +10,22 @@ import com.tepmex.cornegame.data.FileSettingsStore
 import com.tepmex.cornegame.data.SessionHistoryStore
 import com.tepmex.cornegame.data.SessionRecord
 import com.tepmex.cornegame.data.SettingsStore
+import com.tepmex.cornegame.domain.ActionSession
+import com.tepmex.cornegame.domain.AndroidKeyCodes
 import com.tepmex.cornegame.domain.BoardLive
+import com.tepmex.cornegame.domain.DrillKind
 import com.tepmex.cornegame.domain.HardwareStep
 import com.tepmex.cornegame.domain.InputEffect
+import com.tepmex.cornegame.domain.InputSource
+import com.tepmex.cornegame.domain.KeyModifier
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LegendTable
+import com.tepmex.cornegame.domain.Resolved
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.TypingSession
 import com.tepmex.cornegame.domain.generatePrompt
+import com.tepmex.cornegame.domain.serviceExercises
+import com.tepmex.cornegame.domain.shortcutExercises
 import java.io.File
 import kotlin.random.Random
 import kotlinx.coroutines.delay
@@ -33,6 +41,7 @@ enum class AppScreen {
     Results,
     Progress,
     Settings,
+    Usb,
 }
 
 /**
@@ -49,6 +58,9 @@ data class TrainUiState(
     val history: List<SessionRecord>,
     val board: BoardLive = BoardLive(),
     val legends: LegendTable = LegendTable(),
+    val drill: DrillKind = DrillKind.TEXT,
+    val actionSession: ActionSession? = null,
+    val lastResolution: InputResolution? = null,
 )
 
 class TrainViewModel(
@@ -89,11 +101,36 @@ class TrainViewModel(
         }
     }
 
-    fun onHardwareModifiers(shift: Boolean, alt: Boolean) {
+    fun resolutionLanguage(): Language {
+        val current = _state.value
+        return if (current.drill == DrillKind.TEXT) current.session.typingLanguage else current.settings.language
+    }
+
+    fun onHardwareModifiers(
+        shift: Boolean,
+        alt: Boolean,
+        ctrl: Boolean = false,
+        meta: Boolean = false,
+    ) {
         _state.update { state ->
             val board = state.board
-            if (board.hardwareShift == shift && board.hardwareAlt == alt) state
-            else state.copy(board = board.copy(hardwareShift = shift, hardwareAlt = alt))
+            if (
+                board.hardwareShift == shift &&
+                board.hardwareAlt == alt &&
+                board.hardwareCtrl == ctrl &&
+                board.hardwareMeta == meta
+            ) {
+                state
+            } else {
+                state.copy(
+                    board = board.copy(
+                        hardwareShift = shift,
+                        hardwareAlt = alt,
+                        hardwareCtrl = ctrl,
+                        hardwareMeta = meta,
+                    ),
+                )
+            }
         }
     }
 
@@ -143,6 +180,7 @@ class TrainViewModel(
             )
         }
         if (step.deliver.isEmpty()) {
+            rememberResolution(trace, step, action = "-", matched = "none")
             debug(
                 formatUiReaction(
                     before = before,
@@ -156,14 +194,22 @@ class TrainViewModel(
             return
         }
         var cursor = before
-        for (action in step.deliver) {
-            val applied = applyAction(action, origin = null)
+        var matched = "none"
+        var label = "-"
+        for (resolved in step.deliver) {
+            val applied = route(resolved, origin = null)
+            matched = when {
+                applied.mistake -> "miss"
+                applied.moved -> "match"
+                else -> "ignored"
+            }
+            label = resolved.action.traceLabel()
             val after = _state.value
             debug(
                 formatUiReaction(
                     before = cursor,
                     after = after,
-                    action = action,
+                    action = resolved.action,
                     ignored = applied.ignored,
                     mistake = applied.mistake,
                     moved = applied.moved,
@@ -171,6 +217,38 @@ class TrainViewModel(
             )
             cursor = after
         }
+        rememberResolution(trace, step, action = label, matched = matched)
+    }
+
+    private fun rememberResolution(
+        trace: HardwareKeyTrace,
+        step: HardwareStep,
+        action: String,
+        matched: String,
+    ) {
+        val resolution = InputResolution(
+            source = step.source,
+            deviceId = trace.deviceId,
+            keyCode = trace.keyCode,
+            keyLabel = trace.keyLabel,
+            scanCode = trace.scanCode,
+            unicodeChar = trace.unicodeChar,
+            characters = trace.characters,
+            modifiers = step.heldModifiers,
+            language = step.language,
+            action = action,
+            matched = matched,
+        )
+        _state.update { it.copy(lastResolution = resolution) }
+        debug(formatResolution(resolution))
+    }
+
+    private fun route(resolved: Resolved, origin: String?): ApplyResult {
+        val current = _state.value
+        if (current.drill != DrillKind.TEXT && current.actionSession != null) {
+            return applyDrill(resolved, origin)
+        }
+        return applyAction(resolved.action, origin)
     }
 
     fun onPointer(
@@ -214,6 +292,8 @@ class TrainViewModel(
                 TrainerAction.Lower -> board.copy(screenLower = down)
                 TrainerAction.Upper -> board.copy(screenUpper = down)
                 TrainerAction.Alt -> board.copy(screenAlt = down)
+                TrainerAction.Ctrl -> board.copy(screenCtrl = down)
+                TrainerAction.Meta -> board.copy(screenMeta = down)
                 else -> board
             }
             state.copy(board = next)
@@ -225,10 +305,51 @@ class TrainViewModel(
         if (screenModifierUsed) {
             screenModifierUsed = false
             debug("TOUCH up ${action.traceLabel()} HOLD-USED | ${uiDelta(before, _state.value)}")
-        } else {
-            debug("TOUCH up ${action.traceLabel()} SHORT | ${uiDelta(before, _state.value)}")
-            onTrainerAction(action)
+            return
         }
+        if (action == TrainerAction.Ctrl || action == TrainerAction.Meta) {
+            debug("TOUCH up ${action.traceLabel()} SHORT | ${uiDelta(before, _state.value)}")
+            return
+        }
+        debug("TOUCH up ${action.traceLabel()} SHORT | ${uiDelta(before, _state.value)}")
+        onTrainerAction(action)
+    }
+
+    fun onScreenKey(keyCode: Int, action: TrainerAction) {
+        if (action.isScreenModifier()) return
+        val current = _state.value
+        val mods = heldMods(current.board)
+        val blocking = mods.any { it == KeyModifier.CTRL || it == KeyModifier.ALT || it == KeyModifier.META }
+        if (current.drill == DrillKind.TEXT) {
+            if (blocking && action is TrainerAction.Character) {
+                screenModifierUsed = true
+                debug("ACTION screen ${action.traceLabel()} BLOCKED mods=$mods")
+                return
+            }
+            applyAction(action, origin = "screen")
+            return
+        }
+        if (mods.isNotEmpty()) screenModifierUsed = true
+        val code = when (action) {
+            is TrainerAction.KeyPress -> action.keyCode
+            is TrainerAction.Shortcut -> action.keyCode
+            TrainerAction.Backspace -> AndroidKeyCodes.DEL
+            else -> keyCode
+        }
+        val resolvedAction = when {
+            code != 0 && (
+                blocking ||
+                    (KeyModifier.SHIFT in mods && action !is TrainerAction.Character && action !is TrainerAction.Backspace)
+                ) -> TrainerAction.Shortcut(code, mods)
+            else -> action
+        }
+        val resolved = Resolved(
+            action = resolvedAction,
+            keyCode = code,
+            modifiers = (resolvedAction as? TrainerAction.Shortcut)?.modifiers ?: emptySet(),
+            source = InputSource.UNKNOWN,
+        )
+        applyDrill(resolved, origin = "screen")
     }
 
     fun onTrainerAction(action: TrainerAction) {
@@ -238,7 +359,10 @@ class TrainViewModel(
     private fun applyAction(action: TrainerAction, origin: String?): ApplyResult {
         val current = _state.value
         if (action is TrainerAction.Character &&
-            (current.board.screenShift || current.board.screenLower || current.board.screenUpper)
+            (
+                current.board.screenShift || current.board.screenLower || current.board.screenUpper ||
+                    current.board.screenCtrl || current.board.screenAlt || current.board.screenMeta
+                )
         ) {
             screenModifierUsed = true
         }
@@ -280,6 +404,54 @@ class TrainViewModel(
         return ApplyResult(ignored = false, mistake = effect.mistake, moved = moved)
     }
 
+    private fun applyDrill(resolved: Resolved, origin: String?): ApplyResult {
+        val current = _state.value
+        val session = current.actionSession
+        if (session == null || current.screen != AppScreen.Train || session.completed) {
+            if (origin != null) {
+                debug("ACTION $origin ${resolved.action.traceLabel()} IGNORED screen=${current.screen}")
+            }
+            return ApplyResult(ignored = true, mistake = false, moved = false)
+        }
+        val (next, effect) = session.apply(resolved, clock())
+        _state.update {
+            it.copy(
+                actionSession = next,
+                screen = if (effect.completed) AppScreen.Results else it.screen,
+                errorNonce = if (effect.mistake) it.errorNonce + 1 else it.errorNonce,
+                lastWrong = wrongChar(resolved.action, effect) ?: it.lastWrong,
+                nowMs = clock(),
+            )
+        }
+        val after = _state.value
+        val moved = after.actionSession != current.actionSession || after.screen != current.screen
+        if (origin != null) {
+            val verdict = when {
+                effect.mistake -> "MISS"
+                moved -> "OK"
+                else -> "NOOP"
+            }
+            debug("ACTION $origin ${resolved.action.traceLabel()} $verdict | ${uiDelta(current, after)}")
+        }
+        return ApplyResult(ignored = false, mistake = effect.mistake, moved = moved)
+    }
+
+    fun setDrill(kind: DrillKind) {
+        if (kind == _state.value.drill) return
+        screenModifierUsed = false
+        _state.update {
+            it.copy(
+                drill = kind,
+                actionSession = if (kind == DrillKind.TEXT) null else newActionSession(kind),
+                screen = AppScreen.Train,
+                errorNonce = 0,
+                lastWrong = null,
+                nowMs = clock(),
+            )
+        }
+        debug("DRILL $kind | ${uiSnapshot(_state.value)}")
+    }
+
     fun setLanguage(language: Language) {
         // Повторный тап по уже выбранному языку сессию не трогает.
         if (language == _state.value.settings.language) return
@@ -297,9 +469,12 @@ class TrainViewModel(
                 board = it.board.copy(
                     screenShift = false,
                     screenAlt = false,
+                    screenCtrl = false,
+                    screenMeta = false,
                     screenLower = false,
                     screenUpper = false,
                 ),
+                actionSession = if (it.drill == DrillKind.TEXT) null else newActionSession(it.drill),
             )
         }
         val current = _state.value
@@ -309,19 +484,39 @@ class TrainViewModel(
     fun restart() {
         screenModifierUsed = false
         _state.update {
-            it.copy(
-                session = newSession(it.settings.language),
-                screen = AppScreen.Train,
-                errorNonce = 0,
-                lastWrong = null,
-                nowMs = clock(),
-                board = it.board.copy(
-                    screenShift = false,
-                    screenAlt = false,
-                    screenLower = false,
-                    screenUpper = false,
-                ),
-            )
+            if (it.drill != DrillKind.TEXT) {
+                it.copy(
+                    actionSession = newActionSession(it.drill),
+                    screen = AppScreen.Train,
+                    errorNonce = 0,
+                    lastWrong = null,
+                    nowMs = clock(),
+                    board = it.board.copy(
+                        screenShift = false,
+                        screenAlt = false,
+                        screenCtrl = false,
+                        screenMeta = false,
+                        screenLower = false,
+                        screenUpper = false,
+                    ),
+                )
+            } else {
+                it.copy(
+                    session = newSession(it.settings.language),
+                    screen = AppScreen.Train,
+                    errorNonce = 0,
+                    lastWrong = null,
+                    nowMs = clock(),
+                    board = it.board.copy(
+                        screenShift = false,
+                        screenAlt = false,
+                        screenCtrl = false,
+                        screenMeta = false,
+                        screenLower = false,
+                        screenUpper = false,
+                    ),
+                )
+            }
         }
         val current = _state.value
         debug("RESTART | target=\"${current.session.target}\" | ${uiSnapshot(current)}")
@@ -346,10 +541,20 @@ class TrainViewModel(
         debug("NAV Settings | ${uiSnapshot(_state.value)}")
     }
 
-    /** Назад из прогресса и настроек: к результату, если сессия уже кончилась. */
+    fun openUsb() {
+        _state.update { it.copy(screen = AppScreen.Usb) }
+        debug("NAV Usb | ${uiSnapshot(_state.value)}")
+    }
+
+    /** Назад из прогресса, настроек и USB: к результату, если сессия уже кончилась. */
     fun closeOverlay() {
         _state.update {
-            val screen = if (it.session.completed) AppScreen.Results else AppScreen.Train
+            val done = if (it.drill == DrillKind.TEXT) {
+                it.session.completed
+            } else {
+                it.actionSession?.completed == true
+            }
+            val screen = if (done) AppScreen.Results else AppScreen.Train
             it.copy(screen = screen)
         }
         debug("NAV ${_state.value.screen} | ${uiSnapshot(_state.value)}")
@@ -376,6 +581,22 @@ class TrainViewModel(
             target = generatePrompt(language, random),
         )
 
+    private fun newActionSession(kind: DrillKind): ActionSession = ActionSession(
+        kind = kind,
+        steps = when (kind) {
+            DrillKind.SERVICE -> serviceExercises()
+            DrillKind.SHORTCUT -> shortcutExercises()
+            DrillKind.TEXT -> emptyList()
+        },
+    )
+
+    private fun heldMods(board: BoardLive): Set<KeyModifier> = buildSet {
+        if (board.hardwareShift || board.screenShift) add(KeyModifier.SHIFT)
+        if (board.hardwareCtrl || board.screenCtrl) add(KeyModifier.CTRL)
+        if (board.hardwareAlt || board.screenAlt) add(KeyModifier.ALT)
+        if (board.hardwareMeta || board.screenMeta) add(KeyModifier.META)
+    }
+
     private fun wrongChar(action: TrainerAction, effect: InputEffect): Char? {
         if (!effect.mistake) return null
         return (action as? TrainerAction.Character)?.value
@@ -399,7 +620,9 @@ private fun TrainerAction.isScreenModifier(): Boolean =
     this == TrainerAction.Shift ||
         this == TrainerAction.Lower ||
         this == TrainerAction.Upper ||
-        this == TrainerAction.Alt
+        this == TrainerAction.Alt ||
+        this == TrainerAction.Ctrl ||
+        this == TrainerAction.Meta
 
 fun trainViewModelFactory(context: Context): ViewModelProvider.Factory =
     object : ViewModelProvider.Factory {
