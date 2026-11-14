@@ -15,6 +15,7 @@ WEB_APPS=(
   same-element
   mock-br-lk
   zametki-kitai
+  vafin-context
 )
 
 ANDROID_APPS=(
