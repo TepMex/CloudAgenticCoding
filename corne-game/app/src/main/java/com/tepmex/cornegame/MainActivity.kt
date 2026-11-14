@@ -36,8 +36,14 @@ import com.tepmex.cornegame.domain.UsbDiagnosticsController
  */
 class MainActivity : ComponentActivity() {
     private val trainViewModel: TrainViewModel by viewModels { trainViewModelFactory(this) }
-    private val usbHardware = AndroidUsbHardware(this)
-    val usb = UsbDiagnosticsController(usbHardware)
+
+    /**
+     * USB создаётся только после [super.onCreate]. Поле activity ещё не прикреплено к
+     * контексту, когда инициализируются свойства, и getSystemService в этот момент падает.
+     */
+    private var usbHardware: AndroidUsbHardware? = null
+    private var usb: UsbDiagnosticsController? = null
+    private var usbReceiverRegistered = false
 
     private var machine = InputMachine()
     private val usbEvents = object : BroadcastReceiver() {
@@ -45,27 +51,32 @@ class MainActivity : ComponentActivity() {
             when (intent.action) {
                 UsbManager.ACTION_USB_DEVICE_ATTACHED,
                 UsbManager.ACTION_USB_DEVICE_DETACHED,
-                -> usb.refresh()
+                -> usb?.refresh()
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val hardware = AndroidUsbHardware(this)
+        val diagnostics = UsbDiagnosticsController(hardware)
+        usbHardware = hardware
+        usb = diagnostics
         enableEdgeToEdge()
-        usbHardware.register()
+        hardware.register()
         val filter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
         ContextCompat.registerReceiver(this, usbEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        usbReceiverRegistered = true
         val info = packageManager.getPackageInfo(packageName, 0)
         @Suppress("DEPRECATION")
         val versionCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
         trainViewModel.noteBoot(info.versionName ?: "?", versionCode)
         setContent {
             CorneTheme {
-                CorneApp(trainViewModel, usb)
+                CorneApp(trainViewModel, diagnostics)
             }
         }
     }
@@ -73,13 +84,18 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         noteOsMap(deviceId = -1)
-        usb.refresh()
+        usb?.refresh()
     }
 
     override fun onDestroy() {
-        runCatching { unregisterReceiver(usbEvents) }
-        usbHardware.unregister()
-        usb.close()
+        if (usbReceiverRegistered) {
+            runCatching { unregisterReceiver(usbEvents) }
+            usbReceiverRegistered = false
+        }
+        usbHardware?.unregister()
+        usb?.close()
+        usbHardware = null
+        usb = null
         super.onDestroy()
     }
 

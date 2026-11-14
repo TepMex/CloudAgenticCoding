@@ -8,13 +8,19 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.hardware.usb.UsbRequest
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.tepmex.cornegame.domain.ClaimResult
 import com.tepmex.cornegame.domain.EndpointFact
+import com.tepmex.cornegame.domain.HidPort
+import com.tepmex.cornegame.domain.HidTransfer
+import com.tepmex.cornegame.domain.IN_ENDPOINT
 import com.tepmex.cornegame.domain.InterfaceFact
+import com.tepmex.cornegame.domain.OUT_ENDPOINT
 import com.tepmex.cornegame.domain.ProbeStatus
 import com.tepmex.cornegame.domain.UsbDeviceSnapshot
 import com.tepmex.cornegame.domain.UsbHardware
@@ -22,6 +28,11 @@ import com.tepmex.cornegame.domain.UsbPermission
 import com.tepmex.cornegame.domain.UsbSession
 import com.tepmex.cornegame.domain.VIA_REPORT_BYTES
 import com.tepmex.cornegame.domain.chooseRawInterface
+import com.tepmex.cornegame.domain.exchangeHidReport
+import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * USB Host для диагностики. Boot-интерфейс клавиатуры не захватывается,
@@ -29,8 +40,12 @@ import com.tepmex.cornegame.domain.chooseRawInterface
  * После запроса интерфейс отпускается.
  */
 class AndroidUsbHardware(private val context: Context) : UsbHardware {
-    private val usb = context.getSystemService(UsbManager::class.java)
-    private val permissionAction = "${context.packageName}.USB_PERMISSION"
+    private val usb: UsbManager? by lazy(LazyThreadSafetyMode.NONE) {
+        context.getSystemService(UsbManager::class.java)
+    }
+    private val permissionAction: String by lazy(LazyThreadSafetyMode.NONE) {
+        "${context.packageName}.USB_PERMISSION"
+    }
     private var pending: ((Boolean) -> Unit)? = null
     private var registered = false
     private val receiver = object : BroadcastReceiver() {
@@ -167,15 +182,18 @@ private class AndroidUsbSession(
 
     override fun exchange(payload: ByteArray): ByteArray? {
         val iface = claimed ?: return null
-        val out = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_OUT }
-        val incoming = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_IN }
-        if (out == null || incoming == null) return null
-        val sent = connection.bulkTransfer(out, payload, payload.size, TIMEOUT_MS)
-        if (sent < 0) return null
-        val buffer = ByteArray(VIA_REPORT_BYTES)
-        val got = connection.bulkTransfer(incoming, buffer, buffer.size, TIMEOUT_MS)
-        if (got <= 0) return null
-        return buffer.copyOf(got.coerceAtMost(buffer.size))
+        if (closed) return null
+        val out = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_OUT } ?: return null
+        val incoming = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_IN } ?: return null
+        val port = UsbRequestPort(connection, mapOf(OUT_ENDPOINT to out, IN_ENDPOINT to incoming))
+        return exchangeHidReport(
+            port = port,
+            outKey = OUT_ENDPOINT,
+            inKey = IN_ENDPOINT,
+            payload = payload,
+            responseLength = VIA_REPORT_BYTES,
+            timeoutMs = TIMEOUT_MS.toLong(),
+        )
     }
 
     override fun close() {
@@ -192,4 +210,86 @@ private class AndroidUsbSession(
     private companion object {
         const val TIMEOUT_MS = 400
     }
+}
+
+/**
+ * Interrupt IN/OUT ходят только через [UsbRequest].
+ * bulkTransfer для этих эндпоинтов Android не обещает: в UsbRequest сказано, что
+ * interrupt передаётся асинхронно, через queue и requestWait.
+ */
+private class UsbRequestPort(
+    private val connection: UsbDeviceConnection,
+    private val endpoints: Map<String, UsbEndpoint>,
+) : HidPort {
+    private var legacyWaiter: CountDownLatch? = null
+
+    override fun open(endpointKey: String): HidTransfer {
+        val endpoint = endpoints[endpointKey] ?: return ClosedTransfer
+        val request = UsbRequest()
+        if (!request.initialize(connection, endpoint)) {
+            request.close()
+            return ClosedTransfer
+        }
+        return object : HidTransfer {
+            override val token: Any = request
+
+            override fun queue(buffer: ByteBuffer, length: Int): Boolean {
+                check(buffer.isDirect) { "UsbRequest ждёт прямой ByteBuffer" }
+                // Старая queue(ByteBuffer, int) читает с индекса 0 и игнорирует position.
+                // Новая queue(ByteBuffer) берёт remaining(). Оба варианта получают одни байты.
+                buffer.position(0)
+                buffer.limit(length)
+                return if (Build.VERSION.SDK_INT >= 26) {
+                    request.queue(buffer)
+                } else {
+                    @Suppress("DEPRECATION")
+                    request.queue(buffer, length)
+                }
+            }
+
+            override fun cancel() {
+                request.cancel()
+                reap()
+            }
+
+            override fun close() {
+                request.close()
+            }
+        }
+    }
+
+    override fun await(timeoutMs: Long): Any? {
+        if (Build.VERSION.SDK_INT >= 26) return connection.requestWait(timeoutMs)
+        val done = CountDownLatch(1)
+        val box = AtomicReference<UsbRequest?>()
+        legacyWaiter = done
+        Thread({
+            try {
+                box.set(connection.requestWait())
+            } finally {
+                done.countDown()
+            }
+        }, "usb-request-wait").start()
+        if (!done.await(timeoutMs, TimeUnit.MILLISECONDS)) return null
+        return box.get()
+    }
+
+    private fun reap() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            connection.requestWait(REAP_MS)
+            return
+        }
+        legacyWaiter?.await(REAP_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private companion object {
+        const val REAP_MS = 200L
+    }
+}
+
+private object ClosedTransfer : HidTransfer {
+    override val token: Any = Any()
+    override fun queue(buffer: ByteBuffer, length: Int): Boolean = false
+    override fun cancel() = Unit
+    override fun close() = Unit
 }
