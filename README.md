@@ -48,6 +48,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `same-element-android` | [same-element-android](https://tepmex.github.io/CloudAgenticCoding/same-element-android/) | Общий элемент · Android WebView wrapper (APK) |
 | `mock-br-lk` | [mock-br-lk](https://tepmex.github.io/CloudAgenticCoding/mock-br-lk/) | BRY Chinese · mock student cabinet: hero choice, map of China, quizzes (IndexedDB) |
 | `zametki-kitai` | [zametki-kitai](https://tepmex.github.io/CloudAgenticCoding/zametki-kitai/) | Путевые заметки · China, September 2026, opened with a passphrase in the browser |
+| `vafin-context` | [vafin-context](https://tepmex.github.io/CloudAgenticCoding/vafin-context/) | Говорит Вафин · личные контексты к выпускам, открытая страница без пароля |
 | `china-railways-map` | [china-railways-map](https://tepmex.github.io/CloudAgenticCoding/china_rail_interactive_map.html) | Chinese Railways map with pinyin and hanzi |
 
 Develop and build from inside the app directory (see `README.md` in each app that ships one). Deployment is configured in `.github/workflows/deploy.yml`.
