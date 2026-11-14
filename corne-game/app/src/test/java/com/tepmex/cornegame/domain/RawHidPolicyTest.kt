@@ -120,7 +120,7 @@ class RawHidPolicyTest {
 
         val incompatibleBytes = ByteArray(32).also {
             it[0] = VIA_GET_PROTOCOL_VERSION
-            it[2] = 0x10
+            it[1] = 0x10
         }
         val incompatible = ClosingProbe(exchange = { HidReport.Data(incompatibleBytes) })
         val version = runReadOnlyProbe(incompatible)
@@ -137,7 +137,7 @@ class RawHidPolicyTest {
             HidReport.Data(reply)
         })
         val result = runReadOnlyProbe(session)
-        assertEquals(ProbeStatus.OK, result.status)
+        assertEquals(ProbeStatus.PARTIAL, result.status)
         assertEquals(9, result.protocolVersion)
         assertNull(result.vialKeyboardId)
         assertEquals("неправильный ответ", result.vialNote)
@@ -155,8 +155,8 @@ private fun endpoint(address: Int, packet: Int) = EndpointFact(address, attribut
 
 private fun viaVersion(version: Int): ByteArray = ByteArray(32).also {
     it[0] = VIA_GET_PROTOCOL_VERSION
-    it[1] = (version and 0xFF).toByte()
-    it[2] = ((version shr 8) and 0xFF).toByte()
+    it[1] = ((version shr 8) and 0xFF).toByte()
+    it[2] = (version and 0xFF).toByte()
 }
 
 private fun device(interfaces: List<InterfaceFact> = emptyList()) = UsbDeviceSnapshot(

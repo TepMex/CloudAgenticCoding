@@ -1,5 +1,7 @@
 package com.tepmex.cornegame.ui
 
+import android.content.ClipData
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,10 +22,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.tepmex.cornegame.domain.UidMatchResult
+import com.tepmex.cornegame.domain.cornedeonVialUidBytes
+import com.tepmex.cornegame.domain.formatHidExchange
+import com.tepmex.cornegame.domain.formatHidExchanges
+import com.tepmex.cornegame.domain.uidComparisonText
+import com.tepmex.cornegame.domain.uidHex
+import com.tepmex.cornegame.domain.usbDiagnosticsReport
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tepmex.cornegame.domain.CORNEDEON_PRODUCT_ID
 import com.tepmex.cornegame.domain.CORNEDEON_PRODUCT_ID_V2M
@@ -63,9 +76,10 @@ fun UsbScreen(
             Text("USB-диагностика", style = MaterialTheme.typography.titleLarge)
         }
         Text(
-            "Ориентиры: VID %04X, PID %04X (2mod) и PID %04X (v2m). Другой дескриптор тоже показывается. " +
+            "Cornedeon v2m USB VID:PID: %04X:%04X. Ориентир 2mod — PID %04X. " +
+                "Ожидаемые ответы этой прошивки — VIA protocol 9 и Vial protocol 6; экран показывает то, что пришло. " +
                 "Обычная проверка только читает VIA/Vial и не отключает драйвер. Boot-клавиатура не захватывается."
-                    .format(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID, CORNEDEON_PRODUCT_ID_V2M),
+                    .format(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID_V2M, CORNEDEON_PRODUCT_ID),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -95,6 +109,45 @@ fun UsbScreen(
             Text("Закрыть USB-соединение")
         }
         ProbeBlock(dashboard)
+        Text(
+            usbDiagnosticsReport(
+                devicePresent = dashboard.devices.isNotEmpty(),
+                probe = dashboard.probe,
+                activeLayersMask = firmware.activeLayersMask,
+            ),
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (dashboard.probe.uidComparison == UidMatchResult.MISMATCH) {
+            Text(
+                uidComparisonText(
+                    dashboard.probe.uidComparison,
+                    dashboard.probe.vial?.let { uidHex(it.uidBytes) },
+                    uidHex(cornedeonVialUidBytes()),
+                ),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        val exchangeLog = formatHidExchanges(dashboard.probe.exchanges)
+        if (exchangeLog.isNotEmpty()) {
+            Text("Обмен USB", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "В копируемый журнал входит полный HEX каждого ответа и его длина. Набор текста сюда не пишется.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                exchangeLog,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            )
+            CopyHexButton(label = "Копировать обмен", text = exchangeLog)
+            dashboard.probe.exchanges.forEach { record ->
+                CopyHexButton(label = "Копировать ${record.name}", text = formatHidExchange(record))
+            }
+        }
         FirmwareBlock(firmware)
         if (askForce) {
             AlertDialog(
@@ -229,16 +282,34 @@ private fun FirmwareBlock(firmware: FirmwareState) {
     Text(
         "Подключение: ${if (firmware.connected) "да" else "нет"}\n" +
             "Состояние: ${layerTelemetryLine(firmware)}\n" +
-            "Телеметрия: ${firmware.telemetry}\n" +
-            "Маска слоёв: ${firmware.activeLayersMask?.let { "0x${it.toString(16)}" } ?: "неизвестна"}\n" +
+            "Physical layer telemetry: NOT IMPLEMENTED (${firmware.telemetry})\n" +
+            "Active layer mask: ${firmware.activeLayersMask?.let { "0x${it.toString(16)}" } ?: "UNKNOWN"}\n" +
             "Источник: ${firmware.source}\n" +
             "Достоверность: ${firmware.confidence}\n" +
             "Ошибка: ${firmware.error ?: "нет"}",
         style = MaterialTheme.typography.bodySmall,
     )
     Text(
-        "Активный слой отсюда не читается. Нарисованная клавиатура не является состоянием прошивки.",
+        "Активный слой отсюда не читается. Успешный Vial-обмен не заполняет маску. " +
+            "Нарисованная клавиатура не является состоянием прошивки.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+@Composable
+private fun CopyHexButton(label: String, text: String) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var copied by remember(text) { mutableStateOf(false) }
+    TextButton(
+        onClick = {
+            scope.launch {
+                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text)))
+                copied = true
+            }
+        },
+    ) {
+        Text(if (copied) "Скопировано" else label)
+    }
 }
