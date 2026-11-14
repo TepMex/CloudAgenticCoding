@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tepmex.cornegame.domain.DrillKind
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.topMisses
 
@@ -30,6 +31,42 @@ fun ResultsScreen(
     onOpenProgress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val action = state.actionSession
+    if (state.drill != DrillKind.TEXT && action != null) {
+        Column(
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Готово", style = MaterialTheme.typography.headlineMedium)
+            val pace = action.stats(state.nowMs)
+            Text(
+                text = formatWpm(pace.perMinute),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "Действий в минуту. Это не WPM: в упражнении нет текста.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Summary("Точность", formatAccuracy(pace.accuracyPercent))
+                Summary("Ошибки", pace.errors.toString())
+                Summary("Время", formatDuration(pace.elapsedMs))
+                Summary("Шаги", action.steps.size.toString())
+            }
+            Text(
+                "Слой L1/L2 в этом результате — рекомендация по Vial. Прошивка его не подтверждала.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = onAgain, modifier = Modifier.fillMaxWidth()) {
+                Text("Ещё раз")
+            }
+        }
+        return
+    }
     val stats = state.session.stats(state.nowMs)
     val misses = topMisses(state.session.misses)
     Column(

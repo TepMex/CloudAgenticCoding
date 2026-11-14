@@ -186,102 +186,76 @@ class SessionTest {
     }
 
     @Test
-    fun keyUpWithoutUnicodeStillDeliversWhatDownSaw() {
-        val down = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 44,
-            unicodeChar = 'з'.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
+    fun overlappingDownsKeepPressOrderAndUpDoesNotTypeAgain() {
+        val typed = replay(
+            down(AndroidKeyCodes.A, deviceId = 3),
+            down(AndroidKeyCodes.B, deviceId = 3),
+            up(AndroidKeyCodes.B, deviceId = 3),
+            up(AndroidKeyCodes.A, deviceId = 3),
         )
-        assertTrue(down.deliver.isEmpty())
-        assertTrue(down.consumed)
-        val up = stepHardware(
-            phase = HARDWARE_UP,
-            keyCode = 44,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = down.pending,
-        )
-        assertEquals(listOf(TrainerAction.Character('з')), up.deliver)
-        assertTrue(up.pending.isEmpty())
+        assertEquals(listOf('a', 'b'), typed)
     }
 
     @Test
-    fun keyDownWithoutUnicodeUsesTheCharacterFromUp() {
+    fun plainDownUpTypesOneCharacter() {
+        val down = stepHardware(InputMachine(), downEvent(AndroidKeyCodes.A))
+        assertEquals('a', (down.deliver.single().action as TrainerAction.Character).value)
+        val up = stepHardware(down.machine, upEvent(AndroidKeyCodes.A))
+        assertTrue(up.deliver.isEmpty())
+    }
+
+    @Test
+    fun missingUnicodeOnDownUsesUpWhenTheKeyIsNotInTheLayout() {
         val down = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 45,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
+            InputMachine(),
+            HardwareEvent(phase = HARDWARE_DOWN, keyCode = 250, unicodeChar = 0, deviceId = 4),
         )
-        assertFalse(down.consumed)
+        assertTrue(down.deliver.isEmpty())
         val up = stepHardware(
-            phase = HARDWARE_UP,
-            keyCode = 45,
-            unicodeChar = 'q'.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = down.pending,
+            down.machine,
+            HardwareEvent(phase = HARDWARE_UP, keyCode = 250, unicodeChar = 'q'.code, deviceId = 4),
         )
-        assertEquals(listOf(TrainerAction.Character('q')), up.deliver)
+        assertEquals('q', (up.deliver.single().action as TrainerAction.Character).value)
+    }
+
+    @Test
+    fun knownKeyWithoutUnicodeTypesFromTheSelectedLayoutOnDown() {
+        val down = stepHardware(
+            InputMachine(),
+            HardwareEvent(
+                phase = HARDWARE_DOWN,
+                keyCode = AndroidKeyCodes.P,
+                unicodeChar = 0,
+                language = Language.RU,
+                deviceId = 8,
+            ),
+        )
+        assertEquals('з', (down.deliver.single().action as TrainerAction.Character).value)
+        val up = stepHardware(down.machine, HardwareEvent(phase = HARDWARE_UP, keyCode = AndroidKeyCodes.P, deviceId = 8))
+        assertTrue(up.deliver.isEmpty())
     }
 
     @Test
     fun multipleUnknownKeyTypesTheCharacterString() {
-        val held = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 45,
-            unicodeChar = 'q'.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
-        )
+        val held = stepHardware(InputMachine(), downEvent(AndroidKeyCodes.Q))
         val step = stepHardware(
-            phase = HARDWARE_MULTIPLE,
-            keyCode = 0,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = held.pending,
-            characters = "э",
+            held.machine,
+            HardwareEvent(phase = HARDWARE_MULTIPLE, keyCode = 0, characters = "э", deviceId = -1),
         )
-        assertEquals(listOf(TrainerAction.Character('э')), step.deliver)
+        assertEquals('э', (step.deliver.single().action as TrainerAction.Character).value)
         assertTrue(step.consumed)
-        assertEquals(held.pending, step.pending)
+        assertTrue(AndroidKeyCodes.Q in step.machine.held)
         val both = stepHardware(
-            phase = HARDWARE_MULTIPLE,
-            keyCode = 0,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
-            characters = "Эж",
+            InputMachine(),
+            HardwareEvent(phase = HARDWARE_MULTIPLE, keyCode = 0, characters = "Эж"),
         )
         assertEquals(
-            listOf(TrainerAction.Character('Э'), TrainerAction.Character('ж')),
-            both.deliver,
+            listOf('Э', 'ж'),
+            both.deliver.map { (it.action as TrainerAction.Character).value },
         )
         val blank = stepHardware(
-            phase = HARDWARE_MULTIPLE,
-            keyCode = 0,
-            unicodeChar = 0,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
-            characters = "\n",
+            InputMachine(),
+            HardwareEvent(phase = HARDWARE_MULTIPLE, keyCode = 0, characters = "\n"),
         )
         assertTrue(blank.deliver.isEmpty())
         assertFalse(blank.consumed)
@@ -289,25 +263,64 @@ class SessionTest {
 
     @Test
     fun heldKeyDoesNotRepeatIntoTheSession() {
-        val down = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 45,
-            unicodeChar = 'q'.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 0,
-            pending = emptyMap(),
-        )
+        val down = stepHardware(InputMachine(), downEvent(AndroidKeyCodes.Q))
         val repeat = stepHardware(
-            phase = HARDWARE_DOWN,
-            keyCode = 45,
-            unicodeChar = 'q'.code,
-            shiftDown = false,
-            altDown = false,
-            repeatCount = 4,
-            pending = down.pending,
+            down.machine,
+            downEvent(AndroidKeyCodes.Q).copy(repeatCount = 4),
         )
         assertTrue(repeat.deliver.isEmpty())
-        assertEquals(down.pending, repeat.pending)
+        val up = stepHardware(repeat.machine, upEvent(AndroidKeyCodes.Q))
+        assertTrue(up.deliver.isEmpty())
     }
+
+    @Test
+    fun altShiftOutsideTheLanguageTaskIsNotAMistake() {
+        val session = TypingSession(Language.EN, "a")
+        val (next, effect) = session.apply(TrainerAction.AltShift, 1_000)
+        assertFalse(effect.mistake)
+        assertEquals(0, next.index)
+        assertEquals(0, next.errors)
+    }
+}
+
+private fun downEvent(keyCode: Int) = HardwareEvent(
+    phase = HARDWARE_DOWN,
+    keyCode = keyCode,
+    deviceId = 5,
+    language = Language.EN,
+)
+
+private fun upEvent(keyCode: Int) = HardwareEvent(
+    phase = HARDWARE_UP,
+    keyCode = keyCode,
+    deviceId = 5,
+    language = Language.EN,
+)
+
+private fun down(keyCode: Int, deviceId: Int) = HardwareEvent(
+    phase = HARDWARE_DOWN,
+    keyCode = keyCode,
+    deviceId = deviceId,
+    language = Language.EN,
+)
+
+private fun up(keyCode: Int, deviceId: Int) = HardwareEvent(
+    phase = HARDWARE_UP,
+    keyCode = keyCode,
+    deviceId = deviceId,
+    language = Language.EN,
+)
+
+private fun replay(vararg events: HardwareEvent): List<Char> {
+    var machine = InputMachine()
+    val typed = mutableListOf<Char>()
+    events.forEach { event ->
+        val step = stepHardware(machine, event)
+        machine = step.machine
+        step.deliver.forEach { resolved ->
+            val character = resolved.action as? TrainerAction.Character ?: return@forEach
+            typed += character.value
+        }
+    }
+    return typed
 }

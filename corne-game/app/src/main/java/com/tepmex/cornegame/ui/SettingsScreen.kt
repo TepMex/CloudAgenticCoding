@@ -37,6 +37,7 @@ fun SettingsScreen(
     settings: AppSettings,
     onBack: () -> Unit,
     onChange: ((AppSettings) -> AppSettings) -> Unit,
+    onOpenUsb: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -90,6 +91,17 @@ fun SettingsScreen(
             checked = settings.vibrate,
             onChecked = { value -> onChange { it.copy(vibrate = value) } },
         )
+        SettingSwitch(
+            label = "Диагностика ввода",
+            checked = settings.inputDiagnostics,
+            onChecked = { value -> onChange { it.copy(inputDiagnostics = value) } },
+        )
+        Text(
+            "На экране тренировки показывает источник события, код клавиши и что из него получилось.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onOpenUsb) { Text("USB-диагностика") }
         Spacer(Modifier.height(8.dp))
         Text("Размер клавиш")
         Slider(

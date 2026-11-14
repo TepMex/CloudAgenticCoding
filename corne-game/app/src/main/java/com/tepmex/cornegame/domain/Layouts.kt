@@ -62,8 +62,8 @@ const val KEY_COLS = 6
 
 private const val LEFT_SHIFT = 12
 private const val RIGHT_SHIFT = 41
-private const val LOWER_KEY = 22
-private const val UPPER_KEY = 43
+internal const val LOWER_KEY = 22
+internal const val UPPER_KEY = 43
 private const val ALT_KEY = 21
 
 val SHIFT_KEY_IDS = setOf(LEFT_SHIFT, RIGHT_SHIFT)
@@ -85,6 +85,7 @@ private data class Slot(
     val holdOutput: Char? = null,
     val role: Role = Role.TEXT,
     val hid: Int = 0,
+    val keyCode: Int = 0,
     val forcedShift: Boolean = false,
 )
 
@@ -98,8 +99,12 @@ data class BoardLive(
     val language: Language? = null,
     val hardwareShift: Boolean = false,
     val hardwareAlt: Boolean = false,
+    val hardwareCtrl: Boolean = false,
+    val hardwareMeta: Boolean = false,
     val screenShift: Boolean = false,
     val screenAlt: Boolean = false,
+    val screenCtrl: Boolean = false,
+    val screenMeta: Boolean = false,
     val screenLower: Boolean = false,
     val screenUpper: Boolean = false,
 ) {
@@ -123,6 +128,7 @@ data class LegendTable(
 
 data class KeyFace(
     val id: Int,
+    val keyCode: Int,
     val column: Int,
     val legend: String,
     val holdLegend: String?,
@@ -138,6 +144,27 @@ data class KeyboardModel(
     val leftRows: List<List<KeyFace>>,
     val rightRows: List<List<KeyFace>>,
     val caption: String,
+)
+
+/**
+ * Подсветка упражнения на служебные клавиши или сочетание.
+ * [layer] — рекомендуемый слой по выгрузке Vial, не показание прошивки.
+ * [keyActions] подменяет тап только у целевой клавиши, модификаторы остаются удержанием.
+ */
+data class DrillFocus(
+    val layer: Latch,
+    val press: Set<Int>,
+    val hint: Set<Int>,
+    val caption: String,
+    val keyActions: Map<Int, TrainerAction> = emptyMap(),
+)
+
+data class PlacedKey(
+    val id: Int,
+    val layer: Latch,
+    val keyCode: Int,
+    val legend: String,
+    val empty: Boolean,
 )
 
 data class Stroke(
@@ -269,12 +296,64 @@ private fun attach(slots: List<Slot>, hids: List<Hid>): List<Slot> {
     }
 }
 
+/**
+ * Android keycode там, где HID для легенды нулевой: модификаторы, стрелки, F-ряд.
+ * 0 значит «брать hid». Левая и правая Ctrl различаются по позиции, не по подписи.
+ */
+private val baseExtra = intArrayOf(
+    111, 0, 0, 0, 0, 0,
+    61, 0, 0, 0, 0, 0,
+    59, 0, 0, 0, 0, 0,
+    113, 21, 22, 57, 0, 62,
+    0, 0, 0, 0, 0, 67,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 60,
+    62, 0, 118, 19, 20, 114,
+)
+
+private val lowerExtra = intArrayOf(
+    111, 0, 0, 0, 0, 0,
+    61, 0, 0, 0, 0, 0,
+    59, 0, 0, 0, 0, 0,
+    113, 122, 123, 57, 0, 66,
+    0, 0, 0, 0, 124, 112,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 60,
+    66, 0, 118, 92, 93, 114,
+)
+
+private val upperExtra = intArrayOf(
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
+    59, 0, 0, 0, 0, 0,
+    113, 122, 123, 210, 0, 160,
+    137, 138, 139, 140, 120, 121,
+    134, 135, 136, 141, 143, 0,
+    131, 132, 133, 142, 82, 60,
+    66, 0, 115, 92, 93, 114,
+)
+
+private fun extraKey(layer: Latch, id: Int): Int {
+    val table = when (layer) {
+        Latch.NONE, Latch.SHIFT -> baseExtra
+        Latch.LOWER -> lowerExtra
+        Latch.UPPER -> upperExtra
+    }
+    return table[id]
+}
+
+private fun coded(layer: Latch, slots: List<Slot>): List<Slot> =
+    slots.mapIndexed { id, slot ->
+        val code = if (slot.hid != 0) slot.hid else extraKey(layer, id)
+        slot.copy(keyCode = code)
+    }
+
 /** Коды, которые надо спросить у раскладки ОС, чтобы легенда совпала с клавишей. */
 fun trackedLegendCodes(): Set<Int> =
     (baseHids + lowerHids + upperHids).map { it.code }.filter { it != 0 }.toSet()
 
 // Сначала четыре ряда левой половинки, затем четыре ряда правой. Ряд больших — четвёртый.
-private val enBase = attach(grid(
+private val enBase = coded(Latch.NONE, attach(grid(
     """
     esc q w e r t
     tab a s d f g
@@ -285,9 +364,9 @@ private val enBase = attach(grid(
     n m , . / sft
     sp l2 gui up down ctl
     """,
-), baseHids)
+), baseHids))
 
-private val enShift = attach(grid(
+private val enShift = coded(Latch.SHIFT, attach(grid(
     """
     esc Q W E R T
     tab A S D F G
@@ -298,9 +377,9 @@ private val enShift = attach(grid(
     N M < > ? sft
     sp l2 gui up down ctl
     """,
-), baseHids)
+), baseHids))
 
-private val enLower = attach(grid(
+private val enLower = coded(Latch.LOWER, attach(grid(
     """
     esc ` ( ) * /
     tab xx [ ] + -
@@ -311,9 +390,9 @@ private val enLower = attach(grid(
     1 2 3 = / sft
     ent l2 gui pgu pgd ctl
     """,
-), lowerHids)
+), lowerHids))
 
-private val ruBase = attach(grid(
+private val ruBase = coded(Latch.NONE, attach(grid(
     """
     esc й ц у к е
     tab ф ы в а п
@@ -324,9 +403,9 @@ private val ruBase = attach(grid(
     т ь б ю . sft
     sp l2 gui up down ctl
     """,
-), baseHids)
+), baseHids))
 
-private val ruShift = attach(grid(
+private val ruShift = coded(Latch.SHIFT, attach(grid(
     """
     esc Й Ц У К Е
     tab Ф Ы В А П
@@ -337,9 +416,9 @@ private val ruShift = attach(grid(
     Т Ь Б Ю , sft
     sp l2 gui up down ctl
     """,
-), baseHids)
+), baseHids))
 
-private val ruLower = attach(grid(
+private val ruLower = coded(Latch.LOWER, attach(grid(
     """
     esc ё ( ) * /
     tab xx х ъ + -
@@ -350,9 +429,9 @@ private val ruLower = attach(grid(
     1 2 3 = . sft
     ent l2 gui pgu pgd ctl
     """,
-), lowerHids)
+), lowerHids))
 
-private val enUpper = attach(grid(
+private val enUpper = coded(Latch.UPPER, attach(grid(
     """
     * / 0 7 8 9
     + - . 4 5 6
@@ -363,9 +442,9 @@ private val enUpper = attach(grid(
     f1 f2 f3 f12 men sft
     ent l2 caps pgu pgd ctl
     """,
-), upperHids)
+), upperHids))
 
-private val ruUpper = attach(grid(
+private val ruUpper = coded(Latch.UPPER, attach(grid(
     """
     * / 0 7 8 9
     + - . 4 5 6
@@ -376,7 +455,7 @@ private val ruUpper = attach(grid(
     f1 f2 f3 f12 men sft
     ent l2 caps pgu pgd ctl
     """,
-), upperHids)
+), upperHids))
 
 private fun slots(language: Language, latch: Latch): List<Slot> = when (latch) {
     Latch.NONE -> if (language == Language.EN) enBase else ruBase
@@ -385,14 +464,18 @@ private fun slots(language: Language, latch: Latch): List<Slot> = when (latch) {
     Latch.UPPER -> if (language == Language.EN) enUpper else ruUpper
 }
 
-private fun Slot.tapAction(): TrainerAction = when (role) {
-    Role.TEXT -> output?.let { TrainerAction.Character(it) } ?: TrainerAction.Unexpected
-    Role.SHIFT -> TrainerAction.Shift
-    Role.LOWER -> TrainerAction.Lower
-    Role.UPPER -> TrainerAction.Upper
-    Role.ALT -> TrainerAction.Alt
-    Role.BACKSPACE -> TrainerAction.Backspace
-    Role.NONE -> TrainerAction.Unexpected
+private fun Slot.tapAction(): TrainerAction = when {
+    legend == "Ctl" -> TrainerAction.Ctrl
+    legend == "Gui" -> TrainerAction.Meta
+    else -> when (role) {
+        Role.TEXT -> output?.let { TrainerAction.Character(it) } ?: TrainerAction.Unexpected
+        Role.SHIFT -> TrainerAction.Shift
+        Role.LOWER -> TrainerAction.Lower
+        Role.UPPER -> TrainerAction.Upper
+        Role.ALT -> TrainerAction.Alt
+        Role.BACKSPACE -> TrainerAction.Backspace
+        Role.NONE -> TrainerAction.Unexpected
+    }
 }
 
 private fun Slot.holdAction(): TrainerAction? = holdOutput?.let { TrainerAction.Character(it) }
@@ -479,14 +562,39 @@ fun actionsToType(target: String, start: Language): List<TrainerAction> {
     return actions
 }
 
+fun boardPlacements(): List<PlacedKey> =
+    listOf(Latch.NONE, Latch.LOWER, Latch.UPPER).flatMap { layer ->
+        slots(Language.EN, layer).mapIndexed { id, slot ->
+            PlacedKey(
+                id = id,
+                layer = layer,
+                keyCode = slot.keyCode,
+                legend = slot.legend,
+                empty = slot.legend == "·",
+            )
+        }
+    }
+
+fun placementsFor(keyCode: Int): List<PlacedKey> =
+    boardPlacements().filter { it.keyCode == keyCode && it.keyCode != 0 && !it.empty }
+
 fun keyboardModel(
     session: TypingSession,
     live: BoardLive = BoardLive(),
     legends: LegendTable = LegendTable(),
+    focus: DrillFocus? = null,
 ): KeyboardModel {
     val language = live.language ?: session.typingLanguage
-    val shown = shownLayer(session, live)
-    val marks = coach(session, live, shown)
+    val shown = if (focus == null) {
+        shownLayer(session, live)
+    } else {
+        when {
+            live.screenUpper -> Latch.UPPER
+            live.screenLower -> Latch.LOWER
+            else -> focus.layer
+        }
+    }
+    val marks = if (focus == null) coach(session, live, shown) else Coach(focus.press, focus.hint, hold = false)
     val userShift = live.shiftHeld && (shown == Latch.LOWER || shown == Latch.UPPER)
     val faces = slots(language, shown).mapIndexed { id, raw ->
         val slot = raw
@@ -494,11 +602,12 @@ fun keyboardModel(
             .withDeviceLegend(legends, live.shiftHeld || shown == Latch.SHIFT)
         KeyFace(
             id = id,
+            keyCode = slot.keyCode,
             column = id % KEY_COLS,
             legend = slot.legend,
             holdLegend = slot.holdLegend,
             finger = fingerFor(id),
-            tap = slot.tapAction(),
+            tap = focus?.keyActions?.get(id) ?: slot.tapAction(),
             longPress = slot.holdAction(),
             primary = id in marks.press,
             hinted = id in marks.hint,
@@ -510,7 +619,8 @@ fun keyboardModel(
         val start = 24 + row * KEY_COLS
         faces.subList(start, start + KEY_COLS)
     }
-    return KeyboardModel(left, right, caption(session, live, shown, marks))
+    val caption = if (focus == null) caption(session, live, shown, marks) else focus.caption
+    return KeyboardModel(left, right, caption)
 }
 
 private fun shownLayer(session: TypingSession, live: BoardLive): Latch = when {

@@ -1,7 +1,10 @@
 package com.tepmex.cornegame.ui
 
 import com.tepmex.cornegame.domain.HardwareStep
+import com.tepmex.cornegame.domain.InputSource
+import com.tepmex.cornegame.domain.KeyModifier
 import com.tepmex.cornegame.domain.KeyboardModel
+import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LegendTable
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.keyboardModel
@@ -82,6 +85,10 @@ internal fun TrainerAction.traceLabel(): String = when (this) {
     TrainerAction.Upper -> "L2"
     TrainerAction.Alt -> "alt"
     TrainerAction.AltShift -> "alt+shift"
+    TrainerAction.Ctrl -> "ctrl"
+    TrainerAction.Meta -> "meta"
+    is TrainerAction.KeyPress -> "key${keyCode}"
+    is TrainerAction.Shortcut -> "shortcut${modifiers.sorted().joinToString("+") { it.name }}+$keyCode"
     TrainerAction.Unexpected -> "unexpected"
 }
 
@@ -174,9 +181,54 @@ internal fun formatPending(pending: Map<Int, TrainerAction>): String =
     }
 
 internal fun formatStep(step: HardwareStep): String {
-    val deliver = step.deliver.joinToString(",") { it.traceLabel() }.ifEmpty { "-" }
-    return "STEP consumed=${bit(step.consumed)} deliver=$deliver " +
-        "shift=${bit(step.shiftDown)} alt=${bit(step.altDown)} pending=${formatPending(step.pending)}"
+    val deliver = step.deliver.joinToString(",") { it.action.traceLabel() }.ifEmpty { "-" }
+    val held = if (step.machine.held.isEmpty()) {
+        "-"
+    } else {
+        step.machine.held.keys.sorted().joinToString(",")
+    }
+    return "STEP src=${step.source} consumed=${bit(step.consumed)} deliver=$deliver " +
+        "shift=${bit(step.shiftDown)} alt=${bit(step.altDown)} " +
+        "ctrl=${bit(step.ctrlDown)} meta=${bit(step.metaDown)} held=$held lang=${step.language}"
+}
+
+data class InputResolution(
+    val source: InputSource,
+    val deviceId: Int,
+    val keyCode: Int,
+    val keyLabel: String,
+    val scanCode: Int,
+    val unicodeChar: Int,
+    val characters: String?,
+    val modifiers: Set<KeyModifier>,
+    val language: Language,
+    val action: String,
+    val matched: String,
+)
+
+internal fun formatResolution(resolution: InputResolution): String = buildString {
+    append("RESOLVE source=")
+    append(resolution.source.name)
+    append(" dev=")
+    append(resolution.deviceId)
+    append(" code=")
+    append(resolution.keyCode)
+    append(' ')
+    append(resolution.keyLabel)
+    append(" scan=")
+    append(resolution.scanCode)
+    append(" uni=")
+    append(showUnicode(resolution.unicodeChar))
+    append(" chars=")
+    append(resolution.characters?.let(::showText) ?: "-")
+    append(" mods=")
+    append(if (resolution.modifiers.isEmpty()) "-" else resolution.modifiers.sorted().joinToString("+") { it.name })
+    append(" lang=")
+    append(resolution.language.name)
+    append(" action=")
+    append(resolution.action)
+    append(" step=")
+    append(resolution.matched)
 }
 
 /** Q/A/Z и знаки правой руки: по ним видно, какую раскладку отдала система. */
@@ -210,6 +262,7 @@ internal fun uiSnapshot(state: TrainUiState): String {
         "screen=${state.screen} hl=${bit(state.settings.highlight)} " +
         "cap=\"${model.caption}\" hi=${marks(model, primary = true)} hint=${marks(model, primary = false)} " +
         "board=hwS${bit(board.hardwareShift)} hwA${bit(board.hardwareAlt)} " +
+        "hwC${bit(board.hardwareCtrl)} hwM${bit(board.hardwareMeta)} " +
         "scrS${bit(board.screenShift)} scrL${bit(board.screenLower)} " +
         "scrU${bit(board.screenUpper)} scrA${bit(board.screenAlt)} " +
         "kbd=${board.language ?: "-"}"

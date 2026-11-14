@@ -29,21 +29,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tepmex.cornegame.domain.BoardLive
+import com.tepmex.cornegame.domain.DrillKind
+import com.tepmex.cornegame.domain.FirmwareState
+import com.tepmex.cornegame.domain.KeyModifier
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LiveStats
 import com.tepmex.cornegame.domain.TrainerAction
+import com.tepmex.cornegame.domain.acceptanceLine
 import com.tepmex.cornegame.domain.keyboardModel
+import com.tepmex.cornegame.domain.toFocus
 import com.tepmex.cornegame.ui.theme.typedColor
 
 @Composable
 fun TrainScreen(
     state: TrainUiState,
-    onAction: (TrainerAction) -> Unit,
     onLanguage: (Language) -> Unit,
+    onDrill: (DrillKind) -> Unit,
     onOpenProgress: () -> Unit,
     onOpenSettings: () -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
     onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
+    onScreenKey: (Int, TrainerAction) -> Unit,
+    firmware: FirmwareState = FirmwareState(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -82,13 +90,60 @@ fun TrainScreen(
                 Text("Настройки", maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
             }
         }
-        TargetLine(
-            target = state.session.target,
-            index = state.session.index,
+        DrillSwitch(selected = state.drill, onDrill = onDrill)
+        val action = state.actionSession
+        val drillStep = if (state.drill == DrillKind.TEXT) null else action?.current
+        if (drillStep == null) {
+            TargetLine(
+                target = state.session.target,
+                index = state.session.index,
+            )
+            Spacer(Modifier.height(4.dp))
+            StatsRow(stats = state.session.stats(state.nowMs), textMode = true)
+        } else {
+            Text(drillStep.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${action?.index?.plus(1) ?: 1}/${action?.steps?.size ?: 0} · ${drillStep.hint}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            drillStep.interceptNote?.let { note ->
+                Text(note, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+            }
+            val pace = action?.stats(state.nowMs)
+            if (pace != null) {
+                ActionStatsRow(pace)
+            }
+            val outcome = when (action?.lastAccepted) {
+                true -> acceptanceLine(drillStep.recommendedLayer, firmware)
+                false -> "Неверная клавиша или сочетание."
+                null -> "Удерживайте модификаторы и нажмите основную клавишу."
+            }
+            Text(outcome, style = MaterialTheme.typography.labelMedium)
+        }
+        Text(
+            "Удержано: ${heldModifierLabel(state.board)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(4.dp))
-        StatsRow(stats = state.session.stats(state.nowMs))
-        val model = keyboardModel(state.session, state.board, state.legends)
+        if (state.settings.inputDiagnostics) {
+            val resolution = state.lastResolution
+            if (resolution == null) {
+                Text(
+                    "Диагностика: событий ещё не было.",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            } else {
+                ResolutionPanel(resolution)
+            }
+        }
+        val model = keyboardModel(
+            state.session,
+            state.board,
+            state.legends,
+            drillStep?.toFocus(),
+        )
         Text(
             text = model.caption,
             style = MaterialTheme.typography.labelLarge,
@@ -102,7 +157,7 @@ fun TrainScreen(
             keyScale = state.settings.keyScale,
             errorNonce = state.errorNonce,
             lastWrong = state.lastWrong,
-            onAction = onAction,
+            onAction = onScreenKey,
             onContact = onContact,
             onPointer = onPointer,
             modifier = Modifier
@@ -165,16 +220,85 @@ private fun TargetLine(target: String, index: Int) {
 }
 
 @Composable
-private fun StatsRow(stats: LiveStats) {
+private fun DrillSwitch(selected: DrillKind, onDrill: (DrillKind) -> Unit) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        FilterChip(
+            selected = selected == DrillKind.TEXT,
+            onClick = { onDrill(DrillKind.TEXT) },
+            label = { Text("Текст") },
+        )
+        FilterChip(
+            selected = selected == DrillKind.SERVICE,
+            onClick = { onDrill(DrillKind.SERVICE) },
+            label = { Text("Клавиши") },
+        )
+        FilterChip(
+            selected = selected == DrillKind.SHORTCUT,
+            onClick = { onDrill(DrillKind.SHORTCUT) },
+            label = { Text("Сочетания") },
+        )
+    }
+}
+
+@Composable
+private fun StatsRow(stats: LiveStats, textMode: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Stat("WPM", formatWpm(stats.wpm), Modifier.weight(1f))
+        if (textMode) {
+            Stat("WPM", formatWpm(stats.wpm), Modifier.weight(1f))
+        }
         Stat("Точность", formatAccuracy(stats.accuracyPercent), Modifier.weight(1f))
         Stat("Ошибки", stats.errors.toString(), Modifier.weight(1f))
         Stat("Время", formatDuration(stats.elapsedMs), Modifier.weight(1f))
     }
+}
+
+@Composable
+private fun ActionStatsRow(stats: com.tepmex.cornegame.domain.ActionStats) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Stat("Скорость", formatWpm(stats.perMinute), Modifier.weight(1f))
+        Stat("Точность", formatAccuracy(stats.accuracyPercent), Modifier.weight(1f))
+        Stat("Ошибки", stats.errors.toString(), Modifier.weight(1f))
+        Stat("Время", formatDuration(stats.elapsedMs), Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun ResolutionPanel(resolution: InputResolution) {
+    Text(
+        text = listOf(
+            "Source: ${resolution.source}",
+            "Device ID: ${resolution.deviceId}",
+            "Android KeyCode: ${resolution.keyCode} ${resolution.keyLabel}",
+            "ScanCode: ${resolution.scanCode}",
+            "Unicode: ${showUnicode(resolution.unicodeChar)}",
+            "Characters: ${resolution.characters ?: "-"}",
+            "Modifiers: ${resolution.modifiers.sorted().joinToString("+").ifEmpty { "-" }}",
+            "Selected language: ${resolution.language}",
+            "Resolved action: ${resolution.action}",
+            "Matched exercise step: ${resolution.matched}",
+        ).joinToString("\n"),
+        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.labelSmall,
+    )
+}
+
+private fun heldModifierLabel(board: BoardLive): String {
+    val names = buildList {
+        if (board.hardwareShift || board.screenShift) add(KeyModifier.SHIFT.name)
+        if (board.hardwareCtrl || board.screenCtrl) add(KeyModifier.CTRL.name)
+        if (board.hardwareAlt || board.screenAlt) add(KeyModifier.ALT.name)
+        if (board.hardwareMeta || board.screenMeta) add(KeyModifier.META.name)
+    }
+    return names.joinToString("+").ifEmpty { "—" }
 }
 
 @Composable

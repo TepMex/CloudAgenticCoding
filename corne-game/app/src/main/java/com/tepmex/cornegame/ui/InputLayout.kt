@@ -5,27 +5,36 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LegendTable
+import com.tepmex.cornegame.domain.ownKeyboardDevice
 import com.tepmex.cornegame.domain.trackedLegendCodes
 
-/** Раскладка физической клавиатуры: какой символ даст этот код прямо сейчас. */
-internal fun readKeyboardLayout(deviceId: Int): KeyboardLayout? {
-    val map = keyboardMap(deviceId) ?: return null
+/**
+ * Раскладка именно этого устройства. deviceId < 0 и чужая клавиатура сюда не подставляются:
+ * виртуальное событие не доказывает, что его породила Cornedeon.
+ * Таблица нужна для диагностики ОС. Символ упражнения считается по выбранному языку тренажёра.
+ */
+internal fun readKeyboardLayout(deviceId: Int): OsKeyboardSample? {
+    val alphabetic = InputDevice.getDeviceIds().filterTo(mutableSetOf()) { candidate ->
+        InputDevice.getDevice(candidate)?.isAlphabeticKeyboard() == true
+    }
+    val own = ownKeyboardDevice(deviceId, alphabetic) ?: return null
+    val map = InputDevice.getDevice(own)?.keyCharacterMap ?: return null
     val language = when (map.get(KeyEvent.KEYCODE_Q, 0)) {
         'q'.code -> Language.EN
         'й'.code -> Language.RU
         else -> null
     }
-    return KeyboardLayout(language, readLegendTable(map))
+    return OsKeyboardSample(language, readLegendTable(map))
 }
 
-internal data class KeyboardLayout(
+internal data class OsKeyboardSample(
     val language: Language?,
     val legends: LegendTable,
 )
 
 /**
- * Поля KeyEvent для лога. [unicodeChar] — уже прочитанный символ с metaState,
- * тот же, что уходит в сессию. [unicodeBare] — символ без модификаторов.
+ * Поля KeyEvent для лога. [unicodeChar] — символ, который сообщило событие.
+ * В сессию он попадает только как текст. Физический keycode разбирается отдельно.
  */
 @Suppress("DEPRECATION")
 internal fun readHardwareTrace(event: KeyEvent, unicodeChar: Int, unicodeBare: Int): HardwareKeyTrace {
@@ -55,17 +64,6 @@ internal fun readHardwareTrace(event: KeyEvent, unicodeChar: Int, unicodeBare: I
         downTime = event.downTime,
         eventTime = event.eventTime,
     )
-}
-
-private fun keyboardMap(deviceId: Int): KeyCharacterMap? {
-    if (deviceId >= 0) {
-        val device = InputDevice.getDevice(deviceId)
-        if (device != null && device.isAlphabeticKeyboard()) return device.keyCharacterMap
-    }
-    val id = InputDevice.getDeviceIds().firstOrNull { candidate ->
-        InputDevice.getDevice(candidate)?.isAlphabeticKeyboard() == true
-    } ?: return null
-    return InputDevice.getDevice(id)?.keyCharacterMap
 }
 
 private fun InputDevice.isAlphabeticKeyboard(): Boolean =

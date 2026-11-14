@@ -117,7 +117,7 @@ fun CorneKeyboard(
     keyScale: Float,
     errorNonce: Int,
     lastWrong: Char?,
-    onAction: (TrainerAction) -> Unit,
+    onAction: (Int, TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit = { _, _ -> },
     onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit = { _, _, _, _, _ -> },
     modifier: Modifier = Modifier,
@@ -200,7 +200,7 @@ private fun KeyboardHalf(
     fingerColors: Boolean,
     flashAlpha: Float,
     lastWrong: Char?,
-    onAction: (TrainerAction) -> Unit,
+    onAction: (Int, TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
     onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
 ) {
@@ -242,12 +242,13 @@ private fun KeyButton(
     fingerColors: Boolean,
     flashAlpha: Float,
     lastWrong: Char?,
-    onAction: (TrainerAction) -> Unit,
+    onAction: (Int, TrainerAction) -> Unit,
     onContact: (TrainerAction, Boolean) -> Unit,
     onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tap by rememberUpdatedState(face.tap)
+    val keyCode by rememberUpdatedState(face.keyCode)
     val legend by rememberUpdatedState(face.legend)
     val contact by rememberUpdatedState(onContact)
     val action by rememberUpdatedState(onAction)
@@ -292,7 +293,7 @@ private fun KeyButton(
                 role = Role.Button
                 onClick {
                     pointer("click", face.id, legend, tap, true)
-                    action(tap)
+                    action(keyCode, tap)
                     true
                 }
             }
@@ -307,7 +308,7 @@ private fun KeyButton(
                         val released = tryAwaitRelease()
                         pointer("up", face.id, name, started, released)
                         if (modifier) contact(started, false)
-                        else if (released) action(tap)
+                        else if (released) action(keyCode, tap)
                     },
                 )
             },
@@ -340,7 +341,9 @@ private fun TrainerAction.isHoldModifier(): Boolean =
     this == TrainerAction.Shift ||
         this == TrainerAction.Lower ||
         this == TrainerAction.Upper ||
-        this == TrainerAction.Alt
+        this == TrainerAction.Alt ||
+        this == TrainerAction.Ctrl ||
+        this == TrainerAction.Meta
 
 private fun faceProduces(face: KeyFace, char: Char): Boolean {
     val tap = (face.tap as? TrainerAction.Character)?.value
