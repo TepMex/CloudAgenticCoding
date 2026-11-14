@@ -17,6 +17,8 @@ import androidx.core.content.ContextCompat
 import com.tepmex.cornegame.domain.ClaimResult
 import com.tepmex.cornegame.domain.EndpointFact
 import com.tepmex.cornegame.domain.HidPort
+import com.tepmex.cornegame.domain.HidReport
+import com.tepmex.cornegame.domain.HidRole
 import com.tepmex.cornegame.domain.HidTransfer
 import com.tepmex.cornegame.domain.IN_ENDPOINT
 import com.tepmex.cornegame.domain.InterfaceFact
@@ -29,14 +31,17 @@ import com.tepmex.cornegame.domain.UsbSession
 import com.tepmex.cornegame.domain.VIA_REPORT_BYTES
 import com.tepmex.cornegame.domain.chooseRawInterface
 import com.tepmex.cornegame.domain.exchangeHidReport
+import com.tepmex.cornegame.domain.matchesRawCandidate
+import com.tepmex.cornegame.domain.runClaimPlan
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * USB Host для диагностики. Boot-интерфейс клавиатуры не захватывается,
- * claimInterface вызывается только с force=false и только у кандидата Raw HID.
+ * USB Host для диагностики. Boot-клавиатура не захватывается.
+ * claimInterface(force=true) вызывается только для Raw HID и только если
+ * [UsbSession.claimRawHid] получил явное подтверждение, а force=false уже вернул false.
  * После запроса интерфейс отпускается.
  */
 class AndroidUsbHardware(private val context: Context) : UsbHardware {
@@ -144,47 +149,77 @@ private class AndroidUsbSession(
     private var claimed: UsbInterface? = null
     private var closed = false
 
-    override fun claimRawHid(): ClaimResult {
-        val facts = (0 until device.interfaceCount).map { index ->
-            val iface = device.getInterface(index)
-            InterfaceFact(
-                id = iface.id,
-                classCode = iface.interfaceClass,
-                subclass = iface.interfaceSubclass,
-                protocol = iface.interfaceProtocol,
-                endpoints = (0 until iface.endpointCount).map { endpointIndex ->
-                    val endpoint = iface.getEndpoint(endpointIndex)
-                    EndpointFact(endpoint.address, endpoint.attributes, endpoint.maxPacketSize)
-                },
-            )
-        }
+    override fun claimRawHid(allowForce: Boolean): ClaimResult {
+        val facts = (0 until device.interfaceCount).map { index -> fact(device.getInterface(index)) }
         val chosen = chooseRawInterface(facts)
             ?: return ClaimResult(
                 ok = false,
                 status = ProbeStatus.NO_INTERFACE,
-                detail = "Нет отдельного Raw HID (interrupt IN и OUT, пакет от 32 байт). " +
-                    "Рабочая boot-клавиатура не захватывается.",
+                detail = "Нет Raw HID с interrupt IN и OUT от 32 байт. " +
+                    "Boot-клавиатура и прочие интерфейсы не захватываются.",
             )
         val iface = (0 until device.interfaceCount)
             .map { device.getInterface(it) }
-            .first { it.id == chosen.id }
-        val claimedOk = connection.claimInterface(iface, false)
+            .firstOrNull { matchesRawCandidate(chosen, fact(it)) }
+            ?: return ClaimResult(
+                ok = false,
+                status = ProbeStatus.NO_INTERFACE,
+                detail = "Дескриптор Raw HID не совпал ни с одним интерфейсом. Захват не выполнялся.",
+            )
+        if (chosen.role != HidRole.RAW_HID) {
+            return ClaimResult(
+                ok = false,
+                status = ProbeStatus.NO_INTERFACE,
+                detail = "Интерфейс ${iface.id} не Raw HID. claimInterface не вызывался.",
+            )
+        }
+        var gentleText = "не выполнялся"
+        var forceText = "не запрашивался"
+        val attempts = runClaimPlan(chosen.role, allowForce) { force ->
+            val ok = connection.claimInterface(iface, force)
+            if (!force) {
+                gentleText = if (ok) {
+                    "claimInterface(id=${iface.id}, force=false) вернул true."
+                } else {
+                    "claimInterface(id=${iface.id}, force=false) вернул false. Причина системой не названа."
+                }
+            } else {
+                forceText = if (ok) {
+                    "claimInterface(id=${iface.id}, force=true) вернул true. " +
+                        "Драйвер ядра мог отсоединиться только от этого Raw HID."
+                } else {
+                    "claimInterface(id=${iface.id}, force=true) вернул false."
+                }
+            }
+            ok
+        }
+        val claimedOk = attempts.any { it.ok }
         if (!claimedOk) {
             return ClaimResult(
                 ok = false,
                 status = ProbeStatus.CLAIM_FAILED,
-                detail = "Интерфейс ${iface.id} занят. Захват с force=true не выполняется, чтобы не отбирать клавиатуру у системы.",
+                detail = "$gentleText $forceText Boot-клавиатура не захватывалась.",
+                interfaceId = iface.id,
+                gentleClaim = gentleText,
+                forceClaim = forceText,
             )
         }
         claimed = iface
-        return ClaimResult(ok = true, status = ProbeStatus.OK, detail = "Интерфейс ${iface.id} открыт для чтения.")
+        return ClaimResult(
+            ok = true,
+            status = ProbeStatus.OK,
+            detail = "Интерфейс ${iface.id} открыт для чтения.",
+            interfaceId = iface.id,
+            gentleClaim = gentleText,
+            forceClaim = forceText,
+        )
     }
 
-    override fun exchange(payload: ByteArray): ByteArray? {
-        val iface = claimed ?: return null
-        if (closed) return null
-        val out = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_OUT } ?: return null
-        val incoming = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_IN } ?: return null
+    override fun exchange(payload: ByteArray): HidReport {
+        val iface = claimed ?: return HidReport.Failed
+        if (closed) return HidReport.Failed
+        val out = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_OUT } ?: return HidReport.Failed
+        val incoming = endpoints(iface).firstOrNull { it.direction == UsbConstants.USB_DIR_IN } ?: return HidReport.Failed
         val port = UsbRequestPort(connection, mapOf(OUT_ENDPOINT to out, IN_ENDPOINT to incoming))
         return exchangeHidReport(
             port = port,
@@ -199,10 +234,22 @@ private class AndroidUsbSession(
     override fun close() {
         if (closed) return
         closed = true
-        claimed?.let { iface -> runCatching { connection.releaseInterface(iface) } }
+        val iface = claimed
         claimed = null
+        if (iface != null) runCatching { connection.releaseInterface(iface) }
         runCatching { connection.close() }
     }
+
+    private fun fact(iface: UsbInterface) = InterfaceFact(
+        id = iface.id,
+        classCode = iface.interfaceClass,
+        subclass = iface.interfaceSubclass,
+        protocol = iface.interfaceProtocol,
+        endpoints = (0 until iface.endpointCount).map { endpointIndex ->
+            val endpoint = iface.getEndpoint(endpointIndex)
+            EndpointFact(endpoint.address, endpoint.attributes, endpoint.maxPacketSize)
+        },
+    )
 
     private fun endpoints(iface: UsbInterface) =
         (0 until iface.endpointCount).map { iface.getEndpoint(it) }

@@ -237,6 +237,7 @@ private fun layerRank(layer: Latch): Int = when (layer) {
     Latch.LOWER -> 1
     Latch.UPPER -> 2
     Latch.SHIFT -> 3
+    Latch.ADJUST -> 4
 }
 
 private fun modifierKeyIds(kind: KeyModifier): Set<Int> = when (kind) {

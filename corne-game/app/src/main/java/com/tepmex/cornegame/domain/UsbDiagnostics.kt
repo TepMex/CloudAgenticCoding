@@ -1,5 +1,6 @@
 package com.tepmex.cornegame.domain
 
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,7 @@ class UsbDiagnosticsController(
     private val lock = ReentrantLock()
     private val ready = lock.newCondition()
     private var closed = false
+    private val active = AtomicReference<UsbSession?>(null)
     private val worker = Thread {
         try {
             while (true) {
@@ -82,7 +84,13 @@ class UsbDiagnosticsController(
                 current.copy(devices = devices, selectedKey = selected, probe = note)
             }
             if (devices.isEmpty()) {
-                _firmware.value = FirmwareState(error = "Устройство не подключено.")
+                _firmware.value = FirmwareState(
+                    connected = false,
+                    telemetry = Telemetry.UNKNOWN,
+                    stage = LinkStage.NO_DEVICE,
+                    source = "usb",
+                    error = "Устройство не подключено.",
+                )
             }
         }
     }
@@ -112,54 +120,39 @@ class UsbDiagnosticsController(
         }
     }
 
+    /** Обычная проверка: только claimInterface(force=false). */
     fun probeSelected() {
+        probe(allowForce = false)
+    }
+
+    /**
+     * Расширенная проверка. Без [confirmed] соединение не открывается и force=true не вызывается.
+     * Вызов имеет смысл только после CLAIM_FAILED и найденного Raw HID.
+     */
+    fun probeAdvanced(confirmed: Boolean) {
         run {
-            val current = _dashboard.value
-            val device = current.devices.find { it.key == current.selectedKey }
-            if (device == null) {
-                val result = ProbeResult(
-                    opened = false,
-                    status = ProbeStatus.NO_DEVICE,
-                    detail = "Нет выбранного USB-устройства.",
+            if (!canOfferForceProbe(_dashboard.value)) return@run
+            if (!confirmed) {
+                val current = _dashboard.value.probe
+                val declined = current.copy(
+                    forceClaim = "отменён пользователем, force=true не вызывался",
+                    detail = "Принудительный захват отменён. Интерфейс не захватывался с force=true.",
+                    recovery = "Обычная проверка остаётся безопасной. Драйвер ядра не отключался.",
                 )
-                publish(current.copy(probe = result), firmwareFromProbe(result))
+                publish(_dashboard.value.copy(probe = declined))
                 return@run
             }
-            if (device.permission != UsbPermission.GRANTED) {
-                val result = ProbeResult(
-                    opened = false,
-                    status = ProbeStatus.NO_PERMISSION,
-                    detail = "Нет разрешения Android на USB. Запросите доступ и повторите проверку.",
-                )
-                publish(current.copy(probe = result), firmwareFromProbe(result))
-                return@run
-            }
-            val session = runCatching { hardware.open(device.key) }.getOrNull()
-            if (session == null) {
-                val result = ProbeResult(
-                    opened = false,
-                    status = ProbeStatus.IO_ERROR,
-                    detail = "Соединение не открылось. Устройство могло отключиться.",
-                )
-                publish(current.copy(probe = result), firmwareFromProbe(result))
-                return@run
-            }
-            val result = runCatching { runReadOnlyProbe(session) }.getOrElse { error ->
-                runCatching { session.close() }
-                ProbeResult(
-                    opened = true,
-                    status = ProbeStatus.IO_ERROR,
-                    detail = error.message ?: "Ошибка обмена.",
-                )
-            }
-            publish(
-                _dashboard.value.copy(probe = result, log = (_dashboard.value.log + result.detail).takeLast(20)),
-                firmwareFromProbe(result),
-            )
+            probeBody(allowForce = true)
         }
     }
 
+    /** Отпустить интерфейс, если проверка ещё держит соединение. Экран диагностики его не хранит. */
+    fun releaseActive() {
+        active.getAndSet(null)?.let { session -> runCatching { session.close() } }
+    }
+
     fun close() {
+        releaseActive()
         lock.lock()
         try {
             closed = true
@@ -169,6 +162,66 @@ class UsbDiagnosticsController(
             lock.unlock()
         }
         worker.interrupt()
+    }
+
+    private fun probe(allowForce: Boolean) {
+        run { probeBody(allowForce) }
+    }
+
+    private fun probeBody(allowForce: Boolean) {
+        val current = _dashboard.value
+        val device = current.devices.find { it.key == current.selectedKey }
+        if (device == null) {
+            val result = ProbeResult(
+                opened = false,
+                status = ProbeStatus.NO_DEVICE,
+                detail = "Нет выбранного USB-устройства.",
+                recovery = recoveryFor(ProbeStatus.NO_DEVICE),
+            )
+            publish(current.copy(probe = result), firmwareFromProbe(result))
+            return
+        }
+        if (device.permission != UsbPermission.GRANTED) {
+            val result = ProbeResult(
+                opened = false,
+                status = ProbeStatus.NO_PERMISSION,
+                detail = "Нет разрешения Android на USB. Запросите доступ и повторите проверку.",
+                recovery = recoveryFor(ProbeStatus.NO_PERMISSION),
+            )
+            publish(current.copy(probe = result), firmwareFromProbe(result))
+            return
+        }
+        val session = runCatching { hardware.open(device.key) }.getOrNull()
+        if (session == null) {
+            val result = ProbeResult(
+                opened = false,
+                status = ProbeStatus.IO_ERROR,
+                detail = "Соединение не открылось. Устройство могло отключиться.",
+                recovery = recoveryFor(ProbeStatus.IO_ERROR),
+            )
+            publish(current.copy(probe = result), firmwareFromProbe(result))
+            return
+        }
+        active.set(session)
+        val result = try {
+            runReadOnlyProbe(session, allowForce)
+        } catch (error: Exception) {
+            runCatching { session.close() }
+            ProbeResult(
+                opened = true,
+                status = ProbeStatus.IO_ERROR,
+                detail = error.message ?: "Ошибка обмена.",
+                exchangeNote = "исключение, соединение закрывается",
+                recovery = recoveryFor(ProbeStatus.IO_ERROR),
+            )
+        } finally {
+            runCatching { session.close() }
+            active.compareAndSet(session, null)
+        }
+        publish(
+            _dashboard.value.copy(probe = result, log = (_dashboard.value.log + result.detail).takeLast(20)),
+            firmwareFromProbe(result),
+        )
     }
 
     private fun nextTask(): (() -> Unit)? {

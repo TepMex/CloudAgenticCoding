@@ -108,9 +108,14 @@ class LayoutsTest {
         assertTrue(waiting.caption.contains("L1"))
 
         val latched = keyboardModel(
-            TypingSession(Language.EN, "(2) a").apply(TrainerAction.Lower, 1).first,
+            TypingSession(Language.EN, "(2) a"),
+            BoardLive(screenLower = true),
         )
         assertEquals("(", latched.leftRows[0][2].legend)
+        val remembered = keyboardModel(
+            TypingSession(Language.EN, "(2) a").apply(TrainerAction.Lower, 1).first,
+        )
+        assertEquals("w", remembered.leftRows[0][2].legend)
         assertTrue(latched.leftRows[0][2].primary)
         assertEquals("7", latched.rightRows[0][0].legend)
         assertEquals("L2", latched.rightRows[3][1].legend)
@@ -154,8 +159,8 @@ class LayoutsTest {
 
     @Test
     fun upperLayerShowsFunctionKeysWhenLatched() {
-        val session = TypingSession(Language.EN, "a").copy(latch = Latch.UPPER)
-        val model = keyboardModel(session)
+        val session = TypingSession(Language.EN, "a")
+        val model = keyboardModel(session, BoardLive(screenUpper = true))
         assertEquals("F1", model.rightRows[2][0].legend)
         assertEquals("F12", model.rightRows[2][3].legend)
         assertEquals("*", model.leftRows[0][0].legend)
@@ -164,14 +169,18 @@ class LayoutsTest {
         assertEquals("L1", model.leftRows[3][4].legend)
         assertEquals("L2", model.rightRows[3][1].legend)
 
-        val russian = keyboardModel(session.copy(language = Language.RU))
+        val russian = keyboardModel(
+            session.copy(language = Language.RU),
+            BoardLive(screenUpper = true),
+        )
         assertEquals("ж", russian.rightRows[1][5].legend)
     }
 
     @Test
     fun lowerLayerMatchesVialExport() {
         val english = keyboardModel(
-            TypingSession(Language.EN, "a").copy(latch = Latch.LOWER),
+            TypingSession(Language.EN, "a"),
+            BoardLive(screenLower = true),
         )
         assertEquals("Esc", english.leftRows[0][0].legend)
         assertEquals("`", english.leftRows[0][1].legend)
@@ -188,7 +197,8 @@ class LayoutsTest {
         assertEquals("Alt", english.leftRows[3][3].legend)
 
         val russian = keyboardModel(
-            TypingSession(Language.RU, "а").copy(latch = Latch.LOWER),
+            TypingSession(Language.RU, "а"),
+            BoardLive(screenLower = true),
         )
         assertEquals("ё", russian.leftRows[0][1].legend)
         assertEquals("х", russian.leftRows[1][2].legend)
@@ -214,16 +224,16 @@ class LayoutsTest {
         assertFalse(held.leftRows[2][0].primary)
 
         val lower = keyboardModel(
-            TypingSession(Language.EN, "a").copy(latch = Latch.LOWER),
-            BoardLive(hardwareShift = true),
+            TypingSession(Language.EN, "a"),
+            BoardLive(screenLower = true, hardwareShift = true),
         )
         assertEquals("&", lower.rightRows[0][0].legend)
         assertEquals("(", lower.leftRows[0][2].legend)
         assertEquals("~", lower.leftRows[0][1].legend)
 
         val russian = keyboardModel(
-            TypingSession(Language.RU, "а").copy(latch = Latch.LOWER),
-            BoardLive(hardwareShift = true),
+            TypingSession(Language.RU, "а"),
+            BoardLive(screenLower = true, hardwareShift = true),
         )
         assertEquals("Ё", russian.leftRows[0][1].legend)
         assertEquals("?", russian.rightRows[0][0].legend)

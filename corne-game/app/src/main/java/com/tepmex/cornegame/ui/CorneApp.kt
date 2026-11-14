@@ -46,6 +46,7 @@ fun CorneApp(viewModel: TrainViewModel, usb: UsbDiagnosticsController) {
                         onContact = viewModel::onKeyContact,
                         onPointer = viewModel::onPointer,
                         onScreenKey = viewModel::onScreenKey,
+                        onReleaseHolds = viewModel::releaseScreenHolds,
                         firmware = firmware,
                     )
                     AppScreen.Results -> ResultsScreen(

@@ -4,7 +4,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,7 +14,8 @@ class HidExchangeTest {
         val port = ScriptedPort(awaitSteps = ArrayDeque(listOf("out", "in")), response = response)
         val payload = byteArrayOf(0x01, 0, 0)
         val got = exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, payload, responseLength = 32, timeoutMs = 400)
-        assertEquals(listOf(0x01.toByte(), 0x0c.toByte(), 0x00.toByte()), got?.toList())
+        val data = got as HidReport.Data
+        assertEquals(listOf(0x01.toByte(), 0x0c.toByte(), 0x00.toByte()), data.bytes.toList())
         assertEquals(
             listOf(
                 "open:out",
@@ -42,14 +42,14 @@ class HidExchangeTest {
     @Test
     fun outTimeoutCancelsAndDoesNotOpenTheInEndpoint() {
         val port = ScriptedPort(awaitSteps = ArrayDeque(listOf(null)))
-        assertNull(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400))
+        assertTrue(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400) is HidReport.Timeout)
         assertEquals(listOf("open:out", "queue:out:1", "await:400", "cancel:out", "close:out"), port.log)
     }
 
     @Test
     fun inTimeoutCancelsOnlyTheInRequest() {
         val port = ScriptedPort(awaitSteps = ArrayDeque(listOf("out", null)))
-        assertNull(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 50))
+        assertTrue(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 50) is HidReport.Timeout)
         assertEquals(
             listOf(
                 "open:out",
@@ -69,14 +69,14 @@ class HidExchangeTest {
     @Test
     fun failedQueueClosesWithoutCancelOrWait() {
         val port = ScriptedPort(awaitSteps = ArrayDeque(), failQueue = "out")
-        assertNull(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400))
+        assertTrue(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400) is HidReport.Failed)
         assertEquals(listOf("open:out", "queue:out:1", "close:out"), port.log)
     }
 
     @Test
     fun completedInWithNoBytesIsNotAReport() {
         val port = ScriptedPort(awaitSteps = ArrayDeque(listOf("out", "in")), response = byteArrayOf())
-        assertNull(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400))
+        assertTrue(exchangeHidReport(port, OUT_ENDPOINT, IN_ENDPOINT, byteArrayOf(1), 32, 400) is HidReport.Empty)
         assertFalse(port.log.contains("cancel:in"))
         assertTrue(port.log.contains("close:in"))
     }
@@ -95,6 +95,9 @@ class HidExchangeTest {
         assertFalse(usb.contains("bulkTransfer("))
         assertTrue(usb.contains("UsbRequest"))
         assertTrue(usb.contains("requestWait"))
+        assertTrue(usb.contains("connection.claimInterface(iface, force)"))
+        assertFalse(usb.contains("claimInterface(iface, true)"))
+        assertFalse(usb.contains("claimInterface(iface, false)"))
     }
 }
 

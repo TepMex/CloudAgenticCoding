@@ -63,7 +63,7 @@ class TrainViewModelTest {
     }
 
     @Test
-    fun shortTapLatchesAndATypedCharacterWhileHeldDoesNot() {
+    fun shortTapDoesNotLatchLowerAndReleaseClearsTheHold() {
         val dir = tempDir()
         val viewModel = TrainViewModel(
             FileSessionHistory(File(dir, "sessions.json")),
@@ -71,19 +71,15 @@ class TrainViewModelTest {
             clock = { 1_000L },
             random = Random(1),
         )
+        viewModel.setLanguage(Language.RU)
+        assertEquals('(', viewModel.state.value.session.nextChar)
+        val before = viewModel.state.value.session.correctPresses
         viewModel.onKeyContact(TrainerAction.Lower, true)
-        viewModel.onKeyContact(TrainerAction.Lower, false)
-        assertEquals(Latch.LOWER, viewModel.state.value.session.latch)
-        assertFalse(viewModel.state.value.board.screenLower)
-
-        viewModel.restart()
-        viewModel.onKeyContact(TrainerAction.Lower, true)
-        val next = viewModel.state.value.session.nextChar
-        check(next != null)
-        viewModel.onTrainerAction(TrainerAction.Character(next))
         viewModel.onKeyContact(TrainerAction.Lower, false)
         assertEquals(Latch.NONE, viewModel.state.value.session.latch)
-        assertEquals(1, viewModel.state.value.session.index)
+        assertFalse(viewModel.state.value.board.screenLower)
+        assertEquals(0, viewModel.state.value.session.index)
+        assertEquals(before, viewModel.state.value.session.correctPresses)
     }
 
     @Test

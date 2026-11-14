@@ -20,6 +20,20 @@ enum class Confidence {
     REPORTED,
 }
 
+/**
+ * Насколько далеко дошёл обмен. [Telemetry.UNAVAILABLE] ставится только после
+ * проверенного протокола, который сам layer_state не отдаёт.
+ */
+enum class LinkStage {
+    NOT_CHECKED,
+    NO_DEVICE,
+    NO_PERMISSION,
+    NO_RAW_HID,
+    RAW_HID_UNREACHABLE,
+    PROTOCOL_UNVERIFIED,
+    PROTOCOL_VERIFIED,
+}
+
 data class FirmwareState(
     val connected: Boolean = false,
     val telemetry: Telemetry = Telemetry.UNKNOWN,
@@ -27,6 +41,7 @@ data class FirmwareState(
     val source: String = "none",
     val confidence: Confidence = Confidence.UNKNOWN,
     val error: String? = null,
+    val stage: LinkStage = LinkStage.NOT_CHECKED,
 )
 
 /**

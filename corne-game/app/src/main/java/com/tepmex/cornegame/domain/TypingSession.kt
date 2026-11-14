@@ -192,6 +192,9 @@ data class TypingSession(
         return next to InputEffect(mistake = false, completed = done)
     }
 
+    /** Символ экранной клавиши, которого на текущем слое нет. Индекс не двигается. */
+    fun rejectOffLayer(typed: Char, nowMs: Long): Pair<TypingSession, InputEffect> = fail(typed, nowMs)
+
     private fun fail(typed: Char, nowMs: Long): Pair<TypingSession, InputEffect> {
         val started = startedAtMs ?: nowMs
         val expected = target[index]

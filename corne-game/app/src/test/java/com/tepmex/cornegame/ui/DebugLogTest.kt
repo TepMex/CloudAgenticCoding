@@ -224,10 +224,9 @@ class DebugLogTest {
         viewModel.onKeyContact(TrainerAction.Lower, false)
         val text = viewModel.debugLog.value.joinToString("\n")
         assertTrue(text.contains("TOUCH down L1"))
-        assertTrue(text.contains("TOUCH up L1 SHORT"))
-        assertTrue(text.contains("ACTION screen L1 OK"))
-        assertTrue(text.contains("latch NONE→LOWER"))
-        assertEquals(Latch.LOWER, viewModel.state.value.session.latch)
+        assertTrue(text.contains("TOUCH up L1 MOMENTARY"))
+        assertFalse(text.contains("latch NONE→LOWER"))
+        assertEquals(Latch.NONE, viewModel.state.value.session.latch)
 
         viewModel.onPointer("down", 4, "q", TrainerAction.Character('q'), null)
         assertTrue(viewModel.debugLog.value.last().contains("POINTER down id=4 legend=q action=char'q'"))
@@ -248,7 +247,8 @@ class DebugLogTest {
         viewModel.onTrainerAction(TrainerAction.Character(next))
         viewModel.onKeyContact(TrainerAction.Lower, false)
         assertEquals(Latch.NONE, viewModel.state.value.session.latch)
-        assertTrue(viewModel.debugLog.value.any { it.contains("TOUCH up L1 HOLD-USED") })
+        assertFalse(viewModel.state.value.board.screenLower)
+        assertTrue(viewModel.debugLog.value.any { it.contains("TOUCH up L1 MOMENTARY") })
     }
 
     @Test
@@ -288,7 +288,7 @@ class DebugLogTest {
         val line = uiSnapshot(state)
         assertTrue(line.contains("idx=0/3"))
         assertTrue(line.contains("next='('"))
-        assertTrue(line.contains("нужен L1"))
+        assertTrue(line.contains("удерживать L1"))
         assertTrue(line.contains("hi=L1"))
         val moved = state.copy(
             session = state.session.copy(index = 1),
