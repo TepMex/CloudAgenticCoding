@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,22 +29,27 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.tepmex.cornegame.domain.CORNEDEON_PRODUCT_ID
-import com.tepmex.cornegame.domain.CORNEDEON_VENDOR_ID
-import com.tepmex.cornegame.domain.FirmwareState
-import com.tepmex.cornegame.domain.InterfaceFact
 import com.tepmex.cornegame.domain.UidMatchResult
-import com.tepmex.cornegame.domain.UsbDeviceSnapshot
-import com.tepmex.cornegame.domain.UsbDiagnosticsController
 import com.tepmex.cornegame.domain.cornedeonVialUidBytes
 import com.tepmex.cornegame.domain.formatHidExchange
 import com.tepmex.cornegame.domain.formatHidExchanges
-import com.tepmex.cornegame.domain.looksLikeCornedeon
 import com.tepmex.cornegame.domain.uidComparisonText
 import com.tepmex.cornegame.domain.uidHex
 import com.tepmex.cornegame.domain.usbDiagnosticsReport
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tepmex.cornegame.domain.CORNEDEON_PRODUCT_ID
+import com.tepmex.cornegame.domain.CORNEDEON_PRODUCT_ID_V2M
+import com.tepmex.cornegame.domain.CORNEDEON_VENDOR_ID
+import com.tepmex.cornegame.domain.FirmwareState
+import com.tepmex.cornegame.domain.InterfaceFact
+import com.tepmex.cornegame.domain.UsbDashboard
+import com.tepmex.cornegame.domain.UsbDeviceSnapshot
+import com.tepmex.cornegame.domain.UsbDiagnosticsController
+import com.tepmex.cornegame.domain.canOfferForceProbe
+import com.tepmex.cornegame.domain.chooseRawInterface
+import com.tepmex.cornegame.domain.layerTelemetryLine
+import com.tepmex.cornegame.domain.looksLikeCornedeon
 
 @Composable
 fun UsbScreen(
@@ -52,7 +59,11 @@ fun UsbScreen(
 ) {
     val dashboard by controller.dashboard.collectAsStateWithLifecycle()
     val firmware by controller.state.collectAsStateWithLifecycle()
+    var askForce by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { controller.refresh() }
+    DisposableEffect(controller) {
+        onDispose { controller.releaseActive() }
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -65,10 +76,10 @@ fun UsbScreen(
             Text("USB-диагностика", style = MaterialTheme.typography.titleLarge)
         }
         Text(
-            "Cornedeon v2m USB VID:PID: %04X:%04X. Ожидаемые ответы этой прошивки — VIA protocol 9 и Vial protocol 6; " +
-                "экран показывает то, что пришло, и не подставляет эти числа. Другой дескриптор тоже показывается. " +
-                "Проверка только читает VIA/Vial и не меняет раскладку. Boot-клавиатура не захватывается."
-                    .format(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID),
+            "Cornedeon v2m USB VID:PID: %04X:%04X. Ориентир 2mod — PID %04X. " +
+                "Ожидаемые ответы этой прошивки — VIA protocol 9 и Vial protocol 6; экран показывает то, что пришло. " +
+                "Обычная проверка только читает VIA/Vial и не отключает драйвер. Boot-клавиатура не захватывается."
+                    .format(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID_V2M, CORNEDEON_PRODUCT_ID),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -89,6 +100,15 @@ fun UsbScreen(
         Button(onClick = controller::probeSelected, modifier = Modifier.fillMaxWidth()) {
             Text("Проверить Raw HID")
         }
+        if (canOfferForceProbe(dashboard)) {
+            OutlinedButton(onClick = { askForce = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Расширенная проверка Raw HID")
+            }
+        }
+        OutlinedButton(onClick = controller::releaseActive, modifier = Modifier.fillMaxWidth()) {
+            Text("Закрыть USB-соединение")
+        }
+        ProbeBlock(dashboard)
         Text(
             usbDiagnosticsReport(
                 devicePresent = dashboard.devices.isNotEmpty(),
@@ -109,7 +129,6 @@ fun UsbScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        Text(dashboard.probe.detail)
         val exchangeLog = formatHidExchanges(dashboard.probe.exchanges)
         if (exchangeLog.isNotEmpty()) {
             Text("Обмен USB", style = MaterialTheme.typography.titleMedium)
@@ -126,19 +145,76 @@ fun UsbScreen(
             )
             CopyHexButton(label = "Копировать обмен", text = exchangeLog)
             dashboard.probe.exchanges.forEach { record ->
-                CopyHexButton(
-                    label = "Копировать ${record.name}",
-                    text = formatHidExchange(record),
-                )
+                CopyHexButton(label = "Копировать ${record.name}", text = formatHidExchange(record))
             }
         }
         FirmwareBlock(firmware)
+        if (askForce) {
+            AlertDialog(
+                onDismissRequest = {
+                    askForce = false
+                    controller.probeAdvanced(confirmed = false)
+                },
+                title = { Text("Принудительный захват Raw HID") },
+                text = {
+                    Text(
+                        "claimInterface(force=true) может отсоединить драйвер ядра только от интерфейса Raw HID. " +
+                            "Печать может на время пропасть. Boot-клавиатура не захватывается. " +
+                            "После проверки интерфейс будет отпущен. Если печать не вернётся, переподключите кабель.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        askForce = false
+                        controller.probeAdvanced(confirmed = true)
+                    }) { Text("Захватить Raw HID") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        askForce = false
+                        controller.probeAdvanced(confirmed = false)
+                    }) { Text("Отмена") }
+                },
+            )
+        }
         if (dashboard.log.isNotEmpty()) {
             Text("Журнал", style = MaterialTheme.typography.titleMedium)
             dashboard.log.forEach { line ->
                 Text(line, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+@Composable
+private fun ProbeBlock(dashboard: UsbDashboard) {
+    val probe = dashboard.probe
+    val device = dashboard.devices.find { it.key == dashboard.selectedKey }
+    val raw = device?.let { chooseRawInterface(it.interfaces) }
+    Text("Проверка", style = MaterialTheme.typography.titleMedium)
+    Text(
+        listOf(
+            "USB permission: ${device?.permission?.name ?: "устройства нет"}",
+            "Raw HID: ${raw?.let { "интерфейс ${it.id}, ${it.role}" } ?: "не найден"}",
+            "claimInterface(force=false): ${probe.gentleClaim}",
+            "claimInterface(force=true): ${probe.forceClaim}",
+            "Обмен: ${probe.exchangeNote}",
+            "VIA: ${probe.viaNote}",
+            "Vial: ${probe.vialNote}",
+            "Статус: ${probe.status}",
+        ).joinToString("\n"),
+        fontFamily = FontFamily.Monospace,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Text(probe.detail)
+    probe.protocolVersion?.let { version ->
+        Text("VIA protocol: $version")
+    }
+    probe.vialKeyboardId?.let { id ->
+        Text("Vial keyboard id: $id", fontFamily = FontFamily.Monospace)
+    }
+    probe.recovery?.let { recovery ->
+        Text(recovery, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -205,6 +281,7 @@ private fun FirmwareBlock(firmware: FirmwareState) {
     Text("Прошивка", style = MaterialTheme.typography.titleMedium)
     Text(
         "Подключение: ${if (firmware.connected) "да" else "нет"}\n" +
+            "Состояние: ${layerTelemetryLine(firmware)}\n" +
             "Physical layer telemetry: NOT IMPLEMENTED (${firmware.telemetry})\n" +
             "Active layer mask: ${firmware.activeLayersMask?.let { "0x${it.toString(16)}" } ?: "UNKNOWN"}\n" +
             "Источник: ${firmware.source}\n" +

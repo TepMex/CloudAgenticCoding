@@ -2,24 +2,26 @@ package com.tepmex.cornegame.domain
 
 /**
  * Разбор USB-сведений и единственные read-only запросы VIA/Vial, которые диагностика шлёт.
- * Запросы на запись EEPROM, keymap и layer_state здесь отсутствуют: этот обмен слой не отдаёт,
- * а неизвестные пакеты не отправляются.
+ * Запросы на запись EEPROM, keymap и layer_state здесь отсутствуют.
  *
- * Живая Cornedeon v2m отвечает VID 0x4653 / PID 0x0007. PID 0x0009 — старый ориентир
- * дерева cornedeon_2mod, не фильтр и не единственный допустимый идентификатор.
+ * VID 0x4653 / PID 0x0009 — ориентир Cornedeon 2mod. PID 0x0007 — живая Cornedeon v2m.
+ * Оба узнаются, ни один не является фильтром.
  *
- * VIA `id_get_protocol_version` (QMK `quantum/via.c`) оставляет байт команды и пишет
- * `VIA_PROTOCOL_VERSION` как big-endian: `data[1] = version >> 8`, `data[2] = version & 0xFF`.
- * Пакет `01 00 09` — версия 9. Little-endian тех же байт даёт 2304 и к протоколу отношения не имеет.
+ * VIA `id_get_protocol_version` (QMK `quantum/via.c`) пишет версию big-endian:
+ * `data[1] = version >> 8`, `data[2] = version & 0xFF`. Пакет `01 00 09` — версия 9.
  *
- * Vial `vial_get_keyboard_id` (vial-qmk `quantum/vial.c`) обнуляет буфер и пишет
- * `VIAL_PROTOCOL_VERSION` как uint32 little-endian в байты 0..3, затем 8 байт
- * `VIAL_KEYBOARD_UID` в байты 4..11. Префикс запроса `FE 00` в ответе не сохраняется.
+ * Vial `vial_get_keyboard_id` (vial-qmk `quantum/vial.c`) затирает буфер запроса.
+ * Байты 0..3 — версия протокола, uint32 little-endian. Байты 4..11 — UID.
+ * Префикс запроса `FE 00` в ответе не сохраняется.
+ *
+ * `claimInterface(force=true)` планируется только для Raw HID и только после явного
+ * подтверждения, следом за неудачным `force=false`. Boot-клавиатура в план не входит.
  */
 
 const val CORNEDEON_VENDOR_ID = 0x4653
-const val CORNEDEON_PRODUCT_ID = 0x0007
-const val CORNEDEON_LEGACY_PRODUCT_ID = 0x0009
+const val CORNEDEON_PRODUCT_ID = 0x0009
+/** Живая Cornedeon v2m из USB-дескриптора. 0x0009 остаётся ориентиром прошивки 2mod. */
+const val CORNEDEON_PRODUCT_ID_V2M = 0x0007
 const val VIA_REPORT_BYTES = 32
 const val VIA_GET_PROTOCOL_VERSION: Byte = 0x01
 const val VIAL_PREFIX: Byte = 0xFE.toByte()
@@ -28,7 +30,7 @@ const val VIAL_UID_LENGTH = 8
 const val VIAL_VERSION_LENGTH = 4
 
 /**
- * Поле `uid` в [cornedeon_v2m.vil](cornedeon_v2m.vil).
+ * Поле `uid` в cornedeon_v2m.vil.
  * Число больше [Long.MAX_VALUE], поэтому хранится десятичной строкой, а не знаковым Long.
  */
 const val CORNEDEON_VIAL_EXPORT_UID = "11156463090065812860"
@@ -39,7 +41,8 @@ const val CORNEDEON_VIAL_EXPORT_UID = "11156463090065812860"
  */
 const val VIAL_PROTOCOL_VERSION_MAX = 32L
 
-private val CORNEDEON_PRODUCT_IDS = setOf(CORNEDEON_PRODUCT_ID, CORNEDEON_LEGACY_PRODUCT_ID)
+/** VIA-версия шире этого значения не считается совместимой с read-only проверкой. */
+const val VIA_PROTOCOL_VERSION_MAX = 0x0FFF
 
 enum class UsbPermission {
     UNKNOWN,
@@ -60,6 +63,9 @@ enum class ProbeStatus {
     NO_INTERFACE,
     CLAIM_FAILED,
     PROTOCOL_MISMATCH,
+    INCOMPATIBLE_VERSION,
+    TIMEOUT,
+    NO_RESPONSE,
     IO_ERROR,
     /** VIA разобран, идентичность Vial — нет. Это не полный успех. */
     PARTIAL,
@@ -118,7 +124,7 @@ data class UsbDeviceSnapshot(
 /**
  * Идентичность, которую прошивка возвращает на `get_keyboard_id`.
  * [protocolVersion] — uint32, он помещается в неотрицательный [Long].
- * UID — ровно 8 байт. В знаковый Long он не упаковывается: экспорт Cornedeon больше [Long.MAX_VALUE].
+ * UID — ровно 8 байт и в знаковый Long не упаковывается.
  */
 class VialIdentity(
     val protocolVersion: Long,
@@ -152,11 +158,18 @@ data class ProbeResult(
     val status: ProbeStatus,
     val detail: String,
     val protocolVersion: Int? = null,
+    val vialKeyboardId: String? = null,
+    val rawInterfaceId: Int? = null,
+    val gentleClaim: String = "не выполнялся",
+    val forceClaim: String = "не запрашивался",
+    val exchangeNote: String = "не выполнялся",
+    val viaNote: String = "не запрашивался",
+    val vialNote: String = "не запрашивался",
+    val recovery: String? = null,
     val vial: VialIdentity? = null,
     val vialProtocolVersion: Long? = null,
     val partialUidHex: String? = null,
     val uidComparison: UidMatchResult = UidMatchResult.UNKNOWN,
-    val interfaceId: Int? = null,
     val flags: Set<DiagnosticFlag> = emptySet(),
     val exchanges: List<HidExchangeRecord> = emptyList(),
 )
@@ -198,9 +211,49 @@ fun hidRole(classCode: Int, subclass: Int, protocol: Int, endpoints: List<Endpoi
     return if (subclass == 0 && protocol == 0 && interruptIn && interruptOut) HidRole.RAW_HID else HidRole.OTHER
 }
 
-/** Boot-клавиатуру не выбираем: её захват сломал бы обычный ввод. force=true здесь не используется. */
+/** Boot-клавиатуру и интерфейс без пары interrupt IN/OUT не выбираем. */
 fun chooseRawInterface(interfaces: List<InterfaceFact>): InterfaceFact? =
     interfaces.firstOrNull { it.role == HidRole.RAW_HID }
+
+/**
+ * Совпадает ли живой интерфейс с выбранным дескриптором Raw HID.
+ * Сравнение идёт по классу, протоколу и эндпоинтам, не по порядковому номеру.
+ */
+fun matchesRawCandidate(candidate: InterfaceFact, actual: InterfaceFact): Boolean =
+    candidate.role == HidRole.RAW_HID &&
+        actual.role == HidRole.RAW_HID &&
+        candidate.id == actual.id &&
+        candidate.classCode == actual.classCode &&
+        candidate.subclass == actual.subclass &&
+        candidate.protocol == actual.protocol &&
+        candidate.endpoints == actual.endpoints
+
+/**
+ * Порядок [android.hardware.usb.UsbDeviceConnection.claimInterface]. true в списке — это force=true.
+ * Boot-клавиатура и любой не-Raw HID дают пустой план: claimInterface не вызывается.
+ * force=true есть в плане только после явного подтверждения и только следом за force=false.
+ */
+fun claimForces(role: HidRole, userConfirmedForce: Boolean): List<Boolean> {
+    if (role != HidRole.RAW_HID) return emptyList()
+    return if (userConfirmedForce) listOf(false, true) else listOf(false)
+}
+
+data class ClaimAttempt(val force: Boolean, val ok: Boolean)
+
+/** Останавливается на первом успехе, поэтому force=true не вызывается, если хватило force=false. */
+fun runClaimPlan(
+    role: HidRole,
+    userConfirmedForce: Boolean,
+    tryClaim: (force: Boolean) -> Boolean,
+): List<ClaimAttempt> {
+    val log = mutableListOf<ClaimAttempt>()
+    for (force in claimForces(role, userConfirmedForce)) {
+        val ok = tryClaim(force)
+        log += ClaimAttempt(force, ok)
+        if (ok) break
+    }
+    return log
+}
 
 fun looksLikeCornedeon(
     vendorId: Int,
@@ -209,7 +262,11 @@ fun looksLikeCornedeon(
     productName: String?,
     deviceName: String,
 ): Boolean {
-    if (vendorId == CORNEDEON_VENDOR_ID && productId in CORNEDEON_PRODUCT_IDS) return true
+    if (vendorId == CORNEDEON_VENDOR_ID &&
+        (productId == CORNEDEON_PRODUCT_ID || productId == CORNEDEON_PRODUCT_ID_V2M)
+    ) {
+        return true
+    }
     val blob = listOfNotNull(manufacturer, productName, deviceName).joinToString(" ").lowercase()
     return "cornedeon" in blob || ("alko" in blob && "corne" in blob)
 }
@@ -225,11 +282,13 @@ sealed class ViaVersionParse {
     data class Ok(val version: Int) : ViaVersionParse()
     data object Incomplete : ViaVersionParse()
     data class ProtocolError(val reason: String) : ViaVersionParse()
+    data class Incompatible(val version: Int) : ViaVersionParse()
 }
 
 /**
  * Два байта версии — big-endian, как в QMK: старший байт в `response[1]`, младший в `response[2]`.
- * Меньше трёх байт — ответ оборван. Чужой первый байт или нулевая версия — ошибка протокола.
+ * Меньше трёх байт — ответ оборван. Чужой первый байт — ошибка протокола.
+ * Нулевая или слишком большая версия при правильном байте команды — несовместимая версия.
  */
 fun parseViaProtocolVersion(response: ByteArray): ViaVersionParse {
     if (response.size < 3) return ViaVersionParse.Incomplete
@@ -240,6 +299,7 @@ fun parseViaProtocolVersion(response: ByteArray): ViaVersionParse {
         ((response[1].toInt() and 0xFF) shl 8) or
             (response[2].toInt() and 0xFF)
     if (version <= 0) return ViaVersionParse.ProtocolError("версия VIA равна 0")
+    if (version > VIA_PROTOCOL_VERSION_MAX) return ViaVersionParse.Incompatible(version)
     return ViaVersionParse.Ok(version)
 }
 
@@ -255,7 +315,7 @@ sealed class VialIdentityParse {
 
 /**
  * Ответ `get_keyboard_id` не начинается с `FE 00`: прошивка затирает буфер запроса.
- * Версия — uint32 little-endian. UID короче 8 байт не считается идентичностью и не сравнивается как совпадение.
+ * Версия — uint32 little-endian. UID короче 8 байт не считается идентичностью.
  */
 fun parseVialKeyboardId(response: ByteArray): VialIdentityParse {
     if (response.size < VIAL_VERSION_LENGTH) {
@@ -366,7 +426,7 @@ fun usbDiagnosticsReport(
         append(rawHid)
         append('\n')
         append("Interface: ")
-        append(probe.interfaceId?.toString() ?: "—")
+        append(probe.rawInterfaceId?.toString() ?: "—")
         append("\n\n")
         append("VIA protocol: ")
         append(probe.protocolVersion?.toString() ?: "—")
@@ -406,8 +466,12 @@ fun usbDiagnosticsReport(
 }
 
 interface UsbSession {
-    fun claimRawHid(): ClaimResult
-    fun exchange(payload: ByteArray): ByteArray?
+    /**
+     * [allowForce] true только после явного подтверждения расширенной проверки.
+     * Реализация всё равно не захватывает boot-клавиатуру и сначала пробует force=false.
+     */
+    fun claimRawHid(allowForce: Boolean): ClaimResult
+    fun exchange(payload: ByteArray): HidReport
     fun close()
 }
 
@@ -416,149 +480,326 @@ data class ClaimResult(
     val status: ProbeStatus,
     val detail: String,
     val interfaceId: Int? = null,
+    val gentleClaim: String = "не выполнялся",
+    val forceClaim: String = "не запрашивался",
 )
 
 /**
  * Сначала VIA get_protocol_version, затем Vial get_keyboard_id.
  * Оба запроса только читают. Если VIA не разобран, Vial не запрашивается.
- * layer_state не запрашивается и [FirmwareState.activeLayersMask] отсюда не заполняется.
+ * layer_state не запрашивается. Соединение закрывается и при успехе, и при ошибке.
  * Несовпадение UID с экспортом Cornedeon не отменяет уже разобранную идентичность Vial.
  */
 fun runReadOnlyProbe(
     session: UsbSession,
+    allowForce: Boolean = false,
     exportUid: ByteArray = cornedeonVialUidBytes(),
 ): ProbeResult {
     val exchanges = mutableListOf<HidExchangeRecord>()
     try {
-        val claim = session.claimRawHid()
+        val claim = session.claimRawHid(allowForce)
+        val base = ProbeResult(
+            opened = true,
+            status = claim.status,
+            detail = claim.detail,
+            rawInterfaceId = claim.interfaceId,
+            gentleClaim = claim.gentleClaim,
+            forceClaim = claim.forceClaim,
+        )
         if (!claim.ok) {
-            return assembleProbe(
-                opened = true,
-                status = claim.status,
-                detail = claim.detail,
-                interfaceId = claim.interfaceId,
+            return finish(
+                base.copy(
+                    exchangeNote = "не начинался: интерфейс не захвачен",
+                    recovery = recoveryFor(claim.status),
+                ),
+                rawHid = false,
                 exchanges = exchanges,
             )
         }
         val viaRequest = viaProtocolRequest()
-        val versionBytes = session.exchange(viaRequest)
-        exchanges += hidExchangeRecord("VIA get_protocol_version", viaRequest, versionBytes)
-        if (versionBytes == null) {
-            return assembleProbe(
-                opened = true,
-                status = ProbeStatus.IO_ERROR,
-                detail = "Нет ответа на VIA get_protocol_version.",
-                interfaceId = claim.interfaceId,
-                rawHid = true,
-                exchanges = exchanges,
-            )
-        }
-        val viaVersion = when (val via = parseViaProtocolVersion(versionBytes)) {
-            is ViaVersionParse.Ok -> via.version
-            ViaVersionParse.Incomplete -> {
-                return assembleProbe(
-                    opened = true,
-                    status = ProbeStatus.PROTOCOL_MISMATCH,
-                    detail = "Неполный ответ VIA get_protocol_version (${versionBytes.size} байт).",
-                    interfaceId = claim.interfaceId,
+        return when (val via = session.exchange(viaRequest)) {
+            HidReport.Timeout -> {
+                exchanges += hidExchangeRecord("VIA get_protocol_version", viaRequest, null)
+                finish(
+                    base.copy(
+                        status = ProbeStatus.TIMEOUT,
+                        detail = "Таймаут VIA get_protocol_version. Ответа не было.",
+                        exchangeNote = "таймаут",
+                        viaNote = "таймаут, ответа нет",
+                        recovery = recoveryFor(ProbeStatus.TIMEOUT),
+                    ),
                     rawHid = true,
                     exchanges = exchanges,
                 )
             }
-            is ViaVersionParse.ProtocolError -> {
-                return assembleProbe(
-                    opened = true,
-                    status = ProbeStatus.PROTOCOL_MISMATCH,
-                    detail = "Ошибка протокола VIA get_protocol_version: ${via.reason}.",
-                    interfaceId = claim.interfaceId,
+            HidReport.Empty -> {
+                exchanges += hidExchangeRecord("VIA get_protocol_version", viaRequest, null)
+                finish(
+                    base.copy(
+                        status = ProbeStatus.NO_RESPONSE,
+                        detail = "VIA get_protocol_version завершился без байт.",
+                        exchangeNote = "пустой ответ",
+                        viaNote = "пустой ответ",
+                        recovery = recoveryFor(ProbeStatus.NO_RESPONSE),
+                    ),
                     rawHid = true,
                     exchanges = exchanges,
                 )
             }
-        }
-        val vialRequest = vialKeyboardIdRequest()
-        val idBytes = session.exchange(vialRequest)
-        exchanges += hidExchangeRecord("Vial get_keyboard_id", vialRequest, idBytes)
-        if (idBytes == null) {
-            return assembleProbe(
-                opened = true,
-                status = ProbeStatus.PARTIAL,
-                detail = "VIA protocol $viaVersion. Ответ Vial get_keyboard_id не получен.",
-                interfaceId = claim.interfaceId,
-                rawHid = true,
-                viaVersion = viaVersion,
-                exchanges = exchanges,
-            )
-        }
-        return when (val parsed = parseVialKeyboardId(idBytes)) {
-            is VialIdentityParse.Ok -> {
-                val uid = compareKeyboardUid(parsed.identity.uidBytes, exportUid)
-                val note = uidComparisonText(uid, uidHex(parsed.identity.uidBytes), uidHex(exportUid))
-                assembleProbe(
-                    opened = true,
-                    status = ProbeStatus.OK,
-                    detail = "VIA protocol $viaVersion. Vial protocol ${parsed.identity.protocolVersion}. " +
-                        "$note Физический слой этим обменом не читается.",
-                    interfaceId = claim.interfaceId,
+            HidReport.Failed -> {
+                exchanges += hidExchangeRecord("VIA get_protocol_version", viaRequest, null)
+                finish(
+                    base.copy(
+                        status = ProbeStatus.IO_ERROR,
+                        detail = "Сбой обмена VIA get_protocol_version.",
+                        exchangeNote = "ошибка обмена",
+                        viaNote = "обмен не выполнен",
+                        recovery = recoveryFor(ProbeStatus.IO_ERROR),
+                    ),
                     rawHid = true,
-                    viaVersion = viaVersion,
-                    vial = parsed.identity,
-                    uid = uid,
                     exchanges = exchanges,
                 )
             }
-            is VialIdentityParse.Incomplete -> assembleProbe(
-                opened = true,
-                status = ProbeStatus.PARTIAL,
-                detail = "VIA protocol $viaVersion. Ответ Vial неполный: версия " +
-                    "${parsed.protocolVersion ?: "не прочитана"}, UID ${parsed.uidLength} из $VIAL_UID_LENGTH байт.",
-                interfaceId = claim.interfaceId,
-                rawHid = true,
-                viaVersion = viaVersion,
-                vialProtocolVersion = parsed.protocolVersion,
-                partialUidHex = parsed.uidHex,
-                exchanges = exchanges,
-            )
-            is VialIdentityParse.ProtocolError -> assembleProbe(
-                opened = true,
-                status = ProbeStatus.PARTIAL,
-                detail = "VIA protocol $viaVersion. Ошибка протокола Vial get_keyboard_id: ${parsed.reason}.",
-                interfaceId = claim.interfaceId,
-                rawHid = true,
-                viaVersion = viaVersion,
-                exchanges = exchanges,
-            )
+            is HidReport.Data -> {
+                exchanges += hidExchangeRecord("VIA get_protocol_version", viaRequest, via.bytes)
+                readVialAfterVersion(base, via.bytes, session, exportUid, exchanges)
+            }
         }
     } finally {
         session.close()
     }
 }
 
-fun firmwareFromProbe(result: ProbeResult): FirmwareState = when (result.status) {
-    ProbeStatus.OK, ProbeStatus.PARTIAL -> FirmwareState(
-        connected = true,
-        telemetry = Telemetry.UNAVAILABLE,
-        activeLayersMask = null,
-        source = "via-get-protocol-version",
-        confidence = Confidence.UNKNOWN,
-        error = null,
-    )
-    ProbeStatus.NOT_RUN, ProbeStatus.NO_DEVICE -> FirmwareState(
-        connected = false,
-        telemetry = Telemetry.UNKNOWN,
-        activeLayersMask = null,
-        source = "usb",
-        confidence = Confidence.UNKNOWN,
-        error = result.detail,
-    )
-    else -> FirmwareState(
+private fun readVialAfterVersion(
+    base: ProbeResult,
+    bytes: ByteArray,
+    session: UsbSession,
+    exportUid: ByteArray,
+    exchanges: MutableList<HidExchangeRecord>,
+): ProbeResult {
+    when (val via = parseViaProtocolVersion(bytes)) {
+        is ViaVersionParse.Incompatible -> {
+            return finish(
+                base.copy(
+                    status = ProbeStatus.INCOMPATIBLE_VERSION,
+                    detail = "VIA ответил 0x01, но версия ${via.version} вне поддерживаемого диапазона: ${hex(bytes)}.",
+                    exchangeNote = "ответ получен",
+                    viaNote = "несовместимая версия",
+                    recovery = "Другие команды не отправлялись. Раскладка не менялась.",
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        ViaVersionParse.Incomplete -> {
+            return finish(
+                base.copy(
+                    status = ProbeStatus.PROTOCOL_MISMATCH,
+                    detail = "Неполный ответ VIA get_protocol_version (${bytes.size} байт).",
+                    exchangeNote = "ответ получен",
+                    viaNote = "неполный ответ",
+                    recovery = "Это не полный ответ VIA. Запросы записи не отправлялись.",
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        is ViaVersionParse.ProtocolError -> {
+            return finish(
+                base.copy(
+                    status = ProbeStatus.PROTOCOL_MISMATCH,
+                    detail = "Ошибка протокола VIA get_protocol_version: ${via.reason}.",
+                    exchangeNote = "ответ получен",
+                    viaNote = "неправильный ответ",
+                    recovery = "Это не ответ VIA. Запросы записи не отправлялись.",
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        is ViaVersionParse.Ok -> return readVialIdentity(base, via.version, session, exportUid, exchanges)
+    }
+}
+
+private fun readVialIdentity(
+    base: ProbeResult,
+    version: Int,
+    session: UsbSession,
+    exportUid: ByteArray,
+    exchanges: MutableList<HidExchangeRecord>,
+): ProbeResult {
+    val viaNote = "версия $version"
+    val vialRequest = vialKeyboardIdRequest()
+    return when (val vial = session.exchange(vialRequest)) {
+        HidReport.Timeout -> {
+            exchanges += hidExchangeRecord("Vial get_keyboard_id", vialRequest, null)
+            finish(
+                base.copy(
+                    status = ProbeStatus.PARTIAL,
+                    protocolVersion = version,
+                    detail = "VIA protocol $version. Ответ Vial get_keyboard_id не получен.",
+                    exchangeNote = "VIA прочитан, Vial — таймаут",
+                    viaNote = viaNote,
+                    vialNote = "таймаут, ответа нет",
+                    recovery = recoveryFor(ProbeStatus.PARTIAL),
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        HidReport.Empty -> {
+            exchanges += hidExchangeRecord("Vial get_keyboard_id", vialRequest, null)
+            finish(
+                base.copy(
+                    status = ProbeStatus.PARTIAL,
+                    protocolVersion = version,
+                    detail = "VIA protocol $version. Vial get_keyboard_id завершился без байт.",
+                    exchangeNote = "VIA прочитан, Vial пуст",
+                    viaNote = viaNote,
+                    vialNote = "пустой ответ",
+                    recovery = recoveryFor(ProbeStatus.PARTIAL),
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        HidReport.Failed -> {
+            exchanges += hidExchangeRecord("Vial get_keyboard_id", vialRequest, null)
+            finish(
+                base.copy(
+                    status = ProbeStatus.IO_ERROR,
+                    protocolVersion = version,
+                    detail = "VIA protocol $version. Сбой обмена Vial get_keyboard_id.",
+                    exchangeNote = "VIA прочитан, Vial — ошибка",
+                    viaNote = viaNote,
+                    vialNote = "ошибка обмена",
+                    recovery = recoveryFor(ProbeStatus.IO_ERROR),
+                ),
+                rawHid = true,
+                exchanges = exchanges,
+            )
+        }
+        is HidReport.Data -> {
+            exchanges += hidExchangeRecord("Vial get_keyboard_id", vialRequest, vial.bytes)
+            when (val parsed = parseVialKeyboardId(vial.bytes)) {
+                is VialIdentityParse.Ok -> {
+                    val uid = compareKeyboardUid(parsed.identity.uidBytes, exportUid)
+                    val idHex = uidHex(parsed.identity.uidBytes)
+                    val note = uidComparisonText(uid, idHex, uidHex(exportUid))
+                    finish(
+                        base.copy(
+                            status = ProbeStatus.OK,
+                            protocolVersion = version,
+                            vialKeyboardId = idHex,
+                            vial = parsed.identity,
+                            vialProtocolVersion = parsed.identity.protocolVersion,
+                            uidComparison = uid,
+                            detail = "VIA protocol $version. Vial protocol ${parsed.identity.protocolVersion}. " +
+                                "$note Физический слой этим обменом не читается.",
+                            exchangeNote = "успешный обмен",
+                            viaNote = viaNote,
+                            vialNote = note,
+                            recovery = recoveryFor(ProbeStatus.OK),
+                        ),
+                        rawHid = true,
+                        exchanges = exchanges,
+                    )
+                }
+                is VialIdentityParse.Incomplete -> finish(
+                    base.copy(
+                        status = ProbeStatus.PARTIAL,
+                        protocolVersion = version,
+                        vialProtocolVersion = parsed.protocolVersion,
+                        partialUidHex = parsed.uidHex,
+                        detail = "VIA protocol $version. Ответ Vial неполный: версия " +
+                            "${parsed.protocolVersion ?: "не прочитана"}, UID ${parsed.uidLength} из $VIAL_UID_LENGTH байт.",
+                        exchangeNote = "VIA прочитан, Vial не подтверждён",
+                        viaNote = viaNote,
+                        vialNote = if (parsed.protocolVersion == null) "неправильный ответ" else "неполный UID",
+                        recovery = recoveryFor(ProbeStatus.PARTIAL),
+                    ),
+                    rawHid = true,
+                    exchanges = exchanges,
+                )
+                is VialIdentityParse.ProtocolError -> finish(
+                    base.copy(
+                        status = ProbeStatus.PARTIAL,
+                        protocolVersion = version,
+                        detail = "VIA protocol $version. Ошибка протокола Vial get_keyboard_id: ${parsed.reason}.",
+                        exchangeNote = "VIA прочитан, Vial не подтверждён",
+                        viaNote = viaNote,
+                        vialNote = "неправильный ответ",
+                        recovery = recoveryFor(ProbeStatus.PARTIAL),
+                    ),
+                    rawHid = true,
+                    exchanges = exchanges,
+                )
+            }
+        }
+    }
+}
+
+fun recoveryFor(status: ProbeStatus): String = when (status) {
+    ProbeStatus.OK, ProbeStatus.PARTIAL ->
+        "Интерфейс отпущен, соединение закрыто. Если печать пропала, переподключите кабель."
+    ProbeStatus.CLAIM_FAILED -> "Интерфейс не остался захваченным. Обычная проверка не отключала драйвер. " +
+        "Если печать нарушилась, переподключите клавиатуру."
+    ProbeStatus.TIMEOUT, ProbeStatus.NO_RESPONSE, ProbeStatus.IO_ERROR ->
+        "Соединение закрыто. Переподключите Cornedeon и повторите проверку."
+    ProbeStatus.NO_PERMISSION -> "Разрешите USB и повторите. Клавиатура у системы не забиралась."
+    ProbeStatus.NO_INTERFACE -> "Подходящий Raw HID не захватывался. Boot-клавиатура остаётся у системы."
+    else -> "Соединение закрыто. При сбое печати переподключите кабель."
+}
+
+fun firmwareFromProbe(result: ProbeResult): FirmwareState {
+    val stage = when (result.status) {
+        ProbeStatus.NOT_RUN -> LinkStage.NOT_CHECKED
+        ProbeStatus.NO_DEVICE -> LinkStage.NO_DEVICE
+        ProbeStatus.NO_PERMISSION -> LinkStage.NO_PERMISSION
+        ProbeStatus.NO_INTERFACE -> LinkStage.NO_RAW_HID
+        ProbeStatus.CLAIM_FAILED -> LinkStage.RAW_HID_UNREACHABLE
+        ProbeStatus.OK, ProbeStatus.PARTIAL -> LinkStage.PROTOCOL_VERIFIED
+        ProbeStatus.TIMEOUT,
+        ProbeStatus.NO_RESPONSE,
+        ProbeStatus.PROTOCOL_MISMATCH,
+        ProbeStatus.INCOMPATIBLE_VERSION,
+        ProbeStatus.IO_ERROR,
+        -> LinkStage.PROTOCOL_UNVERIFIED
+    }
+    val verified = result.status == ProbeStatus.OK || result.status == ProbeStatus.PARTIAL
+    return FirmwareState(
         connected = result.opened,
-        telemetry = Telemetry.UNAVAILABLE,
+        telemetry = if (verified) Telemetry.UNAVAILABLE else Telemetry.UNKNOWN,
         activeLayersMask = null,
-        source = "usb-probe",
+        source = if (verified) "via-get-protocol-version" else "usb-probe",
         confidence = Confidence.UNKNOWN,
-        error = result.detail,
+        error = if (verified) null else result.detail,
+        stage = stage,
     )
+}
+
+/** Текст телеметрии. UNAVAILABLE произносится только после проверенного протокола. */
+fun layerTelemetryLine(state: FirmwareState): String = when {
+    state.telemetry == Telemetry.AVAILABLE &&
+        state.confidence == Confidence.REPORTED &&
+        state.activeLayersMask != null -> "телеметрия слоёв доступна"
+    state.stage == LinkStage.PROTOCOL_VERIFIED && state.telemetry == Telemetry.UNAVAILABLE ->
+        "телеметрия слоёв не поддерживается существующим протоколом"
+    state.stage == LinkStage.RAW_HID_UNREACHABLE ->
+        "Raw HID обнаружен, но недоступен. Обмен с прошивкой не проверялся"
+    state.stage == LinkStage.NO_PERMISSION -> "USB-разрешение отсутствует"
+    state.stage == LinkStage.NO_DEVICE -> "USB-устройство не обнаружено"
+    state.stage == LinkStage.NO_RAW_HID -> "подходящий Raw HID не найден"
+    state.stage == LinkStage.PROTOCOL_UNVERIFIED ->
+        "обмен не подтвердил протокол VIA/Vial. Телеметрия слоёв не оценивалась"
+    else -> "телеметрия слоёв не проверялась"
+}
+
+/** Кнопка расширенной проверки: обычный захват уже вернул false и Raw HID в дескрипторе есть. */
+fun canOfferForceProbe(dashboard: UsbDashboard): Boolean {
+    if (dashboard.probe.status != ProbeStatus.CLAIM_FAILED) return false
+    val device = dashboard.devices.find { it.key == dashboard.selectedKey } ?: return false
+    return chooseRawInterface(device.interfaces) != null
 }
 
 fun hidExchangeRecord(name: String, request: ByteArray, response: ByteArray?): HidExchangeRecord =
@@ -603,38 +844,22 @@ internal fun readUint32Le(bytes: ByteArray, offset: Int): Long {
     return value
 }
 
-private fun assembleProbe(
-    opened: Boolean,
-    status: ProbeStatus,
-    detail: String,
-    interfaceId: Int? = null,
-    rawHid: Boolean = false,
-    viaVersion: Int? = null,
-    vialProtocolVersion: Long? = null,
-    vial: VialIdentity? = null,
-    partialUidHex: String? = null,
-    uid: UidMatchResult = UidMatchResult.UNKNOWN,
-    exchanges: List<HidExchangeRecord> = emptyList(),
+private fun finish(
+    result: ProbeResult,
+    rawHid: Boolean,
+    exchanges: List<HidExchangeRecord>,
 ): ProbeResult {
-    val resolvedUid = if (vial == null) UidMatchResult.UNKNOWN else uid
-    return ProbeResult(
-        opened = opened,
-        status = status,
-        detail = detail,
-        protocolVersion = viaVersion,
-        vial = vial,
-        vialProtocolVersion = vialProtocolVersion ?: vial?.protocolVersion,
-        partialUidHex = partialUidHex,
-        uidComparison = resolvedUid,
-        interfaceId = interfaceId,
-        flags = diagnosticFlags(
-            opened = opened,
-            rawHid = rawHid,
-            viaVerified = viaVersion != null,
-            vialVerified = vial != null,
-            uid = resolvedUid,
-        ),
+    val uid = if (result.vial == null) UidMatchResult.UNKNOWN else result.uidComparison
+    return result.copy(
+        uidComparison = uid,
         exchanges = exchanges,
+        flags = diagnosticFlags(
+            opened = result.opened,
+            rawHid = rawHid,
+            viaVerified = result.protocolVersion != null,
+            vialVerified = result.vial != null,
+            uid = uid,
+        ),
     )
 }
 

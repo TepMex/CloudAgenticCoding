@@ -45,12 +45,17 @@ enum class Finger {
     RIGHT_THUMB,
 }
 
-/** Какой модификатор должен быть зажат, чтобы тап дал символ. */
+/**
+ * Какой модификатор должен быть зажат, чтобы тап дал символ.
+ * [ADJUST] — слой 3 прошивки, когда на экране одновременно удерживаются L1 и L2.
+ * В защёлку упражнения он не ставится.
+ */
 enum class Latch {
     NONE,
     SHIFT,
     LOWER,
     UPPER,
+    ADJUST,
 }
 
 /** Один шаг цели. ⇄ — не символ, а сочетание Alt, затем Shift. */
@@ -92,7 +97,7 @@ private data class Slot(
 /**
  * Живое состояние клавиатуры, отдельно от защёлки упражнения.
  * Shift и Alt приходят с физической клавиатуры и с зажатого пальца на экране.
- * L1/L2 Android с прошивки не видит: их даёт палец на нарисованной клавише.
+ * Экранные L1/L2 — только пальцы на рисунке. Они не описывают layer_state прошивки.
  * [language] — раскладка подключённой клавиатуры; null значит «как у текста упражнения».
  */
 data class BoardLive(
@@ -138,6 +143,7 @@ data class KeyFace(
     val primary: Boolean,
     val hinted: Boolean,
     val holdCue: Boolean,
+    val held: Boolean,
 )
 
 data class KeyboardModel(
@@ -333,11 +339,16 @@ private val upperExtra = intArrayOf(
     66, 0, 115, 92, 93, 114,
 )
 
+private val adjustExtra = IntArray(KEY_COUNT).also { table ->
+    table[15] = AndroidKeyCodes.CALCULATOR
+}
+
 private fun extraKey(layer: Latch, id: Int): Int {
     val table = when (layer) {
         Latch.NONE, Latch.SHIFT -> baseExtra
         Latch.LOWER -> lowerExtra
         Latch.UPPER -> upperExtra
+        Latch.ADJUST -> adjustExtra
     }
     return table[id]
 }
@@ -457,11 +468,30 @@ private val ruUpper = coded(Latch.UPPER, attach(grid(
     """,
 ), upperHids))
 
+/**
+ * Слой 3 из cornedeon_v2m.vil. Правая половинка в файле записана от внешнего края,
+ * здесь она развёрнута. KC_NO — пустые клавиши. KC_TRNS на местах L1 и L2 оставляет
+ * сами клавиши слоя. Единственная живая команда — KC_CALC.
+ */
+private val adjustLayer = coded(Latch.ADJUST, attach(grid(
+    """
+    xx xx xx xx xx xx
+    xx xx xx xx xx xx
+    xx xx xx calc xx xx
+    xx xx xx xx l1 xx
+    xx xx xx xx xx xx
+    xx xx xx xx xx xx
+    xx xx xx xx xx xx
+    xx l2 xx xx xx xx
+    """,
+), List(KEY_COUNT) { z() }))
+
 private fun slots(language: Language, latch: Latch): List<Slot> = when (latch) {
     Latch.NONE -> if (language == Language.EN) enBase else ruBase
     Latch.SHIFT -> if (language == Language.EN) enShift else ruShift
     Latch.LOWER -> if (language == Language.EN) enLower else ruLower
     Latch.UPPER -> if (language == Language.EN) enUpper else ruUpper
+    Latch.ADJUST -> adjustLayer
 }
 
 private fun Slot.tapAction(): TrainerAction = when {
@@ -555,7 +585,7 @@ fun actionsToType(target: String, start: Language): List<TrainerAction> {
             Latch.SHIFT -> actions += TrainerAction.Shift
             Latch.LOWER -> actions += TrainerAction.Lower
             Latch.UPPER -> actions += TrainerAction.Upper
-            Latch.NONE -> Unit
+            Latch.NONE, Latch.ADJUST -> Unit
         }
         actions += TrainerAction.Character(char)
     }
@@ -563,7 +593,7 @@ fun actionsToType(target: String, start: Language): List<TrainerAction> {
 }
 
 fun boardPlacements(): List<PlacedKey> =
-    listOf(Latch.NONE, Latch.LOWER, Latch.UPPER).flatMap { layer ->
+    listOf(Latch.NONE, Latch.LOWER, Latch.UPPER, Latch.ADJUST).flatMap { layer ->
         slots(Language.EN, layer).mapIndexed { id, slot ->
             PlacedKey(
                 id = id,
@@ -589,6 +619,7 @@ fun keyboardModel(
         shownLayer(session, live)
     } else {
         when {
+            live.screenLower && live.screenUpper -> Latch.ADJUST
             live.screenUpper -> Latch.UPPER
             live.screenLower -> Latch.LOWER
             else -> focus.layer
@@ -612,6 +643,7 @@ fun keyboardModel(
             primary = id in marks.press,
             hinted = id in marks.hint,
             holdCue = marks.hold && id in marks.press,
+            held = slotHeld(slot, live),
         )
     }
     val left = List(KEY_ROWS) { row -> faces.subList(row * KEY_COLS, (row + 1) * KEY_COLS) }
@@ -623,19 +655,92 @@ fun keyboardModel(
     return KeyboardModel(left, right, caption)
 }
 
+/**
+ * Слой рисунка. L1/L2 берутся только из удерживаемых пальцев.
+ * Защёлка упражнения для Lower/Upper картинку не держит: короткий тап слой не включает.
+ */
 private fun shownLayer(session: TypingSession, live: BoardLive): Latch = when {
-    live.screenUpper -> Latch.UPPER
+    live.screenLower && live.screenUpper -> Latch.ADJUST
     live.screenLower -> Latch.LOWER
-    session.latch == Latch.LOWER || session.latch == Latch.UPPER -> session.latch
+    live.screenUpper -> Latch.UPPER
     live.shiftHeld || session.latch == Latch.SHIFT -> Latch.SHIFT
     else -> Latch.NONE
+}
+
+private fun slotHeld(slot: Slot, live: BoardLive): Boolean = when (slot.role) {
+    Role.LOWER -> live.screenLower
+    Role.UPPER -> live.screenUpper
+    Role.SHIFT -> live.screenShift
+    else -> false
+}
+
+/** Слой, который задают экранные L1/L2. Shift сюда не входит: это не слой прошивки. */
+fun virtualLayer(live: BoardLive): Latch = when {
+    live.screenLower && live.screenUpper -> Latch.ADJUST
+    live.screenLower -> Latch.LOWER
+    live.screenUpper -> Latch.UPPER
+    else -> Latch.NONE
+}
+
+fun virtualLayerName(live: BoardLive): String = when (virtualLayer(live)) {
+    Latch.ADJUST -> "ADJUST"
+    Latch.LOWER -> "LOWER"
+    Latch.UPPER -> "UPPER"
+    else -> "BASE"
+}
+
+/**
+ * Подпись физического слоя. Экранные L1/L2 сюда не подставляются:
+ * без маски от прошивки слой неизвестен.
+ */
+fun physicalLayerLabel(firmware: FirmwareState): String {
+    val mask = firmware.activeLayersMask
+    if (firmware.telemetry != Telemetry.AVAILABLE ||
+        firmware.confidence != Confidence.REPORTED ||
+        mask == null
+    ) {
+        return "неизвестен"
+    }
+    return "0x${mask.toString(16)}"
+}
+
+fun offeredCharacters(
+    session: TypingSession,
+    live: BoardLive,
+    legends: LegendTable = LegendTable(),
+): Set<Char> {
+    val model = keyboardModel(session, live, legends)
+    return (model.leftRows.flatten() + model.rightRows.flatten()).mapNotNull { face ->
+        (face.tap as? TrainerAction.Character)?.value
+    }.toSet()
+}
+
+fun holdRecommendation(session: TypingSession, live: BoardLive): String {
+    if (session.completed) return ""
+    val next = session.nextChar ?: return ""
+    if (next == LANGUAGE_SWITCH) return "Рекомендуется: Alt, затем Shift"
+    val stroke = strokeFor(next, session.typingLanguage) ?: return ""
+    val keyName = stroke.keyIds.firstOrNull()?.let(::physicalKeyName) ?: return ""
+    return when (stroke.latch) {
+        Latch.LOWER -> "Рекомендуется: удерживать L1 и нажать $keyName"
+        Latch.UPPER -> "Рекомендуется: удерживать L2 и нажать $keyName"
+        Latch.SHIFT -> "Рекомендуется: удерживать Shift и нажать $keyName"
+        Latch.ADJUST -> "Рекомендуется: удерживать L1 и L2 и нажать $keyName"
+        Latch.NONE -> "Рекомендуется: нажать $keyName"
+    }
+}
+
+private fun physicalKeyName(id: Int): String {
+    val legend = baseLegend(Language.EN, id)
+    return if (legend.length == 1 && legend[0].isLetter()) legend.uppercase() else legend
 }
 
 private fun modifierReady(session: TypingSession, live: BoardLive, needed: Latch): Boolean = when (needed) {
     Latch.NONE -> true
     Latch.SHIFT -> live.shiftHeld || session.latch == Latch.SHIFT
-    Latch.LOWER -> live.screenLower || session.latch == Latch.LOWER
-    Latch.UPPER -> live.screenUpper || session.latch == Latch.UPPER
+    Latch.LOWER -> live.screenLower && !live.screenUpper
+    Latch.UPPER -> live.screenUpper && !live.screenLower
+    Latch.ADJUST -> live.screenLower && live.screenUpper
 }
 
 private fun Slot.withUserShift(language: Language, shown: Latch, id: Int, active: Boolean): Slot {
@@ -720,7 +825,7 @@ private fun coach(session: TypingSession, live: BoardLive, shown: Latch): Coach 
             Latch.SHIFT -> SHIFT_KEY_IDS
             Latch.LOWER -> setOf(LOWER_KEY)
             Latch.UPPER -> setOf(UPPER_KEY)
-            Latch.NONE -> stroke.keyIds
+            Latch.NONE, Latch.ADJUST -> stroke.keyIds
         }
         val hint = if (stroke.latch == Latch.NONE) emptySet() else stroke.keyIds
         return Coach(modifiers, hint, hold = false)
@@ -743,12 +848,14 @@ private fun caption(session: TypingSession, live: BoardLive, shown: Latch, marks
         Latch.SHIFT -> "прописные"
         Latch.LOWER -> "знаки"
         Latch.UPPER -> "функции"
+        Latch.ADJUST -> "слой 3"
     }
     val needed = when {
         stroke == null || modifierReady(session, live, stroke.latch) -> ""
-        stroke.latch == Latch.SHIFT -> " · нужен Shift"
-        stroke.latch == Latch.LOWER -> " · нужен L1"
-        stroke.latch == Latch.UPPER -> " · нужен L2"
+        stroke.latch == Latch.SHIFT -> " · удерживать Shift"
+        stroke.latch == Latch.LOWER -> " · удерживать L1"
+        stroke.latch == Latch.UPPER -> " · удерживать L2"
+        stroke.latch == Latch.ADJUST -> " · удерживать L1 и L2"
         else -> ""
     }
     val hold = if (marks.hold) " · удержать" else ""

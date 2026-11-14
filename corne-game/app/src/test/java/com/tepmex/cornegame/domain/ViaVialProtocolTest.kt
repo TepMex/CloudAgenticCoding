@@ -309,12 +309,12 @@ private class ScriptSession(
     val payloads = mutableListOf<ByteArray>()
     var closed = false
 
-    override fun claimRawHid(): ClaimResult = claim
+    override fun claimRawHid(allowForce: Boolean): ClaimResult = claim
 
-    override fun exchange(payload: ByteArray): ByteArray? {
+    override fun exchange(payload: ByteArray): HidReport {
         val reply = replies.getOrNull(payloads.size)
         payloads += payload.copyOf()
-        return reply?.copyOf()
+        return reply?.let { HidReport.Data(it.copyOf()) } ?: HidReport.Empty
     }
 
     override fun close() {

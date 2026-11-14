@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +38,11 @@ import com.tepmex.cornegame.domain.Language
 import com.tepmex.cornegame.domain.LiveStats
 import com.tepmex.cornegame.domain.TrainerAction
 import com.tepmex.cornegame.domain.acceptanceLine
+import com.tepmex.cornegame.domain.holdRecommendation
 import com.tepmex.cornegame.domain.keyboardModel
+import com.tepmex.cornegame.domain.physicalLayerLabel
 import com.tepmex.cornegame.domain.toFocus
+import com.tepmex.cornegame.domain.virtualLayerName
 import com.tepmex.cornegame.ui.theme.typedColor
 
 @Composable
@@ -51,9 +55,13 @@ fun TrainScreen(
     onContact: (TrainerAction, Boolean) -> Unit,
     onPointer: (String, Int, String, TrainerAction, Boolean?) -> Unit,
     onScreenKey: (Int, TrainerAction) -> Unit,
+    onReleaseHolds: () -> Unit = {},
     firmware: FirmwareState = FirmwareState(),
     modifier: Modifier = Modifier,
 ) {
+    DisposableEffect(Unit) {
+        onDispose { onReleaseHolds() }
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -126,6 +134,7 @@ fun TrainScreen(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        LayerStatus(state = state, firmware = firmware)
         if (state.settings.inputDiagnostics) {
             val resolution = state.lastResolution
             if (resolution == null) {
@@ -288,6 +297,25 @@ private fun ResolutionPanel(resolution: InputResolution) {
         ).joinToString("\n"),
         fontFamily = FontFamily.Monospace,
         style = MaterialTheme.typography.labelSmall,
+    )
+}
+
+@Composable
+private fun LayerStatus(state: TrainUiState, firmware: FirmwareState) {
+    val board = state.board
+    val goal = state.session.nextChar?.let { if (it == '\u21C4') "⇄" else it.toString() } ?: "—"
+    val lines = listOf(
+        "Цель: $goal",
+        holdRecommendation(state.session, board).ifEmpty { "Рекомендация появится на следующем шаге" },
+        "Экранная L1: ${if (board.screenLower) "нажата" else "отпущена"}",
+        "Экранная L2: ${if (board.screenUpper) "нажата" else "отпущена"}",
+        "Экранный слой: ${virtualLayerName(board)}",
+        "Физический слой: ${physicalLayerLabel(firmware)}",
+    )
+    Text(
+        text = lines.joinToString("\n"),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

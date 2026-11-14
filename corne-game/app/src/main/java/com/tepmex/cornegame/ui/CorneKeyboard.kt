@@ -4,7 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +52,17 @@ import com.tepmex.cornegame.ui.theme.HighlightYellow
 
 private val ErrorRed = Color(0xFFE53935)
 private val KeyInk = Color(0xFF1C1C1C)
+internal val HeldGreen = Color(0xFF1B7A32)
+
+/** Жёлтый — рекомендация. Зелёный — палец реально держит клавишу. Это разные состояния. */
+internal enum class KeyFill { PLAIN, HINT, HELD, HELD_AND_HINT }
+
+internal fun keyFill(highlighted: Boolean, held: Boolean): KeyFill = when {
+    held && highlighted -> KeyFill.HELD_AND_HINT
+    held -> KeyFill.HELD
+    highlighted -> KeyFill.HINT
+    else -> KeyFill.PLAIN
+}
 
 /** Доля высоты клавиши, на которую колонка опущена. Как в info.json Cornedeon 2M. */
 internal val COLUMN_STAGGER = floatArrayOf(0.30f, 0.30f, 0.10f, 0.00f, 0.10f, 0.20f)
@@ -258,14 +272,20 @@ private fun KeyButton(
         fingerColors -> face.finger.zoneColor()
         else -> scheme.surfaceVariant
     }
+    val held = face.held
     val wrong = lastWrong != null && flashAlpha > 0f && faceProduces(face, lastWrong)
-    val background = when {
-        highlighted -> HighlightYellow
-        hinted -> lerp(base, HighlightYellow, 0.55f)
-        wrong -> lerp(base, ErrorRed, flashAlpha.coerceIn(0f, 1f))
-        else -> base
+    val fill = keyFill(highlighted, held)
+    val background = when (fill) {
+        KeyFill.HELD_AND_HINT -> lerp(HighlightYellow, HeldGreen, 0.45f)
+        KeyFill.HELD -> lerp(base, HeldGreen, 0.72f)
+        KeyFill.HINT -> HighlightYellow
+        KeyFill.PLAIN -> when {
+            hinted -> lerp(base, HighlightYellow, 0.55f)
+            wrong -> lerp(base, ErrorRed, flashAlpha.coerceIn(0f, 1f))
+            else -> base
+        }
     }
-    val foreground = if (highlighted || hinted || fingerColors) KeyInk else scheme.onSurface
+    val foreground = if (highlighted || hinted || held || fingerColors) KeyInk else scheme.onSurface
     val shape = RoundedCornerShape(6.dp)
     val labelSize = (
         when {
@@ -280,16 +300,25 @@ private fun KeyButton(
             .clip(shape)
             .background(background)
             .border(
-                width = if (highlighted) 2.dp else 1.dp,
-                color = when {
-                    highlighted -> Color(0xFF8A6A00)
-                    hinted -> Color(0xFF8A6A00).copy(alpha = 0.7f)
-                    else -> scheme.outline.copy(alpha = 0.45f)
+                width = when (fill) {
+                    KeyFill.HELD, KeyFill.HELD_AND_HINT -> 3.dp
+                    KeyFill.HINT -> 2.dp
+                    KeyFill.PLAIN -> 1.dp
+                },
+                color = when (fill) {
+                    KeyFill.HELD, KeyFill.HELD_AND_HINT -> HeldGreen
+                    KeyFill.HINT -> Color(0xFF8A6A00)
+                    KeyFill.PLAIN -> if (hinted) Color(0xFF8A6A00).copy(alpha = 0.7f) else scheme.outline.copy(alpha = 0.45f)
                 },
                 shape = shape,
             )
             .semantics {
-                contentDescription = "Клавиша ${face.legend.ifEmpty { face.id.toString() }}"
+                contentDescription = buildString {
+                    append("Клавиша ")
+                    append(face.legend.ifEmpty { face.id.toString() })
+                    if (held) append(" удерживается")
+                    if (highlighted) append(" подсказка")
+                }
                 role = Role.Button
                 onClick {
                     pointer("click", face.id, legend, tap, true)
@@ -298,19 +327,42 @@ private fun KeyButton(
                 }
             }
             .pointerInput(face.id) {
-                detectTapGestures(
-                    onPress = {
-                        val started = tap
-                        val name = legend
-                        pointer("down", face.id, name, started, null)
-                        val modifier = started.isHoldModifier()
-                        if (modifier) contact(started, true)
-                        val released = tryAwaitRelease()
-                        pointer("up", face.id, name, started, released)
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val pointerId = down.id
+                    down.consume()
+                    val started = tap
+                    val code = keyCode
+                    val name = legend
+                    val modifier = started.isHoldModifier()
+                    pointer("down", face.id, name, started, null)
+                    if (modifier) contact(started, true)
+                    var releasedInside = false
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val change = event.changes.firstOrNull { it.id == pointerId } ?: continue
+                            val inside = change.position.x >= 0f &&
+                                change.position.y >= 0f &&
+                                change.position.x <= size.width.toFloat() &&
+                                change.position.y <= size.height.toFloat()
+                            if (!change.pressed || change.changedToUp()) {
+                                releasedInside = inside
+                                change.consume()
+                                break
+                            }
+                            if (!inside) {
+                                change.consume()
+                                break
+                            }
+                            change.consume()
+                        }
+                    } finally {
                         if (modifier) contact(started, false)
-                        else if (released) action(keyCode, tap)
-                    },
-                )
+                    }
+                    pointer("up", face.id, name, started, releasedInside)
+                    if (!modifier && releasedInside) action(code, started)
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -319,7 +371,7 @@ private fun KeyButton(
                 text = face.legend,
                 color = foreground,
                 fontSize = labelSize,
-                fontWeight = if (highlighted || layerKey) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = if (highlighted || held || layerKey) FontWeight.Bold else FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

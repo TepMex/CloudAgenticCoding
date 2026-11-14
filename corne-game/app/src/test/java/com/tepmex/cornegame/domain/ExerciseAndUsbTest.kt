@@ -112,7 +112,10 @@ class ExerciseAndUsbTest {
         claimController.refresh()
         claimController.probeSelected()
         assertEquals(ProbeStatus.CLAIM_FAILED, claimController.dashboard.value.probe.status)
+        assertEquals(listOf(false), claimed.forces)
         assertTrue(claimed.payloads.isEmpty())
+        assertEquals(Telemetry.UNKNOWN, claimController.state.value.telemetry)
+        assertEquals(LinkStage.RAW_HID_UNREACHABLE, claimController.state.value.stage)
         assertNull(claimController.state.value.activeLayersMask)
 
         val success = RecordingSession(
@@ -130,6 +133,7 @@ class ExerciseAndUsbTest {
         assertTrue(DiagnosticFlag.VIA_VERIFIED in ok.dashboard.value.probe.flags)
         assertTrue(DiagnosticFlag.VIAL_VERIFIED in ok.dashboard.value.probe.flags)
         assertTrue(DiagnosticFlag.LAYER_TELEMETRY_UNAVAILABLE in ok.dashboard.value.probe.flags)
+        assertEquals(listOf(false), success.forces)
         assertEquals(2, success.payloads.size)
         assertEquals(VIA_GET_PROTOCOL_VERSION, success.payloads[0][0])
         assertEquals(VIAL_PREFIX, success.payloads[1][0])
@@ -177,7 +181,7 @@ class ExerciseAndUsbTest {
             looksLikeCornedeon(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID, null, null, "/dev/bus/usb/001/002"),
         )
         assertTrue(
-            looksLikeCornedeon(CORNEDEON_VENDOR_ID, CORNEDEON_LEGACY_PRODUCT_ID, null, null, "/dev/bus/usb/001/002"),
+            looksLikeCornedeon(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID_V2M, null, null, "/dev/bus/usb/001/002"),
         )
         assertTrue(looksLikeCornedeon(0x1234, 0x1, "alko", "Cornedeon v2m", "usb"))
         assertFalse(looksLikeCornedeon(0x1234, 0x1, "Other", "Keyboard", "usb"))
@@ -197,7 +201,10 @@ private fun vialId(): ByteArray = ByteArray(32).also { packet ->
 
 private fun endpoint(address: Int, packet: Int) = EndpointFact(address, attributes = 3, maxPacket = packet)
 
-private fun snapshot(permission: UsbPermission) = UsbDeviceSnapshot(
+private fun snapshot(
+    permission: UsbPermission,
+    interfaces: List<InterfaceFact> = emptyList(),
+) = UsbDeviceSnapshot(
     key = "usb-1",
     deviceName = "usb-1",
     vendorId = CORNEDEON_VENDOR_ID,
@@ -205,7 +212,7 @@ private fun snapshot(permission: UsbPermission) = UsbDeviceSnapshot(
     manufacturer = "alko",
     productName = "Cornedeon v2m",
     permission = permission,
-    interfaces = emptyList(),
+    interfaces = interfaces,
 )
 
 private class FakeUsb(
@@ -213,13 +220,17 @@ private class FakeUsb(
     private val session: UsbSession? = null,
     private val openResult: UsbSession? = session,
 ) : UsbHardware {
+    var opens = 0
     override fun listDevices(): List<UsbDeviceSnapshot> = devices
 
     override fun requestPermission(deviceKey: String, onResult: (Boolean) -> Unit) {
         onResult(false)
     }
 
-    override fun open(deviceKey: String): UsbSession? = openResult
+    override fun open(deviceKey: String): UsbSession? {
+        opens += 1
+        return openResult
+    }
 }
 
 private class RecordingSession(
@@ -228,12 +239,16 @@ private class RecordingSession(
 ) : UsbSession {
     val payloads = mutableListOf<ByteArray>()
     var closed = false
-    override fun claimRawHid(): ClaimResult = claim
+    val forces = mutableListOf<Boolean>()
+    override fun claimRawHid(allowForce: Boolean): ClaimResult {
+        forces += allowForce
+        return claim
+    }
 
-    override fun exchange(payload: ByteArray): ByteArray? {
+    override fun exchange(payload: ByteArray): HidReport {
         val reply = replies.getOrNull(payloads.size)
         payloads += payload
-        return reply
+        return reply?.let { HidReport.Data(it) } ?: HidReport.Empty
     }
 
     override fun close() {
