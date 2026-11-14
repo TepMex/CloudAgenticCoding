@@ -152,8 +152,13 @@ class UsbDiagnosticsController(
                     detail = error.message ?: "Ошибка обмена.",
                 )
             }
+            val exchangeLog = formatHidExchanges(result.exchanges)
+            val lines = listOf(result.detail, exchangeLog).filter { it.isNotBlank() }
             publish(
-                _dashboard.value.copy(probe = result, log = (_dashboard.value.log + result.detail).takeLast(20)),
+                _dashboard.value.copy(
+                    probe = result,
+                    log = (_dashboard.value.log + lines).takeLast(20),
+                ),
                 firmwareFromProbe(result),
             )
         }

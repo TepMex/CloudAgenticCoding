@@ -125,21 +125,28 @@ class ExerciseAndUsbTest {
         ok.probeSelected()
         assertEquals(ProbeStatus.OK, ok.dashboard.value.probe.status)
         assertEquals(9, ok.dashboard.value.probe.protocolVersion)
+        assertEquals(6L, ok.dashboard.value.probe.vialProtocolVersion)
+        assertEquals(UidMatchResult.MATCH, ok.dashboard.value.probe.uidComparison)
+        assertTrue(DiagnosticFlag.VIA_VERIFIED in ok.dashboard.value.probe.flags)
+        assertTrue(DiagnosticFlag.VIAL_VERIFIED in ok.dashboard.value.probe.flags)
+        assertTrue(DiagnosticFlag.LAYER_TELEMETRY_UNAVAILABLE in ok.dashboard.value.probe.flags)
         assertEquals(2, success.payloads.size)
         assertEquals(VIA_GET_PROTOCOL_VERSION, success.payloads[0][0])
         assertEquals(VIAL_PREFIX, success.payloads[1][0])
+        assertEquals(VIAL_GET_KEYBOARD_ID, success.payloads[1][1])
         assertEquals(Telemetry.UNAVAILABLE, ok.state.value.telemetry)
         assertEquals(Confidence.UNKNOWN, ok.state.value.confidence)
         assertNull(ok.state.value.activeLayersMask)
         assertTrue(ok.state.value.connected)
         assertTrue(success.closed)
+        assertTrue(ok.dashboard.value.log.any { it.contains("RX (32 bytes):") })
     }
 
     @Test
     fun probeRejectsAForeignPacketAndDoesNotChooseTheBootKeyboard() {
-        assertNull(parseViaProtocolVersion(ByteArray(32)))
-        assertNull(parseViaProtocolVersion(byteArrayOf(0x05, 0x09, 0x00)))
-        assertEquals(9, parseViaProtocolVersion(viaVersion(9)))
+        assertTrue(parseViaProtocolVersion(ByteArray(32)) is ViaVersionParse.ProtocolError)
+        assertTrue(parseViaProtocolVersion(byteArrayOf(0x05, 0x09, 0x00)) is ViaVersionParse.ProtocolError)
+        assertEquals(ViaVersionParse.Ok(9), parseViaProtocolVersion(viaVersion(9)))
         val boot = InterfaceFact(
             id = 0,
             classCode = 3,
@@ -169,6 +176,9 @@ class ExerciseAndUsbTest {
         assertTrue(
             looksLikeCornedeon(CORNEDEON_VENDOR_ID, CORNEDEON_PRODUCT_ID, null, null, "/dev/bus/usb/001/002"),
         )
+        assertTrue(
+            looksLikeCornedeon(CORNEDEON_VENDOR_ID, CORNEDEON_LEGACY_PRODUCT_ID, null, null, "/dev/bus/usb/001/002"),
+        )
         assertTrue(looksLikeCornedeon(0x1234, 0x1, "alko", "Cornedeon v2m", "usb"))
         assertFalse(looksLikeCornedeon(0x1234, 0x1, "Other", "Keyboard", "usb"))
     }
@@ -176,14 +186,13 @@ class ExerciseAndUsbTest {
 
 private fun viaVersion(version: Int): ByteArray = ByteArray(32).also {
     it[0] = VIA_GET_PROTOCOL_VERSION
-    it[1] = (version and 0xFF).toByte()
-    it[2] = ((version shr 8) and 0xFF).toByte()
+    it[1] = ((version shr 8) and 0xFF).toByte()
+    it[2] = (version and 0xFF).toByte()
 }
 
-private fun vialId(): ByteArray = ByteArray(32).also {
-    it[0] = VIAL_PREFIX
-    it[1] = VIAL_GET_KEYBOARD_ID
-    it[2] = 0x11
+private fun vialId(): ByteArray = ByteArray(32).also { packet ->
+    packet[0] = 6
+    cornedeonVialUidBytes().copyInto(packet, destinationOffset = 4)
 }
 
 private fun endpoint(address: Int, packet: Int) = EndpointFact(address, attributes = 3, maxPacket = packet)

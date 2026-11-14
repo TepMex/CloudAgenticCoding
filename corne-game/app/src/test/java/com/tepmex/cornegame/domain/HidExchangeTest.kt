@@ -95,6 +95,8 @@ class HidExchangeTest {
         assertFalse(usb.contains("bulkTransfer("))
         assertTrue(usb.contains("UsbRequest"))
         assertTrue(usb.contains("requestWait"))
+        assertTrue(usb.contains("claimInterface(iface, false)"))
+        assertFalse(Regex("""claimInterface\([^)\n]*true""").containsMatchIn(usb))
     }
 }
 

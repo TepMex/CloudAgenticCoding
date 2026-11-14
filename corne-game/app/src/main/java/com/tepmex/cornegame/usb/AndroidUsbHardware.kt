@@ -174,10 +174,16 @@ private class AndroidUsbSession(
                 ok = false,
                 status = ProbeStatus.CLAIM_FAILED,
                 detail = "Интерфейс ${iface.id} занят. Захват с force=true не выполняется, чтобы не отбирать клавиатуру у системы.",
+                interfaceId = iface.id,
             )
         }
         claimed = iface
-        return ClaimResult(ok = true, status = ProbeStatus.OK, detail = "Интерфейс ${iface.id} открыт для чтения.")
+        return ClaimResult(
+            ok = true,
+            status = ProbeStatus.OK,
+            detail = "Интерфейс ${iface.id} открыт для чтения.",
+            interfaceId = iface.id,
+        )
     }
 
     override fun exchange(payload: ByteArray): ByteArray? {
