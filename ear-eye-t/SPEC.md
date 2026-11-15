@@ -27,6 +27,7 @@
 14. Показывать сегодня, вчера и выбранную дату, шкалу, диагностику и экспорт JSON/CSV через Storage Access Framework.
 15. Объяснить Usage Access, Notification Listener, Restricted Settings и ограничения MagicOS до перехода в системные настройки.
 16. Не использовать интернет, микрофон, root, скрытые API, аналитические SDK и автоматический обход ограничений Android.
+17. Подписывать debug и release общим sideload-ключом монорепозитория, когда `sideload.keystore` на месте. `versionCode` берётся из Unix-времени, чтобы новая сборка ставилась поверх предыдущей. GitHub Pages публикует `/ear-eye-t/ear-eye-t.apk` и страницу `/ear-eye-t/`. `scripts/ci-apps.sh` включает `ear-eye-t` в `ANDROID_APPS`. Корневой `README.md` ссылается на эту страницу.
 
 ## Interfaces
 
@@ -76,4 +77,5 @@
 - Повторный импорт одного и того же окна UsageEvents не увеличивает число событий.
 - Неполные данные видны в статистике и не подменяются нулём.
 - Манифест не содержит `INTERNET`, `RECORD_AUDIO`, `READ_MEDIA_AUDIO`, `QUERY_ALL_PACKAGES`, `SYSTEM_ALERT_WINDOW` и accessibility service.
+- `ear-eye-t/site/index.html` ссылается на `ear-eye-t.apk` и входит в деплой GitHub Pages вместе с остальными Android-приложениями.
 - В коде нет reflection и вызовов скрытых audio API.

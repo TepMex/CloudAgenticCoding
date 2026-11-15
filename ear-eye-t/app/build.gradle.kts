@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,25 +7,54 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+extra["sideloadPropertyPrefix"] = "eareyet"
+apply(from = rootProject.file("../android/sideload-signing.gradle.kts"))
+
+val autoVersionCode: Int = extra["autoVersionCode"] as Int
+val useCustomSigning: Boolean = extra["useCustomSigning"] as Boolean
+
 android {
     namespace = "dev.eareye.t"
     compileSdk = 36
+
+    signingConfigs {
+        if (useCustomSigning) {
+            create("sideload") {
+                storeFile = extra["sideloadStoreFile"] as File
+                storePassword = extra["sideloadStorePassword"] as String
+                keyAlias = extra["sideloadKeyAlias"] as String
+                keyPassword = extra["sideloadKeyPassword"] as String
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "dev.eareye.t"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = autoVersionCode
+        versionName = "1.0.$autoVersionCode"
     }
 
     buildTypes {
+        debug {
+            signingConfig = if (useCustomSigning) {
+                signingConfigs.getByName("sideload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = if (useCustomSigning) {
+                signingConfigs.getByName("sideload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

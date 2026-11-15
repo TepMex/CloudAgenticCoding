@@ -47,6 +47,7 @@ ANDROID_APPS=(
   corne-game
   inbox
   my-week
+  ear-eye-t
 )
 
 # Repo-root files copied onto the site on every publish.
