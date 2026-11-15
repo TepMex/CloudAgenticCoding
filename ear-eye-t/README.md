@@ -50,15 +50,22 @@ cd ear-eye-t
 ./gradlew testDebugUnitTest
 ./gradlew assembleDebug
 ./gradlew lintDebug
+./gradlew assembleRelease
 ```
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
+Release APK: `app/build/outputs/apk/release/app-release.apk`.
+
+Debug и release подписываются общим sideload-ключом (`sideload.keystore` и `sideload-signing.properties`), тем же, что и остальные Android-приложения монорепозитория. `versionCode` — Unix-время в секундах, поэтому более новая сборка ставится поверх предыдущей. Необязательное переопределение в `local.properties`: `eareyet.signingStoreFile`, `eareyet.signingStorePassword`, `eareyet.signingKeyAlias`, `eareyet.signingKeyPassword`.
+
 Если SDK не установлен, Gradle эти команды не выполнит. Не считайте проект собранным только по наличию исходников.
+
+Страница и APK публикуются так же, как у остальных Android-приложений. Push в `master` запускает `.github/workflows/deploy.yml`: workflow собирает release APK, проверяет sideload-сертификат и выкладывает GitHub Pages по адресу `/<repository>/ear-eye-t/` (`index.html` и `ear-eye-t.apk`). Каталог приложений — корневой `README.md`, список сборки — `scripts/ci-apps.sh`.
 
 ## 5. Как установить на HONOR 400
 
-1. Скопируйте APK на телефон или выполните `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+1. Скачайте `ear-eye-t.apk` со страницы [ear-eye-t](https://tepmex.github.io/CloudAgenticCoding/ear-eye-t/) и установите поверх уже стоящей копии. Для локальной сборки скопируйте APK на телефон или выполните `adb install -r app/build/outputs/apk/release/app-release.apk`.
 2. Разрешите установку из выбранного источника. Название пункта может быть «Установка неизвестных приложений», «Внешние источники» или похожим. Ищите в настройках «неизвестных приложений».
 3. Откройте ear-eye-t. Ярлык на лаунчере совпадает с именем пакета приложения: ear-eye-t.
 
