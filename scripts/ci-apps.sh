@@ -16,6 +16,7 @@ WEB_APPS=(
   mock-br-lk
   zametki-kitai
   vafin-context
+  my-ai-recs
 )
 
 ANDROID_APPS=(
