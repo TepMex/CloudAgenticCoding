@@ -161,6 +161,13 @@ button:focus-visible, a:focus-visible {
   letter-spacing: 0.01em;
 }
 
+.phrase-pinyin {
+  margin: 8px 0 0;
+  font-size: clamp(1.05rem, 3.6vw, 1.32rem);
+  line-height: 1.45;
+  font-weight: 520;
+}
+
 .meaning {
   margin: 12px 0 0;
   font-size: 1.28rem;
