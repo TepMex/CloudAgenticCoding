@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { buildCards, gradeQueue, shuffleCards, type Card, type Grade } from './cards'
 import { ankiStatusLabel, ruCards, ruWords, unitTypeLabel } from './labels'
-import { canSpeak, speakChinese, stopSpeaking } from './speak'
+import { examplePinyin } from './phrase-pinyin'
+import { canSpeak, speakChinese, speakSequence, speechLines, stopSpeaking } from './speak'
 import { readCachedEntries, resolveWorkbookUrl, sameEntries, workbookHtmlUrl, writeCachedEntries } from './source'
 import {
   entriesForFragment,
@@ -93,7 +94,7 @@ export function App() {
       if (!card) return
       if ((event.key === ' ' || event.key === 'Enter') && !revealed) {
         event.preventDefault()
-        setRevealed(true)
+        reveal()
       }
       if (!revealed) return
       if (event.key === '1') grade('again')
@@ -102,6 +103,14 @@ export function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  function reveal() {
+    if (revealed) return
+    const card = session?.queue[0]
+    setRevealed(true)
+    if (!card) return
+    speakSequence(speechLines(card.entry.expression, visibleExample(card.entry)))
+  }
 
   function grade(verdict: Grade) {
     stopSpeaking()
@@ -165,7 +174,7 @@ export function App() {
           banner={banner}
           speech={speech}
           showFragment={choices.length > 1 && (pick.kind !== 'ready' || pick.fragmentId === null)}
-          onReveal={() => setRevealed(true)}
+          onReveal={reveal}
           onGrade={grade}
           onConfirm={setConfirm}
           onRestart={restart}
@@ -330,11 +339,22 @@ function Back({ card, example, showFragment }: { card: Card; example: string; sh
           <p className="example" lang="zh-CN">
             {example}
           </p>
+          <PhrasePinyin example={example} entry={entry} />
         </>
       ) : null}
       {entry.notes ? <p className="notes">{entry.notes}</p> : null}
       {meta.length > 0 ? <p className="meta">{meta.join(' · ')}</p> : null}
     </div>
+  )
+}
+
+function PhrasePinyin({ example, entry }: { example: string; entry: Card['entry'] }) {
+  const reading = examplePinyin(example, entry.expression, entry.pinyin)
+  if (!reading) return null
+  return (
+    <p className="pinyin phrase-pinyin" lang="zh-Latn">
+      {reading}
+    </p>
   )
 }
 
