@@ -17,6 +17,7 @@ WEB_APPS=(
   zametki-kitai
   vafin-context
   my-ai-recs
+  before-reading
 )
 
 ANDROID_APPS=(
