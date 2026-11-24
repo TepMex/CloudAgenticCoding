@@ -1,0 +1,6 @@
+-keep class com.tepmex.swimminglog.data.** { *; }
+-keep class com.tepmex.swimminglog.mi.AuthToken { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**

@@ -1,0 +1,307 @@
+package com.tepmex.swimminglog.ui.journal
+
+import android.content.ClipData
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.tepmex.swimminglog.data.SwimmingActivityEntity
+import com.tepmex.swimminglog.domain.MetricVsAverage
+import com.tepmex.swimminglog.domain.SwimSummaryForPrompt
+import com.tepmex.swimminglog.domain.SwimmingMetrics
+import com.tepmex.swimminglog.domain.TrainerConsultationPrompt
+import com.tepmex.swimminglog.domain.TrailingYearAverages
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
+
+private val BetterGreen = Color(0xFF1B7A4A)
+private val WorseRed = Color(0xFFB53A2E)
+
+data class JournalUiState(
+    val activities: List<SwimmingActivityEntity> = emptyList(),
+    val trailingYearAverages: TrailingYearAverages = TrailingYearAverages(
+        avgSwolf = null,
+        avgHeartbitsPer100m = null,
+    ),
+    val syncing: Boolean = false,
+    val statusMessage: String? = null,
+    val error: String? = null,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun JournalScreen(
+    state: JournalUiState,
+    onSync: () -> Unit,
+    onSignOut: () -> Unit,
+    onMessageConsumed: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+
+    fun copyTrainerPrompt() {
+        val prompt = TrainerConsultationPrompt.build(
+            swimsNewestFirst = state.activities.map { it.toPromptSummary() },
+            trailingYearAverages = state.trailingYearAverages,
+        )
+        scope.launch {
+            clipboard.setClipEntry(
+                ClipEntry(ClipData.newPlainText("swimming coach prompt", prompt)),
+            )
+            snackbarHostState.showSnackbar("Trainer prompt copied")
+        }
+    }
+
+    LaunchedEffect(state.statusMessage, state.error) {
+        val message = state.error ?: state.statusMessage
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            onMessageConsumed()
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("swimming-log", style = MaterialTheme.typography.titleLarge)
+                        if (state.activities.isNotEmpty()) {
+                            Text(
+                                "${state.activities.size} swim${if (state.activities.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    if (state.syncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                    IconButton(onClick = ::copyTrainerPrompt) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy prompt")
+                    }
+                    IconButton(onClick = onSync, enabled = !state.syncing) {
+                        Icon(Icons.Default.Sync, contentDescription = "Sync")
+                    }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Copy prompt") },
+                            leadingIcon = {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            },
+                            onClick = {
+                                menuOpen = false
+                                copyTrainerPrompt()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Sign out") },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onSignOut()
+                            },
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                ),
+            )
+        },
+    ) { padding ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.background,
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        ),
+                    ),
+                ),
+        ) {
+            when {
+                state.syncing && state.activities.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                state.activities.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(
+                            modifier = Modifier.padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                "No swims yet",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Tap sync to pull pool and open-water swims from Xiaomi Fitness.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 16.dp,
+                            bottom = 24.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        items(state.activities, key = { it.workoutId }) { swim ->
+                            SwimRow(swim, state.trailingYearAverages)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwimRow(swim: SwimmingActivityEntity, averages: TrailingYearAverages) {
+    val date = remember(swim.startTimeEpochSec) {
+        DateTimeFormatter.ofPattern("EEE, d MMM yyyy")
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochSecond(swim.startTimeEpochSec))
+    }
+    val heartbitsVs = SwimmingMetrics.compareHeartbitsPer100m(
+        swim.heartbitsPer100m,
+        averages.avgHeartbitsPer100m,
+    )
+    val swolfVs = SwimmingMetrics.compareSwolf(swim.swolf, averages.avgSwolf)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(date, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+        Text(
+            TrainerConsultationPrompt.sportLabel(swim.sportType),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Spacer(Modifier.height(8.dp))
+        MetricLine("Distance", SwimmingMetrics.formatDistance(swim.distanceMeters))
+        MetricLine("Temp", "${SwimmingMetrics.formatPace(swim.paceSecPer100m)} /100 m")
+        MetricLine("Avg BPM", if (swim.avgBpm > 0) "${swim.avgBpm}" else "—")
+        MetricLine(
+            "Heartbits / 100 m",
+            swim.heartbitsPer100m.takeIf { it > 0 }?.let { "%.0f".format(it) } ?: "—",
+            vsAverage = heartbitsVs,
+        )
+        MetricLine(
+            "SWOLF",
+            SwimmingMetrics.formatSwolf(swim.swolf),
+            vsAverage = swolfVs,
+        )
+    }
+}
+
+private fun SwimmingActivityEntity.toPromptSummary() = SwimSummaryForPrompt(
+    startTimeEpochSec = startTimeEpochSec,
+    sportType = sportType,
+    durationSec = durationSec,
+    distanceMeters = distanceMeters,
+    paceSecPer100m = paceSecPer100m,
+    avgBpm = avgBpm,
+    maxBpm = maxBpm,
+    heartbitsPer100m = heartbitsPer100m,
+    swolf = swolf,
+    calories = calories,
+)
+
+@Composable
+private fun MetricLine(
+    label: String,
+    value: String,
+    vsAverage: MetricVsAverage = MetricVsAverage.Unavailable,
+) {
+    val valueColor = when (vsAverage) {
+        MetricVsAverage.Better -> BetterGreen
+        MetricVsAverage.Worse -> WorseRed
+        MetricVsAverage.Equal,
+        MetricVsAverage.Unavailable,
+        -> MaterialTheme.colorScheme.onBackground
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor)
+    }
+}

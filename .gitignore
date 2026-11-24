@@ -72,6 +72,11 @@ running-log/.gradle/
 running-log/**/build/
 running-log/local.properties
 
+# Android (swimming-log)
+swimming-log/.gradle/
+swimming-log/**/build/
+swimming-log/local.properties
+
 # Android (ideal-timing)
 ideal-timing/.gradle/
 ideal-timing/**/build/

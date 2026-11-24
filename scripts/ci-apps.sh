@@ -33,6 +33,7 @@ ANDROID_APPS=(
   zou-lu-shang-2
   pair-comp-elo
   running-log
+  swimming-log
   ideal-timing
   han-count-android
   rth-agriculture-android
