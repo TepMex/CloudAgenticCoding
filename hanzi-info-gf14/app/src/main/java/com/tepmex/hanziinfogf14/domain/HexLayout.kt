@@ -8,6 +8,7 @@ data class PlacedHanzi(
     val hanzi: String,
     val branchIndex: Int?,
     val component: String?,
+    val lookalike: Boolean = false,
 )
 
 object HexLayout {
@@ -31,10 +32,20 @@ object HexLayout {
             .map { it.value }
     }
 
-    fun place(center: String, branches: List<Branch>): List<PlacedHanzi> {
+    /**
+     * Component rays keep the first spokes. Each remaining spoke gets one lookalike
+     * at distance 1, nearest first. Characters already on the map are skipped.
+     */
+    fun place(
+        center: String,
+        branches: List<Branch>,
+        lookalikes: List<String> = emptyList(),
+    ): List<PlacedHanzi> {
         val visible = visibleBranches(branches)
-        val placed = ArrayList<PlacedHanzi>(1 + visible.sumOf { it.characters.size })
+        val placed = ArrayList<PlacedHanzi>(1 + visible.sumOf { it.characters.size } + lookalikes.size)
+        val occupied = HashSet<String>()
         placed.add(PlacedHanzi(0, 0, center, branchIndex = null, component = null))
+        occupied.add(center)
         visible.forEachIndexed { index, branch ->
             val direction = HexDirection.spokes[index]
             branch.characters.forEachIndexed { step, hanzi ->
@@ -48,7 +59,26 @@ object HexLayout {
                         component = branch.component,
                     ),
                 )
+                occupied.add(hanzi)
             }
+        }
+        val free = HexDirection.spokes.drop(visible.size)
+        var slot = 0
+        for (hanzi in lookalikes) {
+            if (slot >= free.size) break
+            if (!occupied.add(hanzi)) continue
+            val direction = free[slot]
+            placed.add(
+                PlacedHanzi(
+                    q = direction.q,
+                    r = direction.r,
+                    hanzi = hanzi,
+                    branchIndex = null,
+                    component = null,
+                    lookalike = true,
+                ),
+            )
+            slot += 1
         }
         return placed
     }

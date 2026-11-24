@@ -6,10 +6,12 @@ Android map of GF 0014-2009 components for the 3500 most frequent characters. Th
 
 - **Center cell** — the character from the field, a tap, or an incoming link
 - **Up to six rays** — east, west, then the four diagonals. Characters that replace the same component line up on one ray, most frequent first
+- **Free sides** — the spokes a component ray does not use show the nearest characters by EmbeddingGemma 2 image distance (a picture of the glyph in Noto Sans CJK SC)
+- **Settings** — downloads the LiteRT EmbeddingGemma 2 text-vision model (~370 MB). It is not in the APK. The 3500 embeddings are already bundled; the model embeds a character that is outside that list
 - **Pan and pinch** — long rays (especially single-component characters) extend past the screen
 - **Back** — returns to the previous center
 - **x-callback-url** — other apps open a character directly
-- Offline: the component JSON is bundled
+- Offline for the 3500: the component JSON and the glyph embeddings are bundled. The LiteRT model is a separate download
 
 ## Open from another app
 
@@ -51,3 +53,4 @@ On push to `master`, `.github/workflows/deploy.yml` builds the release APK, veri
 
 - Kotlin, Jetpack Compose, Material 3
 - Bundled GF 0014 component JSON (3500 level-1 characters)
+- Glyph embeddings from EmbeddingGemma 2 text-vision LiteRT. Rebuild with `tools/build_glyph_embeddings.py`. The `.litertlm` file is not committed
