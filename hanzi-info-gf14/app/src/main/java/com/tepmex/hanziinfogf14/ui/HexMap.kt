@@ -62,12 +62,13 @@ private val DarkBranchColors = listOf(
 fun HexMap(
     center: String,
     branches: List<Branch>,
+    lookalikes: List<String>,
     contentDescription: String,
     modifier: Modifier = Modifier,
     onSelect: (String) -> Unit,
 ) {
     val visible = remember(branches) { HexLayout.visibleBranches(branches) }
-    val nodes = remember(center, visible) { HexLayout.place(center, visible) }
+    val nodes = remember(center, visible, lookalikes) { HexLayout.place(center, visible, lookalikes) }
     val nodeAt = remember(nodes) { nodes.associateBy { it.q to it.r } }
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -78,6 +79,7 @@ fun HexMap(
     val cellText = if (dark) Color(0xFFF3EBDF) else Color(0xFF1C1915)
     val centerFill = if (dark) Color(0xFF8FCBBE) else Color(0xFF1E4D45)
     val centerText = if (dark) Color(0xFF08332E) else Color.White
+    val lookalikeStroke = if (dark) Color(0xFFD7CBBA) else Color(0xFF5C5346)
     val pan = remember { mutableStateOf(Offset.Zero) }
     val scale = remember { mutableFloatStateOf(1f) }
 
@@ -146,6 +148,16 @@ fun HexMap(
                         strokeWidth = hexSize * 0.045f,
                     )
                 }
+                for (node in nodes) {
+                    if (!node.lookalike) continue
+                    val (ex, ey) = HexMath.axialToPixel(node.q, node.r, hexSize)
+                    drawLine(
+                        color = lookalikeStroke.copy(alpha = 0.55f),
+                        start = Offset.Zero,
+                        end = Offset(ex, ey),
+                        strokeWidth = hexSize * 0.03f,
+                    )
+                }
                 for ((index, branch) in visible.withIndex()) {
                     val direction = HexDirection.spokes[index]
                     val anchor = labelAnchor(direction, hexSize)
@@ -170,12 +182,34 @@ fun HexMap(
                     )
                 }
                 for (node in nodes) {
+                    if (node.lookalike) {
+                        val direction = HexDirection.spokes.first { it.q == node.q && it.r == node.r }
+                        val anchor = labelAnchor(direction, hexSize)
+                        drawCircle(color = lookalikeStroke, radius = radius * 0.28f, center = anchor)
+                        val badge = textMeasurer.measure(
+                            text = "≈",
+                            style = TextStyle(
+                                color = if (dark) Color(0xFF141311) else Color.White,
+                                fontSize = (radius * 0.38f / this.density / this.fontScale).sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                        )
+                        drawText(
+                            badge,
+                            topLeft = Offset(
+                                anchor.x - badge.size.width / 2f,
+                                anchor.y - badge.size.height / 2f,
+                            ),
+                        )
+                    }
+                }
+                for (node in nodes) {
                     val (x, y) = HexMath.axialToPixel(node.q, node.r, hexSize)
-                    val isCenter = node.branchIndex == null
-                    val stroke = if (isCenter) {
-                        centerFill
-                    } else {
-                        branchColors[node.branchIndex ?: 0]
+                    val isCenter = node.branchIndex == null && !node.lookalike
+                    val stroke = when {
+                        isCenter -> centerFill
+                        node.lookalike -> lookalikeStroke
+                        else -> branchColors[node.branchIndex ?: 0]
                     }
                     val path = hexPath(x, y, radius)
                     drawPath(path, color = if (isCenter) centerFill else cellFill)

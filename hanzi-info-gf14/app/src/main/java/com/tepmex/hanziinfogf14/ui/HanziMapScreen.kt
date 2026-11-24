@@ -39,7 +39,10 @@ fun HanziMapScreen(viewModel: MapViewModel) {
     val copied = stringResource(R.string.link_copied)
     val clipboard = LocalClipboardManager.current
 
-    BackHandler(enabled = viewModel.canGoBack) {
+    BackHandler(enabled = viewModel.settingsOpen) {
+        viewModel.closeSettings()
+    }
+    BackHandler(enabled = !viewModel.settingsOpen && viewModel.canGoBack) {
         viewModel.back()
     }
 
@@ -68,6 +71,10 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (viewModel.settingsOpen) {
+                SettingsScreen(viewModel)
+                return@Column
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -78,6 +85,9 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 Row {
+                    TextButton(onClick = viewModel::openSettings) {
+                        Text(stringResource(R.string.settings))
+                    }
                     if (viewModel.canGoBack) {
                         TextButton(onClick = viewModel::back) {
                             Text(stringResource(R.string.back))
@@ -115,7 +125,7 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                center.isNotEmpty() && !known && catalog != null -> {
+                center.isNotEmpty() && !known -> {
                     Text(
                         stringResource(R.string.missing),
                         color = MaterialTheme.colorScheme.error,
@@ -127,7 +137,7 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                center.isNotEmpty() && known && catalog != null -> {
+                center.isNotEmpty() && known -> {
                     val parts = catalog.componentsOf(center)
                         .joinToString(" + ") { ComponentGlyph.display(it) }
                     Text(
@@ -162,6 +172,35 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                     )
                 }
             }
+            if (viewModel.embeddingError != null) {
+                Text(
+                    stringResource(R.string.embedding_failed, viewModel.embeddingError ?: ""),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (center.isNotEmpty() && catalog != null) {
+                LookalikeStatus(viewModel)
+                val lookalikeCells = HexLayout.place(center, branches, viewModel.lookalikes)
+                    .filter { it.lookalike }
+                if (lookalikeCells.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.lookalikes_caption),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        lookalikeCells.forEach { cell ->
+                            Text(
+                                text = stringResource(R.string.lookalike_chip, cell.hanzi),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            }
             if (center.isEmpty()) {
                 Text(
                     text = stringResource(R.string.empty_map),
@@ -175,6 +214,7 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                 HexMap(
                     center = center,
                     branches = branches,
+                    lookalikes = viewModel.lookalikes,
                     contentDescription = stringResource(R.string.map_description, center),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -183,5 +223,27 @@ fun HanziMapScreen(viewModel: MapViewModel) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LookalikeStatus(viewModel: MapViewModel) {
+    when (val note = viewModel.lookalikeNote) {
+        null -> Unit
+        LookalikeNote.NeedsModel -> Text(
+            stringResource(R.string.lookalikes_need_model),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LookalikeNote.Computing -> Text(
+            stringResource(R.string.lookalikes_computing),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        is LookalikeNote.Failed -> Text(
+            stringResource(R.string.lookalikes_failed, note.message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }

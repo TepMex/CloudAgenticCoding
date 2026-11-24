@@ -11,7 +11,24 @@
     <string name="back">Назад</string>
     <string name="copy_link">Ссылка</string>
     <string name="link_copied">Ссылка скопирована</string>
-    <string name="empty_map">Введите иероглиф — он встанет в центр. Ветки покажут знаки, которые отличаются одним компонентом.</string>
+    <string name="empty_map">Введите иероглиф — он встанет в центр. Ветки покажут знаки, которые отличаются одним компонентом. Свободные стороны — ближайшие по картинке знака.</string>
+    <string name="settings">Настройки</string>
+    <string name="settings_title">Модель</string>
+    <string name="settings_body">Ближайшие по картинке иероглифы из списка 3500 уже посчитаны моделью EmbeddingGemma 2 и лежат в приложении. Сама модель LiteRT (текст и изображения, около 370 МБ, Apache-2.0) в APK не входит. Кнопка скачивает её с Hugging Face. Она нужна, чтобы посчитать картинку иероглифа, которого нет в списке.</string>
+    <string name="download_model">Скачать модель</string>
+    <string name="model_downloading">Скачивание… %1$d%%</string>
+    <string name="model_ready">Модель скачана</string>
+    <string name="model_absent">Модель не скачана</string>
+    <string name="model_failed">Не удалось скачать: %1$s</string>
+    <string name="delete_model">Удалить модель</string>
+    <string name="cancel_download">Отмена</string>
+    <string name="close_settings">Закрыть</string>
+    <string name="lookalikes_caption">Свободные стороны — ближайшие по картинке знака</string>
+    <string name="lookalike_chip">≈ %1$s</string>
+    <string name="lookalikes_need_model">Для знака вне списка похожие появятся после загрузки модели в настройках.</string>
+    <string name="lookalikes_computing">Считаю похожие по картинке…</string>
+    <string name="lookalikes_failed">Не удалось посчитать похожие: %1$s</string>
+    <string name="embedding_failed">Не удалось прочитать базу похожих знаков: %1$s</string>
     <string name="map_description">Гексагональная карта для %1$s</string>
     <string name="components_line">%1$s</string>
 </resources>

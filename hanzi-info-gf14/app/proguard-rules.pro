@@ -1,3 +1,6 @@
 # kotlinx.serialization Json is used from the catalog loader.
 -keep class kotlinx.serialization.json.** { *; }
 -dontwarn kotlinx.serialization.**
+
+-keep class com.google.ai.edge.litertlm.** { *; }
+-dontwarn com.google.ai.edge.litertlm.**
