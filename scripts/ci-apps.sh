@@ -52,6 +52,7 @@ ANDROID_APPS=(
   my-week
   ear-eye-t
   pacholli
+  assumptions
 )
 
 # Repo-root files copied onto the site on every publish.

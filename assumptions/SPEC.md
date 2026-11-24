@@ -35,6 +35,7 @@ An apprehension is not a separate record. It is an expectation whose pleasure sc
 8. A score of **0** is neither positive nor negative. If the before-score or the after-score is 0, the expectation is counted as neutral and is not placed in a quadrant. Expectations with no after-score are counted as not yet happened, also outside the matrix.
 9. Delete an emotion entry or an expectation after confirmation.
 10. Data stays on the device. No account, no network.
+11. Release and debug builds sign with the shared sideload keystore when it is present. GitHub Pages publishes `/assumptions/` and `assumptions.apk`. `scripts/ci-apps.sh` lists `assumptions` in `ANDROID_APPS`. The root README links that page.
 
 ## Wheel
 
@@ -82,6 +83,7 @@ There is no network API and no exported provider.
 | Expectations tab | «Новое ожидание», list split into «Ещё впереди» and «Уже произошли», «Случилось» opens the after-score |
 | Report tab | 2×2 matrix, legend, pending count, neutral count. Tapping a cell lists the expectations in that quadrant |
 | Back | Closes the expectation editor, then clears a selected quadrant |
+| Pages | `https://tepmex.github.io/CloudAgenticCoding/assumptions/` serves `site/index.html` and `assumptions.apk` |
 
 Pleasure control: eleven equal segments labeled −5…+5, ends captioned «неприятно» and «приятно».
 
@@ -158,4 +160,5 @@ The report matrix reads row-then-column: the top-left cell is negative→negativ
 8. An expectation cannot be saved with a blank event, a blank outcome, or without a score. Scores outside −5…+5 are rejected.
 9. Resolving an expectation stores the after-score. The card moves from «Ещё впереди» to «Уже произошли».
 10. Report counts match the quadrant table, including the zero and pending cases. Cell colors are the four colors above.
-11. `./gradlew :app:testDebugUnitTest` covers the wheel reducer, the layout, and the report counts. `./gradlew :app:assembleDebug` produces an installable debug APK.
+11. `./gradlew :app:testDebugUnitTest` covers the wheel reducer, the layout, and the report counts. `./gradlew :app:assembleRelease` produces the sideload APK that Pages publishes.
+12. `assumptions/site/index.html` links `assumptions.apk` and contains the `deploy-footer` marker. Changing `assumptions/**` selects this app in the deploy plan.

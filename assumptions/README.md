@@ -9,8 +9,12 @@ See [SPEC.md](SPEC.md).
 ## Build
 
 ```bash
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
+cd assumptions
+./gradlew :app:testDebugUnitTest assembleRelease
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Package: `com.tepmex.assumptions`. Min SDK 34.
+Package: `com.tepmex.assumptions`. Min SDK 34.
+
+The release APK is signed with the shared sideload keystore when `sideload.keystore` is present. Install the new APK over the previous build. Uninstall once only if an older build was signed with a different key.
+
+On push to `master`, `.github/workflows/deploy.yml` builds the release APK when `assumptions/**` changes, checks the sideload certificate, and publishes the landing page and `assumptions.apk` at `/assumptions/`.
