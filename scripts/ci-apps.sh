@@ -51,6 +51,7 @@ ANDROID_APPS=(
   inbox
   my-week
   ear-eye-t
+  pacholli
 )
 
 # Repo-root files copied onto the site on every publish.
