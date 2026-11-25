@@ -1,0 +1,11 @@
+---
+description: Keep root README app links in alphabetical order.
+alwaysApply: true
+---
+
+When adding or editing an app in the root `README.md`:
+
+1. Insert the new row in the **Apps** table in alphabetical order by folder slug (the text in the first column and the link label). Use plain ASCII order: hyphens sort before letters, and a shorter slug that is a prefix of a longer one comes first (`hanzi-info` before `hanzi-info-gf14`, `zou-lu-shang` before `zou-lu-shang-2`).
+2. Do not append a new link at the end of the table.
+3. If the app is an Android APK, add its folder name to the parenthetical APK list in the same alphabetical order.
+4. Leave the live-site base URL and the prose around the table as they are. Sort only the catalog entries.
