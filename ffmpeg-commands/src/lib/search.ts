@@ -1,3 +1,4 @@
+import { appUrl } from "./app-url.ts";
 import { EMBEDDING_CONTRACT } from "./contract.ts";
 import { loadEmbedder, type Embedder } from "./engine.ts";
 import { readVectorCache, writeVectorCache } from "./idb.ts";
@@ -60,7 +61,7 @@ export async function searchCommands(query: string, k = 6): Promise<SearchResult
 
 async function run() {
   emit({ phase: "corpus" });
-  const corpus = (await fetch("/corpus.json").then(response => {
+  const corpus = (await fetch(appUrl("/corpus.json")).then(response => {
     if (!response.ok) throw new Error("Нет корпуса документации");
     return response.json();
   })) as CorpusFile;
@@ -99,13 +100,13 @@ async function run() {
 }
 
 async function loadShippedVectors(corpus: CorpusFile): Promise<Float32Array[] | null> {
-  const metaResponse = await fetch("/embeddings.json");
+  const metaResponse = await fetch(appUrl("/embeddings.json"));
   if (!metaResponse.ok) return null;
   const meta = (await metaResponse.json()) as EmbeddingMeta;
   if (meta.corpusId !== corpus.id || meta.dim !== corpus.model.outputSize || meta.count !== corpus.chunks.length) {
     return null;
   }
-  const binary = await fetch("/embeddings.f32");
+  const binary = await fetch(appUrl("/embeddings.f32"));
   if (!binary.ok) return null;
   const buffer = await binary.arrayBuffer();
   if (buffer.byteLength !== meta.count * meta.dim * 4) return null;

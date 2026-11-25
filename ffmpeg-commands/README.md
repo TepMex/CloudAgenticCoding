@@ -13,6 +13,14 @@ bun dev
 
 Откройте адрес, который напечатает сервер (порт 4731, если он свободен). Нужен браузер с WebGPU; если GPU-бэкенд не стартует, приложение пробует CPU.
 
+Опубликованная страница: [tepmex.github.io/CloudAgenticCoding/ffmpeg-commands](https://tepmex.github.io/CloudAgenticCoding/ffmpeg-commands/). Сборка для GitHub Pages:
+
+```bash
+bun run build
+```
+
+`dist/` содержит страницу, корпус, матрицу эмбеддингов и wasm LiteRT. Веса модели туда не попадают: их по-прежнему скачивает браузер. В CI путь задаёт `GH_PAGES_PUBLIC_PATH`.
+
 ## Корпус
 
 ```bash

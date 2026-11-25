@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "NODE_ENV=production bun src/index.ts",
+    "build": "bun run build.ts",
     "corpus": "bun scripts/build-corpus.ts",
     "embed": "python3 scripts/embed_corpus.py",
     "test": "bun test"

@@ -4,6 +4,7 @@ import {
   InputOverflowStrategy,
   loadLiteRtLm,
 } from "@litert-lm/core";
+import { appUrl } from "./app-url.ts";
 import { EMBEDDING_CONTRACT } from "./contract.ts";
 
 const CACHE = "ffmpeg-commands-model-v1";
@@ -64,7 +65,7 @@ async function openEngine(model: Blob, backend: Backend): Promise<EmbeddingEngin
 }
 
 export async function loadEmbedder(onProgress: (loaded: number, total: number) => void): Promise<Embedder> {
-  await loadLiteRtLm("/vendor/litertlm/");
+  await loadLiteRtLm(appUrl("/vendor/litertlm/"));
   const model = await cachedModelBlob(EMBEDDING_CONTRACT.modelUrl, onProgress);
   let engine: EmbeddingEngine;
   let backendName = "GPU";

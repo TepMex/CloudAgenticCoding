@@ -20,6 +20,7 @@ The app is for someone who knows what they want to do with a file and wants the 
 ## Interfaces
 
 - Web UI at `/` (Bun + React). Dev server: `bun dev` in `ffmpeg-commands/`.
+- Static build: `bun run build` writes `dist/` (page, corpus, embedding matrix, LiteRT wasm). GitHub Pages publishes that directory at `/CloudAgenticCoding/ffmpeg-commands/`. The client resolves those files from the page URL, so `/` and the Pages path share one client. `GH_PAGES_PUBLIC_PATH` prefixes the bundled script and stylesheet. The model weights are not in `dist/`.
 - `GET /corpus.json` — fragments and the embedding contract (model URL, prefixes, output size).
 - `GET /embeddings.json` — matrix metadata (`corpusId`, `dim`, `count`).
 - `GET /embeddings.f32` — little-endian float32, one 256-d row per corpus chunk, L2-normalized.
@@ -56,3 +57,4 @@ The app is for someone who knows what they want to do with a file and wants the 
 3. `data/embeddings.f32` byte length equals `chunk count × 256 × 4`, and `embeddings.json.corpusId` equals the corpus id.
 4. In the browser, the first visit downloads EmbeddingGemma 2 from Hugging Face (progress in the header). After the runtime check, a task such as «сделать тише» returns a ranked list whose top commands mention volume or an equivalent documented audio adjustment, and the manual link opens the matching section.
 5. The network panel shows the model request going to Hugging Face, not to the app origin. Reloading uses the browser cache for the weights and does not re-embed the corpus when the shipped matrix matches.
+6. `bun run build` produces `dist/index.html`, `corpus.json`, `embeddings.json`, `embeddings.f32`, and `vendor/litertlm/`. With `GH_PAGES_PUBLIC_PATH` set, the built HTML references the script under that path.
