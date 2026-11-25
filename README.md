@@ -16,6 +16,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `byok-assisted-reader` | [byok-assisted-reader](https://tepmex.github.io/CloudAgenticCoding/byok-assisted-reader/) | BYOK-assisted-reader · Chinese EPUB reader with pinyin, sentence structure, and glossary layers (APK) |
 | `chesswatch` | [chesswatch](https://tepmex.github.io/CloudAgenticCoding/chesswatch/) | ChessWatch · Android time tracker (APK) |
 | `china-railways-map` | [china-railways-map](https://tepmex.github.io/CloudAgenticCoding/china_rail_interactive_map.html) | Chinese Railways map with pinyin and hanzi |
+| `ci-yun` | [ci-yun](https://tepmex.github.io/CloudAgenticCoding/ci-yun/) | 词云 · кластеры лексики HSK и Refold на плоскости и в пространстве |
 | `corne-game` | [corne-game](https://tepmex.github.io/CloudAgenticCoding/corne-game/) | Corne · split-keyboard touch-typing trainer (APK) |
 | `ctx-calendar` | [ctx-calendar](https://tepmex.github.io/CloudAgenticCoding/ctx-calendar/) | ctx-calendar · month calendar with gallery photo previews (APK) |
 | `duoshao-qian` | [duoshao-qian](https://tepmex.github.io/CloudAgenticCoding/duoshao-qian/) | 多少钱 · listen to Chinese prices and pay with RMB notes (APK) |

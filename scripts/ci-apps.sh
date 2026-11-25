@@ -10,6 +10,7 @@ WEB_APPS=(
   han-count-me
   sense-of-text
   map-of-chinese
+  ci-yun
   mandarin-kanshu-pengyou
   rth-agriculture
   same-element
