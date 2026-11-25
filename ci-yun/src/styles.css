@@ -23,7 +23,7 @@ body {
 
 button, input { font: inherit; color: inherit; }
 
-.hanzi, .mark, .focus-label, .hover-label strong, .cluster-label {
+.hanzi, .mark, .focus-label, .hover-label strong, .cluster-label, .word-label {
   font-family: "Iowan Old Style", Palatino, "Songti SC", "Noto Serif SC", "STSong", "WenQuanYi Micro Hei", serif;
 }
 
@@ -52,7 +52,7 @@ button, input { font: inherit; color: inherit; }
   overflow: hidden;
 }
 
-.cluster-label, .focus-label, .hover-label {
+.cluster-label, .focus-label, .hover-label, .word-label {
   position: absolute;
   left: 0;
   top: 0;
@@ -67,6 +67,12 @@ button, input { font: inherit; color: inherit; }
 
 .focus-label {
   font-size: 28px;
+}
+
+.word-label {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--paper);
 }
 
 .hover-label[hidden],

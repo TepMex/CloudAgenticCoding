@@ -20,6 +20,7 @@ Audience: a learner browsing these decks by meaning rather than by HSK level or 
 10. A selected sense shows simplified, pinyin, gloss, part of speech, source, HSK tag, cluster name, and nearest neighbors in the embedding space. Neighbors are clickable.
 11. The page is static. No account, no runtime model download, no call to an embedding API from the browser.
 12. GitHub Pages builds the folder `ci-yun` like the other web apps. The Python embedding step is not part of CI.
+13. Zooming the cloud, on the plane or in space, draws each point's simplified word as a caption once that caption would not cover any other word caption. While the captions would cover one another they stay hidden, including on the wide shot. A caption already on screen remains until its glyph box would meet another point's caption, so zooming back out clears the wide shot. The focused word keeps its large caption instead of a second small one. A cluster name that would cover a word caption stays hidden.
 
 ## Interfaces
 
@@ -61,6 +62,7 @@ Example sentences, audio, and images from the decks are not stored.
 - Search box at the top left. Suggestions open as the reader types. Enter or a click centers that sense and zooms in from the wide shot. The centered hanzi is drawn at the focal point. The card lists the gloss and the neighbors.
 - Cluster chips along the bottom, largest first. The active chip dims the other points.
 - Hovering a point shows the headword, pinyin, and gloss.
+- Zooming in places the simplified word above each point that has room. Captions stay off while they would cover one another, so the wide shot keeps the cluster names. A cluster name yields when a word caption would cover it.
 - Copy is Russian. Hanzi use a serif stack that falls back to a CJK system font.
 
 ## Out of scope
@@ -80,3 +82,4 @@ Example sentences, audio, and images from the decks are not stored.
 5. Entering a listed word centers the view on it and opens its card. Entering a string that is not listed shows that it is absent.
 6. Choosing a cluster recenters on that group. **Всё облако** shows the whole cloud again.
 7. `bun run test` passes. `bun run build` emits `dist/index.html`.
+8. The wide shot draws no word captions. After zooming until neighboring captions would sit apart, those points show their simplified words, and the captions do not cover one another.
