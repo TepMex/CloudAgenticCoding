@@ -1,0 +1,21 @@
+{
+  "name": "plan-schetov",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./serve.ts",
+    "build": "bun ./build.ts",
+    "extract": "python3 scripts/extract.py",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "typescript": "^5.9.2"
+  }
+}
