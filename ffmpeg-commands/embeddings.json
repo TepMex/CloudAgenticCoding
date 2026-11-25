@@ -1,0 +1,10 @@
+{
+  "corpusId": "d8e17baf701e5b08",
+  "file": "embeddings.f32",
+  "dim": 256,
+  "count": 1750,
+  "normalized": true,
+  "modelUrl": "https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm/resolve/main/embeddinggemma-2-text-270m.litertlm",
+  "documentPrefix": "task: search result | text: ",
+  "outputSize": 256
+}
