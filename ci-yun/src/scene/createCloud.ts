@@ -1,6 +1,15 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { clusterCentroid, focusPoint, visibleLabels } from "../lib/focus";
+import {
+  boxesOverlap,
+  clusterCentroid,
+  focusPoint,
+  separatedLabels,
+  visibleLabels,
+  WORD_LABEL_GAP,
+  wordGlyph,
+  type GlyphLabel,
+} from "../lib/focus";
 import { glossOf } from "../lib/gloss";
 import type { Cloud, Mode } from "../lib/types";
 
@@ -258,7 +267,22 @@ export function mountCloud(
   hoverLabel.style.visibility = "hidden";
   overlay.append(focusLabel, hoverLabel);
 
+  const glyphs: GlyphLabel[] = new Array(count);
+  for (const word of cloud.words) glyphs[word.id] = wordGlyph(word.id, word.simplified, 0, 0);
+  const candidates: GlyphLabel[] = [];
+  const shownGlyphs: GlyphLabel[] = [];
+  const wordEls: HTMLDivElement[] = [];
+  const wordElById = new Map<number, HTMLDivElement>();
+  const focusObstacle: GlyphLabel = { id: -1, x: 0, y: 0, halfW: 0, halfH: 0 };
+  const obstacles: GlyphLabel[] = [];
+  const clusterBoxSize = new Map<number, { halfW: number; halfH: number }>();
+  let shownWordIds = new Set<number>();
+  let viewStamp = "";
+  let hiddenCaption: HTMLDivElement | null = null;
+
   let state: CloudViewState = { mode: "3d", focusId: null, activeCluster: null, resetToken: -1 };
+  let labelMode: Mode = state.mode;
+  let labelCluster: number | null = state.activeCluster;
   let animating = false;
   let animStart = 0;
   const fromTarget = new THREE.Vector3();
@@ -434,20 +458,127 @@ export function mountCloud(
     animStart = performance.now();
   }
 
-  function projectLabel(point: THREE.Vector3, element: HTMLElement, lift: number): { x: number; y: number; visible: boolean } {
-    camera.getWorldDirection(ahead);
-    const inFront = scratchB.copy(point).sub(camera.position).dot(ahead) > 0;
+  function projectPoint(point: THREE.Vector3): { x: number; y: number; depth: number; visible: boolean } {
+    const depth = scratchB.copy(point).sub(camera.position).dot(ahead);
     const width = canvas.clientWidth || 1;
     const height = canvas.clientHeight || 1;
     const ndc = scratchB.copy(point).project(camera);
     const x = (ndc.x * 0.5 + 0.5) * width;
     const y = (-ndc.y * 0.5 + 0.5) * height;
-    const visible = inFront && ndc.z < 1;
-    element.style.transform = `translate(${x}px, ${y + lift}px) translate(-50%, -50%)`;
-    return { x, y, visible };
+    return { x, y, depth, visible: depth > 0 && ndc.z < 1 && Number.isFinite(x) && Number.isFinite(y) };
+  }
+
+  function projectLabel(point: THREE.Vector3, element: HTMLElement, lift: number): { x: number; y: number; visible: boolean } {
+    const placed = projectPoint(point);
+    element.style.transform = `translate(${placed.x}px, ${placed.y + lift}px) translate(-50%, -50%)`;
+    return placed;
+  }
+
+  function pointRadiusPx(depth: number): number {
+    if (!pointsMaterial.sizeAttenuation) return pointsMaterial.size * 0.5;
+    const height = canvas.clientHeight || 1;
+    return (pointsMaterial.size * height * 0.25) / Math.max(depth, 0.05);
+  }
+
+  function takeWordLabel(index: number): HTMLDivElement {
+    const existing = wordEls[index];
+    if (existing) return existing;
+    const element = document.createElement("div");
+    element.className = "word-label";
+    element.setAttribute("aria-hidden", "true");
+    overlay.insertBefore(element, focusLabel);
+    wordEls[index] = element;
+    return element;
+  }
+
+  function viewKey(): string {
+    const position = camera.position;
+    const target = controls.target;
+    return [
+      state.mode,
+      state.focusId,
+      state.activeCluster,
+      camera.zoom.toFixed(3),
+      position.x.toFixed(3),
+      position.y.toFixed(3),
+      position.z.toFixed(3),
+      target.x.toFixed(3),
+      target.y.toFixed(3),
+      target.z.toFixed(3),
+      canvas.clientWidth,
+      canvas.clientHeight,
+    ].join("|");
   }
 
   function frameLabels(): void {
+    camera.getWorldDirection(ahead);
+    const stamp = viewKey();
+    if (stamp === viewStamp) {
+      placePointerLabels();
+      return;
+    }
+    viewStamp = stamp;
+    const width = canvas.clientWidth || 1;
+    const height = canvas.clientHeight || 1;
+    if (labelMode !== state.mode || labelCluster !== state.activeCluster) {
+      shownWordIds = new Set();
+      labelMode = state.mode;
+      labelCluster = state.activeCluster;
+    }
+
+    candidates.length = 0;
+    obstacles.length = 0;
+    const focusWord = state.focusId == null ? undefined : cloud.words[state.focusId];
+    if (focusWord && state.focusId != null) {
+      const placed = projectPoint(wordVector(state.focusId, scratch));
+      if (placed.visible) {
+        focusObstacle.x = placed.x;
+        focusObstacle.y = placed.y - 22;
+        focusObstacle.halfW = focusWord.simplified.length * 14;
+        focusObstacle.halfH = 16;
+        obstacles.push(focusObstacle);
+      }
+    }
+
+    const pad = 220;
+    for (let id = 0; id < count; id += 1) {
+      if (id === state.focusId) continue;
+      const word = cloud.words[id];
+      const glyph = glyphs[id];
+      if (!word || !glyph) continue;
+      if (state.activeCluster != null && word.cluster !== state.activeCluster) continue;
+      const placed = projectPoint(wordVector(id, scratch));
+      if (!placed.visible) continue;
+      if (placed.x < -pad || placed.y < -pad || placed.x > width + pad || placed.y > height + pad) continue;
+      glyph.x = placed.x;
+      glyph.y = placed.y - pointRadiusPx(placed.depth) - 3 - glyph.halfH;
+      candidates.push(glyph);
+    }
+
+    const visibleIds = separatedLabels(candidates, WORD_LABEL_GAP, shownWordIds, obstacles);
+    shownWordIds = visibleIds;
+    shownGlyphs.length = 0;
+    let slot = 0;
+    wordElById.clear();
+    for (const glyph of candidates) {
+      if (!visibleIds.has(glyph.id)) continue;
+      shownGlyphs.push(glyph);
+      if (glyph.x + glyph.halfW < 0 || glyph.y + glyph.halfH < 0 || glyph.x - glyph.halfW > width || glyph.y - glyph.halfH > height) {
+        continue;
+      }
+      const element = takeWordLabel(slot);
+      slot += 1;
+      if (element.dataset.id !== String(glyph.id)) {
+        element.dataset.id = String(glyph.id);
+        element.textContent = cloud.words[glyph.id]?.simplified ?? "";
+      }
+      element.style.visibility = "visible";
+      element.style.transform = `translate(${glyph.x}px, ${glyph.y}px) translate(-50%, -50%)`;
+      wordElById.set(glyph.id, element);
+    }
+    for (let index = slot; index < wordEls.length; index += 1) wordEls[index]!.style.visibility = "hidden";
+    hiddenCaption = null;
+
     const boxes: { id: number; x: number; y: number; size: number; element: HTMLDivElement }[] = [];
     for (const cluster of cloud.clusters) {
       const element = labelEls.get(cluster.id);
@@ -463,8 +594,28 @@ export function mountCloud(
       boxes.push({ id: cluster.id, x: placed.x, y: placed.y, size: cluster.size, element });
     }
     const shown = visibleLabels(boxes, 58, state.activeCluster ?? undefined);
-    for (const box of boxes) box.element.style.visibility = shown.has(box.id) ? "visible" : "hidden";
+    for (const box of boxes) {
+      let size = clusterBoxSize.get(box.id);
+      if (!size) {
+        const name = cloud.clusters[box.id]?.name ?? "";
+        const widthPx = box.element.offsetWidth || name.length * 8;
+        const heightPx = box.element.offsetHeight || 16;
+        size = { halfW: widthPx / 2, halfH: heightPx / 2 };
+        if (box.element.offsetWidth > 0) clusterBoxSize.set(box.id, size);
+      }
+      const clusterBox: GlyphLabel = { id: box.id, x: box.x, y: box.y, halfW: size.halfW, halfH: size.halfH };
+      const covered = shownGlyphs.some((glyph) => boxesOverlap(clusterBox, glyph, 4));
+      box.element.style.visibility = shown.has(box.id) && !covered ? "visible" : "hidden";
+    }
 
+    placePointerLabels();
+  }
+
+  function placePointerLabels(): void {
+    if (hiddenCaption) {
+      hiddenCaption.style.visibility = "visible";
+      hiddenCaption = null;
+    }
     if (state.focusId != null) {
       wordVector(state.focusId, scratch);
       projectLabel(scratch, focusLabel, -22);
@@ -483,13 +634,19 @@ export function mountCloud(
         wordVector(hovered, scratch);
         const placed = projectLabel(scratch, hoverLabel, -28);
         const rect = canvas.getBoundingClientRect();
-        const near =
-          Math.hypot(placed.x - (lastClientX - rect.left), placed.y + 28 - (lastClientY - rect.top)) < 24;
+        const near = Math.hypot(placed.x - (lastClientX - rect.left), placed.y - (lastClientY - rect.top)) < 24;
         hoverLabel.style.visibility = near && placed.visible ? "visible" : "hidden";
         if (!near) hovered = null;
       }
     } else {
       hoverLabel.style.visibility = "hidden";
+    }
+    if (hovered != null && hoverLabel.style.visibility === "visible") {
+      const caption = wordElById.get(hovered);
+      if (caption) {
+        caption.style.visibility = "hidden";
+        hiddenCaption = caption;
+      }
     }
   }
 
