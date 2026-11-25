@@ -18,6 +18,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `rth-agriculture-android` | [rth-agriculture-android](https://tepmex.github.io/CloudAgenticCoding/rth-agriculture-android/) | Memory Garden · Android WebView wrapper (APK) |
 | `sense-of-text` | [sense-of-text](https://tepmex.github.io/CloudAgenticCoding/sense-of-text/) | Sense of Text · highlight important words (WASM embeddings or LLM) |
 | `map-of-chinese` | [map-of-chinese](https://tepmex.github.io/CloudAgenticCoding/map-of-chinese/) | Map of Chinese · Mandarin characters on an initial × final matrix |
+| `ci-yun` | [ci-yun](https://tepmex.github.io/CloudAgenticCoding/ci-yun/) | 词云 · кластеры лексики HSK и Refold на плоскости и в пространстве |
 | `mandarin-kanshu-pengyou` | [mandarin-kanshu-pengyou](https://tepmex.github.io/CloudAgenticCoding/mandarin-kanshu-pengyou/) | 看书朋友 · local-first Chinese EPUB reading companion |
 | `byok-assisted-reader` | [byok-assisted-reader](https://tepmex.github.io/CloudAgenticCoding/byok-assisted-reader/) | BYOK-assisted-reader · Chinese EPUB reader with pinyin, sentence structure, and glossary layers (APK) |
 | `extensive-reading-tutor` | [extensive-reading-tutor](https://tepmex.github.io/CloudAgenticCoding/extensive-reading-tutor/) | Extensive Reading Tutor · local-first book lessons with a bring-your-own-key model (APK) |

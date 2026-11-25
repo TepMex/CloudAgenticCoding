@@ -1,0 +1,30 @@
+{
+  "name": "ci-yun",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "$npm_execpath ./node_modules/vite/bin/vite.js",
+    "build": "$npm_execpath ./node_modules/typescript/bin/tsc -b && $npm_execpath ./node_modules/vite/bin/vite.js build",
+    "test": "$npm_execpath ./node_modules/vitest/vitest.mjs run && bun test ./scripts/check-db.bun.ts",
+    "preview": "$npm_execpath ./node_modules/vite/bin/vite.js preview"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@types/bun": "latest",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@types/three": "0.170.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.1.2",
+    "vitest": "^3.2.4"
+  }
+}

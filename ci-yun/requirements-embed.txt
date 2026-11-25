@@ -1,0 +1,9 @@
+# CPU rebuild of data/embeddings.sqlite. Install torch from the CPU index first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# The script loads the text tower with transformers (float32). It does not use
+# the image processor, so torchvision is not required.
+transformers>=4.57
+umap-learn
+scikit-learn
+numpy
+zstandard
