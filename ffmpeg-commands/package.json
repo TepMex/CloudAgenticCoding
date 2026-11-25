@@ -1,0 +1,25 @@
+{
+  "name": "ffmpeg-commands",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "NODE_ENV=production bun src/index.ts",
+    "corpus": "bun scripts/build-corpus.ts",
+    "embed": "python3 scripts/embed_corpus.py",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@litert-lm/core": "0.20.0",
+    "bun-plugin-tailwind": "^0.1.2",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4.1.11"
+  }
+}
