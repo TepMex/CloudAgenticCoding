@@ -42,6 +42,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `my-week` | [my-week](https://tepmex.github.io/CloudAgenticCoding/my-week/) | НЕДЕЛЯ · My Week, Monday sprint checklist (APK) |
 | `ear-eye-t` | [ear-eye-t](https://tepmex.github.io/CloudAgenticCoding/ear-eye-t/) | ear-eye-t · unlocked screen time and playing sound (APK) |
 | `pacholli` | [pacholli](https://tepmex.github.io/CloudAgenticCoding/pacholli/) | Pacholli · личные финансы двойной записью, Beancount (APK) |
+| `plan-schetov` | [plan-schetov](https://tepmex.github.io/CloudAgenticCoding/plan-schetov/) | План счетов · матрица 10×10 и проводки по дебету и кредиту для начинающих |
 | `assumptions` | [assumptions](https://tepmex.github.io/CloudAgenticCoding/assumptions/) | Допущения · журнал эмоций, ожиданий и опасений (APK) |
 | `wo-de-luyou` | [wo-de-luyou](https://tepmex.github.io/CloudAgenticCoding/wo-de-luyou/) | wo-de-luyou · 我的旅游 travel dictionary (APK) |
 | `paizhao-unknown-hanzi` | [paizhao-unknown-hanzi](https://tepmex.github.io/CloudAgenticCoding/paizhao-unknown-hanzi/) | 拍照未知汉字 · offline camera OCR for unknown hanzi (APK) |

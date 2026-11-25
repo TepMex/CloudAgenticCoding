@@ -18,6 +18,7 @@ WEB_APPS=(
   vafin-context
   my-ai-recs
   before-reading
+  plan-schetov
 )
 
 ANDROID_APPS=(
