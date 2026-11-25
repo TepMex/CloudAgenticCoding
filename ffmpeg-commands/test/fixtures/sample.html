@@ -1,0 +1,26 @@
+<h2 class="chapter">8 Audio Filters<span class="pull-right"><a href="#Audio-Filters">#</a></span></h2>
+<h3 class="section">8.120 volume<span class="pull-right"><a class="anchor" href="#volume">#</a> <a href="#toc-volume">TOC</a></span></h3>
+<p>Adjust the input audio volume.</p>
+<dl>
+<dt><samp class="option">volume</samp></dt>
+<dd><p>Set audio volume expression.</p></dd>
+</dl>
+<p>Halve the volume of the input:</p>
+<pre class="example-preformatted">ffmpeg -i input.wav -af volume=0.5 output.wav
+</pre>
+<h2 class="chapter">11 Video Filters</h2>
+<h3 class="section">11.80 scale<span class="pull-right"><a href="#scale">#</a></span></h3>
+<p>Scale the input video size and/or convert the image format.</p>
+<h3 class="section">11.81 Examples<span class="pull-right"><a href="#Examples">#</a></span></h3>
+<p>This heading is not a filter.</p>
+<h2 class="chapter">5 Options</h2>
+<h3 class="section">5.4 Main options<span class="pull-right"><a href="#Main-options">#</a></span></h3>
+<dl>
+<dt><samp class="option">-ss position (input/output)</samp></dt>
+<dd>
+<p>Seek to position. Use it to cut from a timestamp.</p>
+<pre>ffmpeg -ss 00:01:00 -i input.mp4 -t 30 -c copy output.mp4</pre>
+</dd>
+<dt><samp class="option">stream_index</samp></dt>
+<dd><p>Not a flag.</p></dd>
+</dl>

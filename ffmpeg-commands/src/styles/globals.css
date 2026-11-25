@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Liberation Sans", "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Liberation Mono", "Noto Sans Mono", ui-monospace, monospace;
+  --color-bg: #0c0f0c;
+  --color-fg: #e7eedf;
+  --color-muted: #8e9986;
+  --color-line: #2a3328;
+  --color-card: #141a13;
+  --color-card-2: #1c241b;
+  --color-acid: #c6f54e;
+  --color-ink: #142006;
+  --color-amber: #e3c27a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 420px at 0% -10%, rgba(198, 245, 78, 0.09), transparent 55%),
+    var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #c6f54e;
+  color: #142006;
+}
