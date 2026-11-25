@@ -20,6 +20,7 @@ WEB_APPS=(
   my-ai-recs
   before-reading
   plan-schetov
+  ffmpeg-commands
 )
 
 ANDROID_APPS=(

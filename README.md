@@ -22,6 +22,7 @@ This repository hosts multiple browser apps and Android APK landing pages. Each 
 | `duoshao-qian` | [duoshao-qian](https://tepmex.github.io/CloudAgenticCoding/duoshao-qian/) | 多少钱 · listen to Chinese prices and pay with RMB notes (APK) |
 | `ear-eye-t` | [ear-eye-t](https://tepmex.github.io/CloudAgenticCoding/ear-eye-t/) | ear-eye-t · unlocked screen time and playing sound (APK) |
 | `extensive-reading-tutor` | [extensive-reading-tutor](https://tepmex.github.io/CloudAgenticCoding/extensive-reading-tutor/) | Extensive Reading Tutor · local-first book lessons with a bring-your-own-key model (APK) |
+| `ffmpeg-commands` | [ffmpeg-commands](https://tepmex.github.io/CloudAgenticCoding/ffmpeg-commands/) | Команды FFmpeg · ранжированные команды по документации, эмбеддинги в браузере |
 | `han-count-android` | [han-count-android](https://tepmex.github.io/CloudAgenticCoding/han-count-android/) | Han Count Me · Android WebView wrapper (APK) |
 | `han-count-me` | [han-count-me](https://tepmex.github.io/CloudAgenticCoding/han-count-me/) | Han Count Me · Chinese classifier / measure-word gate defense |
 | `hanzi-info` | [hanzi-info](https://tepmex.github.io/CloudAgenticCoding/hanzi-info/) | Hanzi Info · phonetic DB (EN/RU UI, Russian glosses) |
